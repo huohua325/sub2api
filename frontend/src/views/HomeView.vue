@@ -9,7 +9,7 @@
       allowfullscreen
     ></iframe>
     <!-- HTML mode - SECURITY: homeContent is admin-only setting, XSS risk is acceptable -->
-    <div v-else v-html="homeContent"></div>
+    <div v-else @click="onHomeContentClick" v-html="homeContent"></div>
   </div>
 
   <!-- Compact Home Page -->
@@ -514,6 +514,25 @@ const siteSubtitle = computed(() => appStore.cachedPublicSettings?.site_subtitle
 const docUrl = computed(() => sanitizeUrl(appStore.cachedPublicSettings?.doc_url || appStore.docUrl || ''))
 const homeContent = computed(() => appStore.cachedPublicSettings?.home_content || '')
 const hasHomeContent = computed(() => homeContent.value.trim().length > 0)
+
+async function onHomeContentClick(event: MouseEvent) {
+  const target = event.target
+  if (!(target instanceof Element)) return
+  const button = target.closest<HTMLButtonElement>('[data-copy]')
+  if (!button) return
+  const block = document.getElementById(button.dataset.copy || '')
+  if (!block) return
+  const original = button.textContent
+  try {
+    await navigator.clipboard.writeText(block.innerText.replace(/\n$/, ''))
+    button.textContent = '已复制'
+  } catch {
+    button.textContent = '请手动选择复制'
+  }
+  window.setTimeout(() => {
+    button.textContent = original
+  }, 1600)
+}
 const compactHomeEnabled = computed(() => appStore.cachedPublicSettings?.compact_home_enabled === true)
 const modelPlazaEnabled = computed(() => isFeatureFlagEnabled(FeatureFlags.modelPlaza))
 

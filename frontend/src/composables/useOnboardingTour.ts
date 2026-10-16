@@ -1,10 +1,13 @@
-import { onMounted, onUnmounted, nextTick } from 'vue'
+import { computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { driver, type Driver, type DriveStep } from 'driver.js'
 import 'driver.js/dist/driver.css'
 import { useAuthStore as useUserStore } from '@/stores/auth'
 import { useOnboardingStore } from '@/stores/onboarding'
+import { useAdminComplianceStore } from '@/stores/adminCompliance'
+import { useAnnouncementStore } from '@/stores/announcements'
 import { useI18n } from 'vue-i18n'
 import { getAdminSteps, getUserSteps } from '@/components/Guide/steps'
+import { isOnboardingBlockedByOverlay } from '@/composables/onboardingGate'
 
 export interface OnboardingOptions {
   storageKey?: string
@@ -15,7 +18,19 @@ export function useOnboardingTour(options: OnboardingOptions) {
   const { t } = useI18n()
   const userStore = useUserStore()
   const onboardingStore = useOnboardingStore()
+  const complianceStore = useAdminComplianceStore()
+  const announcementStore = useAnnouncementStore()
   const storageVersion = 'v4_interactive' // Bump version for new tour type
+  const overlayBlocked = computed(() => isOnboardingBlockedByOverlay({
+    announcementOpen: announcementStore.currentPopup != null,
+    isAdmin: userStore.user?.role === 'admin',
+    complianceVisible: complianceStore.shouldShow,
+    complianceLoading: complianceStore.loading,
+  }))
+  // Step to resume after a compliance dialog or announcement popup closes.
+  // Null means nothing is waiting. Destroying the tour for an overlay must not
+  // mark it as seen.
+  let pendingStartIndex: number | null = null
 
   // Timing constants for better maintainability
   const TIMING = {
@@ -91,7 +106,45 @@ export function useOnboardingTour(options: OnboardingOptions) {
     return false
   }
 
+  const deferTour = (startIndex: number) => {
+    pendingStartIndex = startIndex
+  }
+
+  const suspendActiveTour = () => {
+    if (!driverInstance?.isActive()) return
+    pendingStartIndex = driverInstance.getActiveIndex() ?? 0
+    const instance = driverInstance
+    driverInstance = null
+    instance.destroy()
+  }
+
+  const scheduleDeferredTour = () => {
+    if (pendingStartIndex === null || hasSeen()) {
+      pendingStartIndex = null
+      return
+    }
+    const startIndex = pendingStartIndex
+    if (autoStartTimer) clearTimeout(autoStartTimer)
+    autoStartTimer = setTimeout(() => {
+      autoStartTimer = null
+      if (hasSeen()) {
+        pendingStartIndex = null
+        return
+      }
+      if (overlayBlocked.value) return
+      pendingStartIndex = null
+      void startTour(startIndex)
+    }, TIMING.AUTO_START_DELAY_MS)
+  }
+
   const startTour = async (startIndex = 0) => {
+    if (userStore.isSimpleMode) return
+    if (overlayBlocked.value) {
+      deferTour(startIndex)
+      return
+    }
+    pendingStartIndex = null
+
     // 动态获取当前用户角色和步骤
     const isAdmin = userStore.user?.role === 'admin'
     const isSimpleMode = userStore.isSimpleMode
@@ -99,11 +152,19 @@ export function useOnboardingTour(options: OnboardingOptions) {
 
     // 确保 DOM 就绪
     await nextTick()
+    if (overlayBlocked.value) {
+      deferTour(startIndex)
+      return
+    }
 
     // 如果指定了起始步骤，确保元素可见
     const currentStep = steps[startIndex]
     if (currentStep?.element && typeof currentStep.element === 'string') {
       await ensureElement(currentStep.element, TIMING.ELEMENT_TIMEOUT_MS)
+    }
+    if (overlayBlocked.value) {
+      deferTour(startIndex)
+      return
     }
 
     if (driverInstance) {
@@ -520,6 +581,19 @@ export function useOnboardingTour(options: OnboardingOptions) {
     void startTour()
   }
 
+  watch(overlayBlocked, (blocked) => {
+    if (blocked) {
+      if (autoStartTimer) {
+        clearTimeout(autoStartTimer)
+        autoStartTimer = null
+        if (!hasSeen() && pendingStartIndex === null) deferTour(0)
+      }
+      suspendActiveTour()
+      return
+    }
+    scheduleDeferredTour()
+  })
+
   onMounted(async () => {
     onboardingStore.setControlMethods({
       nextStep,
@@ -528,6 +602,7 @@ export function useOnboardingTour(options: OnboardingOptions) {
 
     if (onboardingStore.isDriverActive()) {
       driverInstance = onboardingStore.getDriverInstance()
+      if (overlayBlocked.value) suspendActiveTour()
       return
     }
 
@@ -543,7 +618,12 @@ export function useOnboardingTour(options: OnboardingOptions) {
     }
 
     if (!options.autoStart || hasSeen()) return
+    if (overlayBlocked.value) {
+      deferTour(0)
+      return
+    }
     autoStartTimer = setTimeout(() => {
+      autoStartTimer = null
       void startTour()
     }, TIMING.AUTO_START_DELAY_MS)
   })

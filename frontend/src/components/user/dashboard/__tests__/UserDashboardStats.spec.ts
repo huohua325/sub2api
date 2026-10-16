@@ -81,6 +81,40 @@ function cardPlatforms(w: VueWrapper): string[] {
   return w.findAll('[data-testid="platform-card"]').map((c) => c.attributes('data-platform') ?? '')
 }
 
+describe('UserDashboardStats Codex score', () => {
+  it('shows a 100-point OpenAI score and hides dollars for ordinary users', () => {
+    const w = mount(UserDashboardStats, {
+      props: {
+        stats: makeStats({ total_actual_cost: 3, today_actual_cost: 1, today_cost: 1, by_platform: [usage('openai', 1), usage('grok', 2)] }),
+        balance: 999,
+        isSimple: false,
+        hideMoney: true,
+        platformQuotas: [quota({ platform: 'openai', weekly_limit_usd: 100, weekly_usage_usd: 20, weekly_window_resets_at: '2026-10-19T16:00:00Z' })],
+      },
+      global: { stubs: { Icon: true } },
+    })
+    expect(w.get('[data-testid="codex-quota-card"]').text()).toContain('80')
+    expect(w.text()).toContain('dashboard.codexQuota.separateFromGrok')
+    expect(w.text()).not.toContain('$999')
+    expect(w.text()).not.toContain('$1.0000')
+    expect(w.text()).toContain('dashboard.codexQuota.remainingOf:{"points":"80"}')
+  })
+
+  it('says Codex quota is not assigned when the OpenAI weekly limit is empty', () => {
+    const w = mount(UserDashboardStats, {
+      props: {
+        stats: makeStats(),
+        balance: 10,
+        isSimple: false,
+        hideMoney: true,
+        platformQuotas: [quota({ platform: 'grok', weekly_limit_usd: 5, weekly_usage_usd: 1 })],
+      },
+      global: { stubs: { Icon: true } },
+    })
+    expect(w.get('[data-testid="codex-quota-card"]').text()).toContain('dashboard.codexQuota.notConfigured')
+  })
+})
+
 describe('UserDashboardStats 按平台拆分', () => {
   it('只有用量的平台才产生卡片；三档全空的限额记录不产生卡片', () => {
     const w = mountStats(

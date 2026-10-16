@@ -20,8 +20,9 @@ describe('resolveDocumentTitle', () => {
     expect(resolveDocumentTitle(undefined, 'My Site')).toBe('My Site')
   })
 
-  it('站点名为空时，回退默认站点名', () => {
-    expect(resolveDocumentTitle('Dashboard', '')).toBe('Dashboard - Sub2API')
+  it('站点名为空时，只保留页面标题', () => {
+    expect(resolveDocumentTitle('Dashboard', '')).toBe('Dashboard')
+    expect(resolveDocumentTitle('Dashboard', '   ')).toBe('Dashboard')
     expect(resolveDocumentTitle(undefined, '   ')).toBe('Sub2API')
   })
 

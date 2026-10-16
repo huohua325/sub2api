@@ -1,8 +1,39 @@
 <template>
   <!-- Row 1: Core Stats -->
   <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+    <!-- Codex score for ordinary users. Dollars stay on the admin console. -->
+    <div v-if="hideMoney" data-testid="codex-quota-card" class="card p-4">
+      <div class="flex items-center gap-3">
+        <div class="rounded-lg bg-emerald-100 p-2 dark:bg-emerald-900/30">
+          <Icon name="chart" size="md" class="text-emerald-600 dark:text-emerald-400" :stroke-width="2" />
+        </div>
+        <div class="min-w-0 flex-1">
+          <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('dashboard.codexQuota.title') }}</p>
+          <p class="text-xl font-bold text-emerald-600 dark:text-emerald-400">
+            <template v-if="!codexQuota.configured">{{ t('dashboard.codexQuota.notConfigured') }}</template>
+            <template v-else-if="codexQuota.disabled || codexQuota.remaining <= 0">0</template>
+            <template v-else>{{ formatCodexPoints(codexQuota.remaining) }}</template>
+          </p>
+          <p class="text-xs text-gray-500 dark:text-gray-400">
+            <template v-if="codexQuota.configured && (codexQuota.disabled || codexQuota.remaining <= 0)">{{ t('dashboard.codexQuota.exhausted') }}</template>
+            <template v-else>{{ t('dashboard.codexQuota.fullMark') }} · {{ t('dashboard.codexQuota.separateFromGrok') }}</template>
+          </p>
+          <div v-if="codexQuota.configured" class="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-dark-700">
+            <div
+              class="h-full rounded-full transition-all"
+              :class="quotaBarClass(codexQuota.usedPercent)"
+              :style="{ width: Math.min(100, codexQuota.usedPercent) + '%' }"
+            />
+          </div>
+          <p v-if="codexQuota.resetsAt" class="mt-1 text-[10px] text-gray-400">
+            {{ t('dashboard.platformQuota.resetsAt', { time: formatResetTime(codexQuota.resetsAt) }) }}
+          </p>
+        </div>
+      </div>
+    </div>
+
     <!-- Balance -->
-    <div v-if="!isSimple" class="card p-4">
+    <div v-if="!isSimple && !hideMoney" class="card p-4">
       <div class="flex items-center gap-3">
         <div class="rounded-lg bg-emerald-100 p-2 dark:bg-emerald-900/30">
           <svg class="h-5 w-5 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -46,7 +77,7 @@
     </div>
 
     <!-- Today Cost -->
-    <div class="card p-4">
+    <div v-if="!hideMoney" class="card p-4">
       <div class="flex items-center gap-3">
         <div class="rounded-lg bg-purple-100 p-2 dark:bg-purple-900/30">
           <Icon name="dollar" size="md" class="text-purple-600 dark:text-purple-400" :stroke-width="2" />
@@ -157,12 +188,12 @@
           <span class="text-sm font-semibold text-gray-900 dark:text-white">
             {{ item.isOther ? t('dashboard.platformOther') : platformLabel(item.platform) }}
           </span>
-          <span class="font-mono text-sm text-purple-600 dark:text-purple-400" :title="t('dashboard.actual')">
+          <span v-if="!hideMoney" class="font-mono text-sm text-purple-600 dark:text-purple-400" :title="t('dashboard.actual')">
             ${{ formatCost(item.total_actual_cost) }}
           </span>
         </div>
         <div class="mt-2 space-y-1 text-xs">
-          <div class="flex items-center justify-between">
+          <div v-if="!hideMoney" class="flex items-center justify-between">
             <span class="text-gray-500 dark:text-gray-400">{{ t('dashboard.todayCost') }}</span>
             <span class="font-mono text-gray-900 dark:text-white">${{ formatCost(item.today_actual_cost) }}</span>
           </div>
@@ -202,7 +233,8 @@
                 <div class="flex items-center justify-between text-xs">
                   <span class="text-gray-600 dark:text-gray-300">{{ t(`dashboard.platformQuota.${w}`) }}</span>
                   <span class="font-mono text-gray-700 dark:text-gray-200">
-                    ${{ formatUsd((quotaVal(item.quota, `${w}_usage_usd`) as number) ?? 0) }} / ${{ formatUsd(quotaVal(item.quota, `${w}_limit_usd`) as number) }}
+                    <template v-if="hideMoney">{{ t('dashboard.codexQuota.remainingOf', { points: formatCodexPoints(windowRemaining(item.quota, w)) }) }}</template>
+                    <template v-else>${{ formatUsd((quotaVal(item.quota, `${w}_usage_usd`) as number) ?? 0) }} / ${{ formatUsd(quotaVal(item.quota, `${w}_limit_usd`) as number) }}</template>
                   </span>
                 </div>
                 <div class="h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-dark-700">
@@ -230,6 +262,7 @@ import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
 import type { PlatformDashboardStats, UserDashboardStats as UserStatsType } from '@/api/usage'
 import type { PlatformQuotaItem } from '@/types'
+import { codexQuotaPoints, formatCodexPoints } from '@/utils/codexQuota'
 
 interface FusedPlatformCard {
   platform: string
@@ -241,12 +274,15 @@ interface FusedPlatformCard {
   quota?: PlatformQuotaItem
 }
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   stats: UserStatsType
   balance: number
   isSimple: boolean
   platformQuotas?: PlatformQuotaItem[] | null
-}>()
+  hideMoney?: boolean
+}>(), {
+  hideMoney: false,
+})
 const { t } = useI18n()
 
 const PLATFORM_LABELS: Record<string, string> = {
@@ -319,7 +355,7 @@ const platformCards = computed<FusedPlatformCard[]>(() => {
   const diffTotal = Math.max(0, total - sumTotal)
   const diffToday = Math.max(0, today - sumToday)
 
-  if (diffTotal > OTHER_THRESHOLD || diffToday > OTHER_THRESHOLD) {
+  if (!props.hideMoney && (diffTotal > OTHER_THRESHOLD || diffToday > OTHER_THRESHOLD)) {
     cards.push({
       platform: '__other__',
       total_actual_cost: diffTotal,
@@ -348,6 +384,20 @@ function quotaVal(q: PlatformQuotaItem | undefined, key: QuotaField): PlatformQu
 function hasAnyLimit(q: PlatformQuotaItem | undefined): boolean {
   if (!q) return false
   return q.daily_limit_usd != null || q.weekly_limit_usd != null || q.monthly_limit_usd != null
+}
+
+const codexQuota = computed(() => {
+  const openai = (props.platformQuotas ?? []).find((item) => item.platform === 'openai')
+  return codexQuotaPoints(openai)
+})
+
+function windowRemaining(q: PlatformQuotaItem | undefined, window: QuotaWindow): number {
+  const limit = quotaVal(q, `${window}_limit_usd`)
+  const usage = quotaVal(q, `${window}_usage_usd`)
+  return codexQuotaPoints({
+    weekly_limit_usd: typeof limit === 'number' ? limit : null,
+    weekly_usage_usd: typeof usage === 'number' ? usage : 0,
+  }).remaining
 }
 
 function calcPercent(usage: number, limit: number): number {

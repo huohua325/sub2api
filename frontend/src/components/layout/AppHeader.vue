@@ -23,6 +23,16 @@
 
       <!-- Right: Announcements + Docs + Language + Subscriptions + Balance + User Dropdown -->
       <div class="flex min-w-0 items-center gap-1 sm:gap-3">
+        <router-link
+          v-if="user"
+          to="/home"
+          :aria-label="t('nav.backHome')"
+          class="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-dark-400 dark:hover:bg-dark-800 dark:hover:text-white"
+        >
+          <Icon name="arrowLeft" size="sm" />
+          <span class="hidden sm:inline">{{ t('nav.backHome') }}</span>
+        </router-link>
+
         <!-- Announcement Bell -->
         <AnnouncementBell v-if="user" />
 
@@ -58,7 +68,7 @@
 
         <!-- Balance Display -->
         <div
-          v-if="user"
+          v-if="user && authStore.isAdmin"
           class="group relative hidden items-center gap-2 rounded-xl bg-primary-50 px-3 py-1.5 dark:bg-primary-900/20 sm:flex"
         >
           <svg
@@ -142,7 +152,7 @@
               </div>
 
               <!-- Balance (mobile only) -->
-              <div class="border-b border-gray-100 px-4 py-2 dark:border-dark-700 sm:hidden">
+              <div v-if="authStore.isAdmin" class="border-b border-gray-100 px-4 py-2 dark:border-dark-700 sm:hidden">
                 <div class="text-xs text-gray-500 dark:text-dark-400">
                   {{ t('common.balance') }}
                 </div>

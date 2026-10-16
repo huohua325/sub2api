@@ -58,7 +58,7 @@
         </p>
       </div>
     </div>
-    <div class="card p-4 flex items-center gap-3">
+    <div v-if="!hideCost" class="card p-4 flex items-center gap-3">
       <div class="rounded-lg bg-green-100 p-2 dark:bg-green-900/30 text-green-600">
         <Icon name="dollar" size="md" />
       </div>
@@ -99,9 +99,11 @@ const props = withDefaults(defineProps<{
   stats: (AdminUsageStatsResponse | UsageStatsResponse) | null
   showAccountCost?: boolean
   strikeStandardCost?: boolean
+  hideCost?: boolean
 }>(), {
   showAccountCost: true,
   strikeStandardCost: false,
+  hideCost: false,
 })
 
 const { t } = useI18n()

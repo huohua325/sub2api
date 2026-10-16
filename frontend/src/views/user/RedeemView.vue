@@ -2,7 +2,7 @@
   <AppLayout>
     <div class="mx-auto max-w-2xl space-y-6">
       <!-- Current Balance Card -->
-      <div class="card overflow-hidden">
+      <div v-if="showMoney" class="card overflow-hidden">
         <div class="bg-gradient-to-br from-primary-500 to-primary-600 px-6 py-8 text-center">
           <div
             class="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm"
@@ -98,8 +98,11 @@
                 <div class="mt-2 text-sm text-emerald-700 dark:text-emerald-400">
                   <p>{{ redeemResult.message }}</p>
                   <div class="mt-3 space-y-1">
-                    <p v-if="redeemResult.type === 'balance'" class="font-medium">
+                    <p v-if="redeemResult.type === 'balance' && showMoney" class="font-medium">
                       {{ t('redeem.added') }}: ${{ redeemResult.value.toFixed(2) }}
+                    </p>
+                    <p v-else-if="redeemResult.type === 'balance'" class="font-medium">
+                      {{ t('redeem.balanceRecorded') }}
                     </p>
                     <p v-else-if="redeemResult.type === 'concurrency'" class="font-medium">
                       {{ t('redeem.added') }}: {{ redeemResult.value }}
@@ -114,7 +117,7 @@
                         }})</span
                       >
                     </p>
-                    <p v-if="redeemResult.new_balance !== undefined">
+                    <p v-if="showMoney && redeemResult.new_balance !== undefined">
                       {{ t('redeem.newBalance') }}:
                       <span class="font-semibold">${{ redeemResult.new_balance.toFixed(2) }}</span>
                     </p>
@@ -382,6 +385,7 @@ const appStore = useAppStore()
 const subscriptionStore = useSubscriptionStore()
 
 const user = computed(() => authStore.user)
+const showMoney = computed(() => authStore.isAdmin)
 
 const redeemCode = ref('')
 const submitting = ref(false)
@@ -435,6 +439,9 @@ const getHistoryItemTitle = (item: RedeemHistoryItem) => {
 }
 
 const formatHistoryValue = (item: RedeemHistoryItem) => {
+  if (isBalanceType(item.type) && !showMoney.value) {
+    return t('redeem.balanceRecorded')
+  }
   if (isBalanceType(item.type)) {
     const sign = item.value >= 0 ? '+' : ''
     return `${sign}$${item.value.toFixed(2)}`

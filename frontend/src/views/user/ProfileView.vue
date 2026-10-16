@@ -6,6 +6,7 @@
     >
       <ProfileInfoCard
         :user="user"
+        :hide-balance="!authStore.isAdmin"
         :linuxdo-enabled="linuxdoOAuthEnabled"
         :dingtalk-enabled="dingtalkOAuthEnabled"
         :oidc-enabled="oidcOAuthEnabled"
@@ -35,7 +36,7 @@
       <ProfilePasswordForm />
 
       <ProfileBalanceNotifyCard
-        v-if="user && balanceLowNotifyEnabled"
+        v-if="user && authStore.isAdmin && balanceLowNotifyEnabled"
         :enabled="user.balance_notify_enabled ?? true"
         :threshold="user.balance_notify_threshold"
         :extra-emails="user.balance_notify_extra_emails ?? []"

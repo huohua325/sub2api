@@ -60,6 +60,7 @@
 
             <div class="grid gap-3 sm:grid-cols-3">
               <div
+                v-if="!hideBalance"
                 data-testid="profile-overview-metric-balance"
                 class="rounded-2xl bg-white/85 px-4 py-3 shadow-sm ring-1 ring-white/70 dark:bg-dark-900/60 dark:ring-dark-700"
               >
@@ -197,6 +198,7 @@ const props = withDefaults(defineProps<{
   wechatEnabled?: boolean
   wechatOpenEnabled?: boolean
   wechatMpEnabled?: boolean
+  hideBalance?: boolean
 }>(), {
   linuxdoEnabled: false,
   dingtalkEnabled: false,
@@ -205,6 +207,7 @@ const props = withDefaults(defineProps<{
   wechatEnabled: false,
   wechatOpenEnabled: undefined,
   wechatMpEnabled: undefined,
+  hideBalance: false,
 })
 
 const { t } = useI18n()

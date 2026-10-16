@@ -1,7 +1,7 @@
 <template>
   <AppLayout>
     <div class="space-y-6">
-      <UsageStatsCards :stats="usageStats" :show-account-cost="false" :strike-standard-cost="true" />
+      <UsageStatsCards :stats="usageStats" :show-account-cost="false" :strike-standard-cost="true" :hide-cost="!showMoney" />
 
       <div class="space-y-4">
         <div class="card p-4">
@@ -29,7 +29,7 @@
             :model-stats="requestedModelStats"
             :loading="modelStatsLoading"
             :show-source-toggle="false"
-            :show-metric-toggle="true"
+            :show-metric-toggle="showMoney"
             :enable-breakdown="false"
             :show-account-cost="false"
             :start-date="startDate"
@@ -39,7 +39,7 @@
             v-model:metric="groupDistributionMetric"
             :group-stats="groupStats"
             :loading="chartsLoading"
-            :show-metric-toggle="true"
+            :show-metric-toggle="showMoney"
             :enable-breakdown="false"
             :show-account-cost="false"
             :start-date="startDate"
@@ -56,7 +56,7 @@
             :endpoint-path-stats="endpointPathStats"
             :loading="endpointStatsLoading"
             :show-source-toggle="false"
-            :show-metric-toggle="true"
+            :show-metric-toggle="showMoney"
             :enable-breakdown="false"
             :title="t('usage.endpointDistribution')"
             :start-date="startDate"
@@ -222,6 +222,7 @@
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
+import { showConsoleMoney } from '@/utils/showConsoleMoney'
 import { FeatureFlags, resolveFeatureFlag } from '@/utils/featureFlags'
 import { keysAPI, usageAPI, userGroupsAPI } from '@/api'
 import AppLayout from '@/components/layout/AppLayout.vue'
@@ -257,6 +258,7 @@ import { COMMON_ERROR_STATUS_CODES } from '@/utils/errorBadges'
 
 const { t } = useI18n()
 const appStore = useAppStore()
+const showMoney = computed(() => showConsoleMoney())
 
 type DistributionMetric = 'tokens' | 'actual_cost'
 type EndpointSource = 'inbound' | 'upstream' | 'path'
@@ -665,9 +667,7 @@ const exportToCSV = async () => {
       'Output Tokens',
       'Cache Read Tokens',
       'Cache Creation Tokens',
-      'Rate Multiplier',
-      'Billed Cost',
-      'Original Cost',
+      ...(showMoney.value ? ['Rate Multiplier', 'Billed Cost', 'Original Cost'] : []),
       'First Token (ms)',
       'Duration (ms)',
     ]
@@ -684,9 +684,7 @@ const exportToCSV = async () => {
       log.output_tokens,
       log.cache_read_tokens,
       log.cache_creation_tokens,
-      log.rate_multiplier,
-      log.actual_cost.toFixed(8),
-      log.total_cost.toFixed(8),
+      ...(showMoney.value ? [log.rate_multiplier, log.actual_cost.toFixed(8), log.total_cost.toFixed(8)] : []),
       log.first_token_ms ?? '',
       log.duration_ms ?? '',
     ].map(escapeCSVValue))
@@ -724,7 +722,7 @@ const allColumns = computed<Column[]>(() => [
   { key: 'stream', label: t('usage.type'), sortable: false },
   { key: 'billing_mode', label: t('admin.usage.billingMode'), sortable: false },
   { key: 'tokens', label: t('usage.tokens'), sortable: false },
-  { key: 'cost', label: t('usage.cost'), sortable: false },
+  ...(showMoney.value ? [{ key: 'cost', label: t('usage.cost'), sortable: false }] : []),
   { key: 'latency', label: t('usage.latency'), sortable: false },
   { key: 'created_at', label: t('usage.time'), sortable: true },
   { key: 'user_agent', label: t('usage.userAgent'), sortable: false },
