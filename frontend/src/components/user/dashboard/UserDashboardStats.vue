@@ -1,33 +1,30 @@
 <template>
   <!-- Row 1: Core Stats -->
   <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
-    <!-- Codex score for ordinary users. Dollars stay on the admin console. -->
-    <div v-if="hideMoney" data-testid="codex-quota-card" class="card p-4">
+    <div
+      v-for="meter in usageMeters"
+      v-show="hideMoney"
+      :key="meter.id"
+      :data-testid="`${meter.id}-usage-card`"
+      class="card p-4"
+    >
       <div class="flex items-center gap-3">
-        <div class="rounded-lg bg-emerald-100 p-2 dark:bg-emerald-900/30">
-          <Icon name="chart" size="md" class="text-emerald-600 dark:text-emerald-400" :stroke-width="2" />
+        <div class="rounded-lg p-2" :class="meter.iconWrap">
+          <Icon name="chart" size="md" :class="meter.icon" :stroke-width="2" />
         </div>
         <div class="min-w-0 flex-1">
-          <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('dashboard.codexQuota.title') }}</p>
-          <p class="text-xl font-bold text-emerald-600 dark:text-emerald-400">
-            <template v-if="!codexQuota.configured">{{ t('dashboard.codexQuota.notConfigured') }}</template>
-            <template v-else-if="codexQuota.disabled || codexQuota.remaining <= 0">0</template>
-            <template v-else>{{ formatCodexPoints(codexQuota.remaining) }}</template>
-          </p>
+          <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ meter.title }}</p>
+          <p class="text-xl font-bold" :class="meter.value">{{ formatCodexPoints(meter.quota.usedPercent) }}%</p>
           <p class="text-xs text-gray-500 dark:text-gray-400">
-            <template v-if="codexQuota.configured && (codexQuota.disabled || codexQuota.remaining <= 0)">{{ t('dashboard.codexQuota.exhausted') }}</template>
-            <template v-else>{{ t('dashboard.codexQuota.fullMark') }} · {{ t('dashboard.codexQuota.separateFromGrok') }}</template>
+            {{ meter.quota.configured && (meter.quota.disabled || meter.quota.usedPercent >= 100) ? t('dashboard.codexQuota.exhausted') : t('dashboard.codexQuota.used') }}
           </p>
-          <div v-if="codexQuota.configured" class="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-dark-700">
+          <div class="mt-2 h-1 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-dark-700">
             <div
               class="h-full rounded-full transition-all"
-              :class="quotaBarClass(codexQuota.usedPercent)"
-              :style="{ width: Math.min(100, codexQuota.usedPercent) + '%' }"
+              :class="quotaBarClass(meter.quota.usedPercent)"
+              :style="{ width: Math.min(100, meter.quota.usedPercent) + '%' }"
             />
           </div>
-          <p v-if="codexQuota.resetsAt" class="mt-1 text-[10px] text-gray-400">
-            {{ t('dashboard.platformQuota.resetsAt', { time: formatResetTime(codexQuota.resetsAt) }) }}
-          </p>
         </div>
       </div>
     </div>
@@ -233,7 +230,7 @@
                 <div class="flex items-center justify-between text-xs">
                   <span class="text-gray-600 dark:text-gray-300">{{ t(`dashboard.platformQuota.${w}`) }}</span>
                   <span class="font-mono text-gray-700 dark:text-gray-200">
-                    <template v-if="hideMoney">{{ t('dashboard.codexQuota.remainingOf', { points: formatCodexPoints(windowRemaining(item.quota, w)) }) }}</template>
+                    <template v-if="hideMoney">{{ formatCodexPoints(windowUsedPercent(item.quota, w)) }}%</template>
                     <template v-else>${{ formatUsd((quotaVal(item.quota, `${w}_usage_usd`) as number) ?? 0) }} / ${{ formatUsd(quotaVal(item.quota, `${w}_limit_usd`) as number) }}</template>
                   </span>
                 </div>
@@ -386,18 +383,37 @@ function hasAnyLimit(q: PlatformQuotaItem | undefined): boolean {
   return q.daily_limit_usd != null || q.weekly_limit_usd != null || q.monthly_limit_usd != null
 }
 
-const codexQuota = computed(() => {
-  const openai = (props.platformQuotas ?? []).find((item) => item.platform === 'openai')
-  return codexQuotaPoints(openai)
-})
+function platformQuota(platform: string) {
+  const row = (props.platformQuotas ?? []).find((item) => item.platform === platform)
+  return codexQuotaPoints(row)
+}
 
-function windowRemaining(q: PlatformQuotaItem | undefined, window: QuotaWindow): number {
+const usageMeters = computed(() => [
+  {
+    id: 'codex',
+    title: t('dashboard.codexQuota.codex'),
+    quota: platformQuota('openai'),
+    iconWrap: 'bg-emerald-100 dark:bg-emerald-900/30',
+    icon: 'text-emerald-600 dark:text-emerald-400',
+    value: 'text-emerald-600 dark:text-emerald-400',
+  },
+  {
+    id: 'grok',
+    title: t('dashboard.codexQuota.grok'),
+    quota: platformQuota('grok'),
+    iconWrap: 'bg-amber-100 dark:bg-amber-900/30',
+    icon: 'text-amber-600 dark:text-amber-400',
+    value: 'text-amber-600 dark:text-amber-400',
+  },
+])
+
+function windowUsedPercent(q: PlatformQuotaItem | undefined, window: QuotaWindow): number {
   const limit = quotaVal(q, `${window}_limit_usd`)
   const usage = quotaVal(q, `${window}_usage_usd`)
   return codexQuotaPoints({
     weekly_limit_usd: typeof limit === 'number' ? limit : null,
     weekly_usage_usd: typeof usage === 'number' ? usage : 0,
-  }).remaining
+  }).usedPercent
 }
 
 function calcPercent(usage: number, limit: number): number {
