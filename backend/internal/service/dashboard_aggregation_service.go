@@ -405,6 +405,14 @@ func (s *DashboardAggregationService) maybeCleanupRetention(ctx context.Context,
 	}
 }
 
+// RequestRetentionDays 是周报导出和清理任务共用的用量保留天数。
+func (s *DashboardAggregationService) RequestRetentionDays(ctx context.Context) (int, error) {
+	if s == nil {
+		return 0, fmt.Errorf("dashboard aggregation service is nil")
+	}
+	return s.requestRetentionDays(ctx)
+}
+
 func (s *DashboardAggregationService) requestRetentionDays(ctx context.Context) (int, error) {
 	days := s.cfg.Retention.UsageLogsDays
 	if !s.cfg.Enabled {

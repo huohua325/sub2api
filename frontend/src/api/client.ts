@@ -111,11 +111,19 @@ apiClient.interceptors.response.use(
 
     // Handle common errors
     if (error.response) {
-      const { status, data } = error.response
+      const { status } = error.response
+      let body: unknown = error.response.data
       const url = String(error.config?.url || '')
+      if (body instanceof Blob) {
+        try {
+          body = JSON.parse(await body.text()) as unknown
+        } catch {
+          // 非 JSON 的二进制错误保持原样，调用方使用 HTTP 状态文案。
+        }
+      }
 
       // Validate `data` shape to avoid HTML error pages breaking our error handling.
-      const apiData = (typeof data === 'object' && data !== null ? data : {}) as Record<string, any>
+      const apiData = (typeof body === 'object' && body !== null ? body : {}) as Record<string, any>
 
       // Ops monitoring disabled: treat as feature-flagged 404, and proactively redirect away
       // from ops pages to avoid broken UI states.

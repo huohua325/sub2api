@@ -509,6 +509,21 @@ export default {
     usage: {
       title: '使用记录',
       description: '查看和管理所有用户的使用记录',
+      weeklyExport: {
+        title: '周用量汇总',
+        description: '按网关周汇总（周一 00:00 到下周一 00:00，时区由服务器给出）。不是逐条使用记录。目录价 USD 和实扣 USD 是网关内部美元，不是人民币，也不是订阅发票。下载的是 zip，解压后有两份 CSV，用 Excel 直接打开。官方百分比变化只在同一个官方重置时间之内的两次导出之间可比。文件表头是中文。',
+        week: '网关周',
+        currentSuffix: '（本周）',
+        download: '导出周报',
+        downloading: '导出中…',
+        success: '周报已开始下载',
+        failed: '周报导出失败',
+        busy: '已有周报导出在进行',
+        filterHint: '结束日当天包含在内。分组和账号留空表示全部。选择母账号时，影子账号的用量算在一起。这份 CSV 只汇总用量，不对比官方周额度，也不重算学生周限额。',
+        filterDownload: '导出筛选',
+        filterSuccess: '筛选结果已开始下载',
+        filterFailed: '筛选导出失败'
+      },
       userFilter: '用户',
       searchUserPlaceholder: '按邮箱搜索用户...',
       searchApiKeyPlaceholder: '按名称搜索 API 密钥...',

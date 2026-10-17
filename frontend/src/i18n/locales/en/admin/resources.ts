@@ -511,6 +511,21 @@ export default {
     // Usage Records
     usage: {
       title: 'Usage Records',
+      weeklyExport: {
+        title: 'Weekly usage summary',
+        description: 'Summarized by gateway week (Monday 00:00 to next Monday 00:00, timezone from the server). This is not the per-request log. Catalog USD and deducted USD are internal gateway dollars, not RMB and not an invoice. The download is a zip with two CSV files. Official percent changes are comparable only between two exports inside the same official reset window. CSV headers are Chinese.',
+        week: 'Gateway week',
+        currentSuffix: ' (this week)',
+        download: 'Export weekly report',
+        downloading: 'Exporting…',
+        success: 'Weekly report download started',
+        failed: 'Weekly report export failed',
+        busy: 'A weekly export is already running',
+        filterHint: 'The end date is included. Leave group and account empty for all. A parent account includes its shadow accounts. This CSV totals usage only and does not compare the official weekly allowance or recompute student weekly limits.',
+        filterDownload: 'Export filtered',
+        filterSuccess: 'Filtered export download started',
+        filterFailed: 'Filtered export failed'
+      },
       description: 'View and manage all user usage records',
       userFilter: 'User',
       searchUserPlaceholder: 'Search user by email...',

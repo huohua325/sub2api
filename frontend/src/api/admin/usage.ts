@@ -207,6 +207,64 @@ export async function cancelCleanupTask(taskId: number): Promise<{ id: number; s
   return data
 }
 
+export interface WeeklyExportWeek {
+  start: string
+  end: string
+  current: boolean
+}
+
+export interface WeeklyExportWeeksResponse {
+  timezone: string
+  retention_days: number
+  retention_unlimited: boolean
+  usage_cutoff: string | null
+  weeks: WeeklyExportWeek[]
+}
+
+export async function listWeeklyExportWeeks(): Promise<WeeklyExportWeeksResponse> {
+  const { data } = await apiClient.get<WeeklyExportWeeksResponse>('/admin/usage/weekly-export/weeks')
+  return data
+}
+
+export async function exportWeeklyUsage(weekStart: string): Promise<{ blob: Blob; fileName: string }> {
+  return downloadUsageFile('/admin/usage/weekly-export', { week_start: weekStart }, 'weekly-usage.zip')
+}
+
+export interface FilteredUsageExportParams {
+  start_date: string
+  end_date: string
+  group_id?: number
+  account_id?: number
+}
+
+export async function exportFilteredUsage(params: FilteredUsageExportParams): Promise<{ blob: Blob; fileName: string }> {
+  const query: Record<string, string | number | undefined> = {
+    start_date: params.start_date,
+    end_date: params.end_date,
+    group_id: params.group_id,
+    account_id: params.account_id
+  }
+  return downloadUsageFile('/admin/usage/weekly-export/filtered', query, 'usage-filter.csv')
+}
+
+async function downloadUsageFile(
+  url: string,
+  params: Record<string, string | number | undefined>,
+  fallbackName: string
+): Promise<{ blob: Blob; fileName: string }> {
+  const response = await apiClient.get(url, {
+    params,
+    responseType: 'blob',
+    timeout: 60000
+  })
+  const header = String(response.headers?.['content-disposition'] || '')
+  const matched = header.match(/filename="([^"]+)"/)
+  return {
+    blob: response.data as Blob,
+    fileName: matched?.[1] || fallbackName
+  }
+}
+
 export const adminUsageAPI = {
   list,
   getStats,
@@ -214,7 +272,10 @@ export const adminUsageAPI = {
   searchApiKeys,
   listCleanupTasks,
   createCleanupTask,
-  cancelCleanupTask
+  cancelCleanupTask,
+  listWeeklyExportWeeks,
+  exportWeeklyUsage,
+  exportFilteredUsage
 }
 
 export default adminUsageAPI
