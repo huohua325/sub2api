@@ -39,7 +39,7 @@ describe('GettingStartedView', () => {
     expect(steps).toHaveLength(5)
     expect(wrapper.text()).toContain('guide.steps.quota.title')
     expect(wrapper.text()).not.toContain('余额')
-    const snippet = wrapper.get('[data-testid="guide-snippet"]').text()
+    const snippet = wrapper.find('[data-testid="guide-snippet"]').text()
     expect(snippet).toContain('https://gateway.example/v1/chat/completions')
     expect(snippet).toContain('gpt-5.6-terra')
     expect(snippet).not.toContain('/v1/v1/')
