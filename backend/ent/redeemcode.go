@@ -3,6 +3,7 @@
 package ent
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -41,6 +42,8 @@ type RedeemCode struct {
 	GroupID *int64 `json:"group_id,omitempty"`
 	// ValidityDays holds the value of the "validity_days" field.
 	ValidityDays int `json:"validity_days,omitempty"`
+	// PlatformQuotas holds the value of the "platform_quotas" field.
+	PlatformQuotas map[string]float64 `json:"platform_quotas,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the RedeemCodeQuery when eager-loading is set.
 	Edges        RedeemCodeEdges `json:"edges"`
@@ -85,6 +88,8 @@ func (*RedeemCode) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
+		case redeemcode.FieldPlatformQuotas:
+			values[i] = new([]byte)
 		case redeemcode.FieldValue:
 			values[i] = new(sql.NullFloat64)
 		case redeemcode.FieldID, redeemcode.FieldUsedBy, redeemcode.FieldGroupID, redeemcode.FieldValidityDays:
@@ -185,6 +190,14 @@ func (_m *RedeemCode) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.ValidityDays = int(value.Int64)
 			}
+		case redeemcode.FieldPlatformQuotas:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field platform_quotas", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &_m.PlatformQuotas); err != nil {
+					return fmt.Errorf("unmarshal field platform_quotas: %w", err)
+				}
+			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
 		}
@@ -273,6 +286,9 @@ func (_m *RedeemCode) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("validity_days=")
 	builder.WriteString(fmt.Sprintf("%v", _m.ValidityDays))
+	builder.WriteString(", ")
+	builder.WriteString("platform_quotas=")
+	builder.WriteString(fmt.Sprintf("%v", _m.PlatformQuotas))
 	builder.WriteByte(')')
 	return builder.String()
 }

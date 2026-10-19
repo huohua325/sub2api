@@ -170,6 +170,12 @@ func (_c *RedeemCodeCreate) SetNillableValidityDays(v *int) *RedeemCodeCreate {
 	return _c
 }
 
+// SetPlatformQuotas sets the "platform_quotas" field.
+func (_c *RedeemCodeCreate) SetPlatformQuotas(v map[string]float64) *RedeemCodeCreate {
+	_c.mutation.SetPlatformQuotas(v)
+	return _c
+}
+
 // SetUserID sets the "user" edge to the User entity by ID.
 func (_c *RedeemCodeCreate) SetUserID(id int64) *RedeemCodeCreate {
 	_c.mutation.SetUserID(id)
@@ -348,6 +354,10 @@ func (_c *RedeemCodeCreate) createSpec() (*RedeemCode, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.ValidityDays(); ok {
 		_spec.SetField(redeemcode.FieldValidityDays, field.TypeInt, value)
 		_node.ValidityDays = value
+	}
+	if value, ok := _c.mutation.PlatformQuotas(); ok {
+		_spec.SetField(redeemcode.FieldPlatformQuotas, field.TypeJSON, value)
+		_node.PlatformQuotas = value
 	}
 	if nodes := _c.mutation.UserIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
@@ -597,6 +607,24 @@ func (u *RedeemCodeUpsert) AddValidityDays(v int) *RedeemCodeUpsert {
 	return u
 }
 
+// SetPlatformQuotas sets the "platform_quotas" field.
+func (u *RedeemCodeUpsert) SetPlatformQuotas(v map[string]float64) *RedeemCodeUpsert {
+	u.Set(redeemcode.FieldPlatformQuotas, v)
+	return u
+}
+
+// UpdatePlatformQuotas sets the "platform_quotas" field to the value that was provided on create.
+func (u *RedeemCodeUpsert) UpdatePlatformQuotas() *RedeemCodeUpsert {
+	u.SetExcluded(redeemcode.FieldPlatformQuotas)
+	return u
+}
+
+// ClearPlatformQuotas clears the value of the "platform_quotas" field.
+func (u *RedeemCodeUpsert) ClearPlatformQuotas() *RedeemCodeUpsert {
+	u.SetNull(redeemcode.FieldPlatformQuotas)
+	return u
+}
+
 // UpdateNewValues updates the mutable fields using the new values that were set on create.
 // Using this option is equivalent to using:
 //
@@ -828,6 +856,27 @@ func (u *RedeemCodeUpsertOne) AddValidityDays(v int) *RedeemCodeUpsertOne {
 func (u *RedeemCodeUpsertOne) UpdateValidityDays() *RedeemCodeUpsertOne {
 	return u.Update(func(s *RedeemCodeUpsert) {
 		s.UpdateValidityDays()
+	})
+}
+
+// SetPlatformQuotas sets the "platform_quotas" field.
+func (u *RedeemCodeUpsertOne) SetPlatformQuotas(v map[string]float64) *RedeemCodeUpsertOne {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.SetPlatformQuotas(v)
+	})
+}
+
+// UpdatePlatformQuotas sets the "platform_quotas" field to the value that was provided on create.
+func (u *RedeemCodeUpsertOne) UpdatePlatformQuotas() *RedeemCodeUpsertOne {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.UpdatePlatformQuotas()
+	})
+}
+
+// ClearPlatformQuotas clears the value of the "platform_quotas" field.
+func (u *RedeemCodeUpsertOne) ClearPlatformQuotas() *RedeemCodeUpsertOne {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.ClearPlatformQuotas()
 	})
 }
 
@@ -1228,6 +1277,27 @@ func (u *RedeemCodeUpsertBulk) AddValidityDays(v int) *RedeemCodeUpsertBulk {
 func (u *RedeemCodeUpsertBulk) UpdateValidityDays() *RedeemCodeUpsertBulk {
 	return u.Update(func(s *RedeemCodeUpsert) {
 		s.UpdateValidityDays()
+	})
+}
+
+// SetPlatformQuotas sets the "platform_quotas" field.
+func (u *RedeemCodeUpsertBulk) SetPlatformQuotas(v map[string]float64) *RedeemCodeUpsertBulk {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.SetPlatformQuotas(v)
+	})
+}
+
+// UpdatePlatformQuotas sets the "platform_quotas" field to the value that was provided on create.
+func (u *RedeemCodeUpsertBulk) UpdatePlatformQuotas() *RedeemCodeUpsertBulk {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.UpdatePlatformQuotas()
+	})
+}
+
+// ClearPlatformQuotas clears the value of the "platform_quotas" field.
+func (u *RedeemCodeUpsertBulk) ClearPlatformQuotas() *RedeemCodeUpsertBulk {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.ClearPlatformQuotas()
 	})
 }
 

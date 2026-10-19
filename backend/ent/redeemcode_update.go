@@ -214,6 +214,18 @@ func (_u *RedeemCodeUpdate) AddValidityDays(v int) *RedeemCodeUpdate {
 	return _u
 }
 
+// SetPlatformQuotas sets the "platform_quotas" field.
+func (_u *RedeemCodeUpdate) SetPlatformQuotas(v map[string]float64) *RedeemCodeUpdate {
+	_u.mutation.SetPlatformQuotas(v)
+	return _u
+}
+
+// ClearPlatformQuotas clears the value of the "platform_quotas" field.
+func (_u *RedeemCodeUpdate) ClearPlatformQuotas() *RedeemCodeUpdate {
+	_u.mutation.ClearPlatformQuotas()
+	return _u
+}
+
 // SetUserID sets the "user" edge to the User entity by ID.
 func (_u *RedeemCodeUpdate) SetUserID(id int64) *RedeemCodeUpdate {
 	_u.mutation.SetUserID(id)
@@ -352,6 +364,12 @@ func (_u *RedeemCodeUpdate) sqlSave(ctx context.Context) (_node int, err error) 
 	}
 	if value, ok := _u.mutation.AddedValidityDays(); ok {
 		_spec.AddField(redeemcode.FieldValidityDays, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.PlatformQuotas(); ok {
+		_spec.SetField(redeemcode.FieldPlatformQuotas, field.TypeJSON, value)
+	}
+	if _u.mutation.PlatformQuotasCleared() {
+		_spec.ClearField(redeemcode.FieldPlatformQuotas, field.TypeJSON)
 	}
 	if _u.mutation.UserCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -615,6 +633,18 @@ func (_u *RedeemCodeUpdateOne) AddValidityDays(v int) *RedeemCodeUpdateOne {
 	return _u
 }
 
+// SetPlatformQuotas sets the "platform_quotas" field.
+func (_u *RedeemCodeUpdateOne) SetPlatformQuotas(v map[string]float64) *RedeemCodeUpdateOne {
+	_u.mutation.SetPlatformQuotas(v)
+	return _u
+}
+
+// ClearPlatformQuotas clears the value of the "platform_quotas" field.
+func (_u *RedeemCodeUpdateOne) ClearPlatformQuotas() *RedeemCodeUpdateOne {
+	_u.mutation.ClearPlatformQuotas()
+	return _u
+}
+
 // SetUserID sets the "user" edge to the User entity by ID.
 func (_u *RedeemCodeUpdateOne) SetUserID(id int64) *RedeemCodeUpdateOne {
 	_u.mutation.SetUserID(id)
@@ -783,6 +813,12 @@ func (_u *RedeemCodeUpdateOne) sqlSave(ctx context.Context) (_node *RedeemCode, 
 	}
 	if value, ok := _u.mutation.AddedValidityDays(); ok {
 		_spec.AddField(redeemcode.FieldValidityDays, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.PlatformQuotas(); ok {
+		_spec.SetField(redeemcode.FieldPlatformQuotas, field.TypeJSON, value)
+	}
+	if _u.mutation.PlatformQuotasCleared() {
+		_spec.ClearField(redeemcode.FieldPlatformQuotas, field.TypeJSON)
 	}
 	if _u.mutation.UserCleared() {
 		edge := &sqlgraph.EdgeSpec{

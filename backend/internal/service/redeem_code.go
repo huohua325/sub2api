@@ -21,6 +21,9 @@ type RedeemCode struct {
 	GroupID      *int64
 	ValidityDays int
 
+	// 邀请码注册时覆盖的平台周限额。键是平台，值是 weekly_limit_usd。
+	PlatformWeeklyLimits map[string]float64
+
 	User  *User
 	Group *Group
 }

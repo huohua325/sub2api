@@ -4033,6 +4033,16 @@
 
               <!-- ★ 新增：系统全局默认平台限额矩阵 -->
               <div class="border-t border-gray-100 pt-4 dark:border-dark-700">
+                <div class="mb-4 max-w-xl">
+                  <label class="input-label">{{ t("admin.settings.defaults.platformQuotaWeekMode") }}</label>
+                  <p class="mb-2 text-sm text-gray-500 dark:text-gray-400">
+                    {{ t("admin.settings.defaults.platformQuotaWeekModeHint") }}
+                  </p>
+                  <Select
+                    v-model="form.platform_quota_week_mode"
+                    :options="platformQuotaWeekModeOptions"
+                  />
+                </div>
                 <div class="mb-3">
                   <label class="font-medium text-gray-900 dark:text-white">
                     {{ t("admin.settings.defaults.defaultPlatformQuotas") }}
@@ -9762,6 +9772,7 @@ type SettingsForm = Omit<
   payment_recharge_bonus_notice: string;
   // 系统全局平台限额 map；form 内始终归一化为全部平台对象（模板非空绑定依赖此不变量）
   default_platform_quotas: DefaultPlatformQuotasMap;
+  platform_quota_week_mode: 'registration' | 'monday';
   account_scheduling_thresholds: ReturnType<typeof normalizeAccountSchedulingThresholdsMap>;
 };
 
@@ -9772,6 +9783,11 @@ const schedulingThresholdPlatforms = SCHEDULING_THRESHOLD_PLATFORMS;
 function platformQuotaRows(map: DefaultPlatformQuotasMap | undefined): string[] {
   return listPlatformIds().filter((platform) => !!map?.[platform]);
 }
+
+const platformQuotaWeekModeOptions = computed<SelectOption[]>(() => [
+  { value: 'registration', label: t('admin.settings.defaults.platformQuotaWeekRegistration') },
+  { value: 'monday', label: t('admin.settings.defaults.platformQuotaWeekMonday') },
+])
 
 const form = reactive<SettingsForm>({
   registration_enabled: true,
@@ -9795,6 +9811,7 @@ const form = reactive<SettingsForm>({
   login_agreement_updated_at: "2026-03-31",
   login_agreement_documents: defaultLoginAgreementDocuments(),
   default_balance: 0,
+  platform_quota_week_mode: 'registration',
   default_platform_quotas: normalizePlatformQuotasMap() as DefaultPlatformQuotasMap,
   account_scheduling_thresholds: normalizeAccountSchedulingThresholdsMap(),
   affiliate_rebate_rate: 20,
@@ -11111,6 +11128,7 @@ async function loadSettings() {
     );
     form.payment_recharge_bonus_notice = settings.payment_recharge_bonus_notice || "";
     form.default_platform_quotas = normalizePlatformQuotasMap(settings.default_platform_quotas);
+    form.platform_quota_week_mode = settings.platform_quota_week_mode === 'monday' ? 'monday' : 'registration';
     form.account_scheduling_thresholds = normalizeAccountSchedulingThresholdsMap(
       settings.account_scheduling_thresholds,
     );
@@ -11486,6 +11504,7 @@ async function saveSettings() {
         form.registration_email_domain_quota_enabled,
       promo_code_enabled: form.promo_code_enabled,
       invitation_code_enabled: form.invitation_code_enabled,
+      platform_quota_week_mode: form.platform_quota_week_mode,
       password_reset_enabled: form.password_reset_enabled,
       totp_enabled: form.totp_enabled,
       passkey_enabled: form.passkey_enabled,

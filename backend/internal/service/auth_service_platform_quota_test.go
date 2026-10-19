@@ -45,6 +45,8 @@ func (f *fakeInsertRecorder) UpsertForUser(_ context.Context, _ int64, _ []UserP
 	return nil
 }
 
+func (f *fakeInsertRecorder) QuotaWeekMode(context.Context) string { return "registration" }
+
 func (f *fakeInsertRecorder) ResetExpiredWindow(_ context.Context, _ int64, _ string, _ string, _ time.Time) error {
 	return nil
 }

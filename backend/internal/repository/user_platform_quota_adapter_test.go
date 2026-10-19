@@ -29,6 +29,8 @@ func (f *fakeRepoForAdapter) ListByUser(_ context.Context, _ int64) ([]UserPlatf
 func (f *fakeRepoForAdapter) IncrementUsageWithReset(_ context.Context, _ int64, _ string, _ float64, _ time.Time) error {
 	return nil
 }
+func (f *fakeRepoForAdapter) QuotaWeekMode(context.Context) string { return "registration" }
+
 func (f *fakeRepoForAdapter) ResetExpiredWindow(_ context.Context, userID int64, platform string, window string, newStart time.Time) error {
 	f.resetCalledWith = [4]any{userID, platform, window, newStart}
 	return f.resetErr

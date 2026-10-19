@@ -117,17 +117,18 @@ func TestNextDailyResetTime_FollowsServerTimezone(t *testing.T) {
 	}
 }
 
-// TestNextWeeklyResetTime_FollowsServerTimezone 验证下次周重置 = 下周一北京 0 点。
-func TestNextWeeklyResetTime_FollowsServerTimezone(t *testing.T) {
-	if err := timezone.Init("Asia/Shanghai"); err != nil {
-		t.Fatalf("Init: %v", err)
+// TestNextWeeklyResetFrom_RegistrationAnniversary 验证下次周重置 = 窗口起点加 7 天。
+func TestNextWeeklyResetFrom_RegistrationAnniversary(t *testing.T) {
+	start := time.Date(2026, 5, 20, 9, 30, 0, 0, time.UTC)
+	now := start.Add(48 * time.Hour)
+	want := start.Add(timezone.WeeklyPeriod)
+	if got := nextWeeklyResetFrom(&start, now); !got.Equal(want) {
+		t.Errorf("nextWeeklyResetFrom = %v, want %v", got, want)
 	}
-	t.Cleanup(func() { _ = timezone.Init("UTC") })
-
-	// 北京 2026-05-26（周二）→ 下周一是 2026-06-01
-	now := time.Date(2026, 5, 25, 23, 0, 0, 0, time.UTC) // 北京 5/26 07:00 周二
-	want := time.Date(2026, 6, 1, 0, 0, 0, 0, timezone.Location())
-	if got := nextWeeklyResetTime(now); !got.Equal(want) {
-		t.Errorf("nextWeeklyResetTime = %v, want %v", got, want)
+	if !NeedsWeeklyReset(&start, want) {
+		t.Error("窗口应在起点加 7 天时过期")
+	}
+	if NeedsWeeklyReset(&start, want.Add(-time.Second)) {
+		t.Error("差一秒不到 7 天时不应过期")
 	}
 }

@@ -296,6 +296,7 @@ func (s *AuthService) FinalizeOAuthEmailAccount(
 	s.updateOAuthSignupSource(ctx, user.ID, signupSource)
 	grantPlan := s.resolveSignupGrantPlan(ctx, signupSource)
 	s.assignSubscriptions(ctx, user.ID, grantPlan.Subscriptions, "auto assigned by signup defaults")
+	overlayInvitationWeeklyQuotas(&grantPlan, invitationRedeemCode)
 	// snapshot user × platform quota（fail-open）
 	_ = s.snapshotPlatformQuotaDefaults(ctx, user.ID, &grantPlan)
 	s.bindOAuthAffiliate(ctx, user.ID, affiliateCode)

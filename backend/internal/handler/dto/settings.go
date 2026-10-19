@@ -351,6 +351,8 @@ type SystemSettings struct {
 
 	// 系统全局默认平台配额（key = platform，nil/缺省 = 不限制）
 	DefaultPlatformQuotas map[string]*service.DefaultPlatformQuotaSetting `json:"default_platform_quotas,omitempty"`
+	// registration：从注册时刻起每 7 天。monday：每周一 0 点。
+	PlatformQuotaWeekMode string `json:"platform_quota_week_mode,omitempty"`
 
 	// 系统全局账号自动停调阈值（key = platform，100 = disabled）
 	AccountSchedulingThresholds map[string]int `json:"account_scheduling_thresholds,omitempty"`

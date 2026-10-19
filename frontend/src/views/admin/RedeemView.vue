@@ -137,6 +137,12 @@
                   >({{ row.group.name }})</span
                 >
               </template>
+              <template v-else-if="row.type === 'invitation'">
+                <span class="text-xs text-gray-600 dark:text-gray-300">
+                  OpenAI {{ formatInvitationWeekly(row.platform_quotas?.openai) }}
+                  / Grok {{ formatInvitationWeekly(row.platform_quotas?.grok) }}
+                </span>
+              </template>
               <template v-else>{{ value }}</template>
             </span>
           </template>
@@ -306,10 +312,34 @@
               />
             </div>
             <!-- 邀请码类型：显示提示信息 -->
-            <div v-if="generateForm.type === 'invitation'" class="rounded-lg bg-blue-50 p-3 dark:bg-blue-900/20">
+            <div v-if="generateForm.type === 'invitation'" class="space-y-3 rounded-lg bg-blue-50 p-3 dark:bg-blue-900/20">
               <p class="text-sm text-blue-700 dark:text-blue-300">
                 {{ t('admin.redeem.invitationHint') }}
               </p>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="input-label">{{ t('admin.redeem.invitationOpenAIWeekly') }}</label>
+                  <input
+                    v-model.number="generateForm.openai_weekly"
+                    type="number"
+                    min="0"
+                    step="1"
+                    class="input"
+                    :placeholder="t('admin.redeem.invitationWeeklyPlaceholder')"
+                  />
+                </div>
+                <div>
+                  <label class="input-label">{{ t('admin.redeem.invitationGrokWeekly') }}</label>
+                  <input
+                    v-model.number="generateForm.grok_weekly"
+                    type="number"
+                    min="0"
+                    step="1"
+                    class="input"
+                    :placeholder="t('admin.redeem.invitationWeeklyPlaceholder')"
+                  />
+                </div>
+              </div>
             </div>
             <!-- 订阅类型：显示分组选择和有效天数 -->
             <template v-if="generateForm.type === 'subscription'">
@@ -842,8 +872,25 @@ const generateForm = reactive({
   group_id: null as number | null,
   validity_days: 30,
   expiry_option: 'never' as RedeemCodeExpiryOption,
-  custom_expiry_days: 7
+  custom_expiry_days: 7,
+  openai_weekly: 100 as number | null,
+  grok_weekly: 100 as number | null
 })
+
+function formatInvitationWeekly(value: number | null | undefined): string {
+  return typeof value === 'number' && Number.isFinite(value) ? String(value) : '—'
+}
+
+function invitationPlatformQuotas(): Record<string, number> | undefined {
+  const quotas: Record<string, number> = {}
+  if (typeof generateForm.openai_weekly === 'number' && Number.isFinite(generateForm.openai_weekly) && generateForm.openai_weekly >= 0) {
+    quotas.openai = generateForm.openai_weekly
+  }
+  if (typeof generateForm.grok_weekly === 'number' && Number.isFinite(generateForm.grok_weekly) && generateForm.grok_weekly >= 0) {
+    quotas.grok = generateForm.grok_weekly
+  }
+  return Object.keys(quotas).length > 0 ? quotas : undefined
+}
 
 // 监听类型变化，邀请码类型时自动设置 value 为 0
 watch(
@@ -1046,7 +1093,8 @@ const handleGenerateCodes = async () => {
       generateForm.value,
       generateForm.type === 'subscription' ? generateForm.group_id : undefined,
       generateForm.type === 'subscription' ? generateForm.validity_days : undefined,
-      expiresInDays
+      expiresInDays,
+      generateForm.type === 'invitation' ? invitationPlatformQuotas() : undefined
     )
     showGenerateDialog.value = false
     generatedCodes.value = result

@@ -72,6 +72,9 @@ func (RedeemCode) Fields() []ent.Field {
 			Nillable(),
 		field.Int("validity_days").
 			Default(30),
+		// 邀请码注册时覆盖的平台周限额。键是平台，值是 weekly_limit_usd。空表示沿用系统默认。
+		field.JSON("platform_quotas", map[string]float64{}).
+			Optional(),
 	}
 }
 

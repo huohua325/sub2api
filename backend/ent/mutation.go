@@ -38938,6 +38938,7 @@ type RedeemCodeMutation struct {
 	expires_at       *time.Time
 	validity_days    *int
 	addvalidity_days *int
+	platform_quotas  *map[string]float64
 	clearedFields    map[string]struct{}
 	user             *int64
 	cleareduser      bool
@@ -39547,6 +39548,55 @@ func (m *RedeemCodeMutation) ResetValidityDays() {
 	m.addvalidity_days = nil
 }
 
+// SetPlatformQuotas sets the "platform_quotas" field.
+func (m *RedeemCodeMutation) SetPlatformQuotas(value map[string]float64) {
+	m.platform_quotas = &value
+}
+
+// PlatformQuotas returns the value of the "platform_quotas" field in the mutation.
+func (m *RedeemCodeMutation) PlatformQuotas() (r map[string]float64, exists bool) {
+	v := m.platform_quotas
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPlatformQuotas returns the old "platform_quotas" field's value of the RedeemCode entity.
+// If the RedeemCode object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RedeemCodeMutation) OldPlatformQuotas(ctx context.Context) (v map[string]float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPlatformQuotas is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPlatformQuotas requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPlatformQuotas: %w", err)
+	}
+	return oldValue.PlatformQuotas, nil
+}
+
+// ClearPlatformQuotas clears the value of the "platform_quotas" field.
+func (m *RedeemCodeMutation) ClearPlatformQuotas() {
+	m.platform_quotas = nil
+	m.clearedFields[redeemcode.FieldPlatformQuotas] = struct{}{}
+}
+
+// PlatformQuotasCleared returns if the "platform_quotas" field was cleared in this mutation.
+func (m *RedeemCodeMutation) PlatformQuotasCleared() bool {
+	_, ok := m.clearedFields[redeemcode.FieldPlatformQuotas]
+	return ok
+}
+
+// ResetPlatformQuotas resets all changes to the "platform_quotas" field.
+func (m *RedeemCodeMutation) ResetPlatformQuotas() {
+	m.platform_quotas = nil
+	delete(m.clearedFields, redeemcode.FieldPlatformQuotas)
+}
+
 // SetUserID sets the "user" edge to the User entity by id.
 func (m *RedeemCodeMutation) SetUserID(id int64) {
 	m.user = &id
@@ -39648,7 +39698,7 @@ func (m *RedeemCodeMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *RedeemCodeMutation) Fields() []string {
-	fields := make([]string, 0, 11)
+	fields := make([]string, 0, 12)
 	if m.code != nil {
 		fields = append(fields, redeemcode.FieldCode)
 	}
@@ -39682,6 +39732,9 @@ func (m *RedeemCodeMutation) Fields() []string {
 	if m.validity_days != nil {
 		fields = append(fields, redeemcode.FieldValidityDays)
 	}
+	if m.platform_quotas != nil {
+		fields = append(fields, redeemcode.FieldPlatformQuotas)
+	}
 	return fields
 }
 
@@ -39712,6 +39765,8 @@ func (m *RedeemCodeMutation) Field(name string) (ent.Value, bool) {
 		return m.GroupID()
 	case redeemcode.FieldValidityDays:
 		return m.ValidityDays()
+	case redeemcode.FieldPlatformQuotas:
+		return m.PlatformQuotas()
 	}
 	return nil, false
 }
@@ -39743,6 +39798,8 @@ func (m *RedeemCodeMutation) OldField(ctx context.Context, name string) (ent.Val
 		return m.OldGroupID(ctx)
 	case redeemcode.FieldValidityDays:
 		return m.OldValidityDays(ctx)
+	case redeemcode.FieldPlatformQuotas:
+		return m.OldPlatformQuotas(ctx)
 	}
 	return nil, fmt.Errorf("unknown RedeemCode field %s", name)
 }
@@ -39829,6 +39886,13 @@ func (m *RedeemCodeMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetValidityDays(v)
 		return nil
+	case redeemcode.FieldPlatformQuotas:
+		v, ok := value.(map[string]float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPlatformQuotas(v)
+		return nil
 	}
 	return fmt.Errorf("unknown RedeemCode field %s", name)
 }
@@ -39901,6 +39965,9 @@ func (m *RedeemCodeMutation) ClearedFields() []string {
 	if m.FieldCleared(redeemcode.FieldGroupID) {
 		fields = append(fields, redeemcode.FieldGroupID)
 	}
+	if m.FieldCleared(redeemcode.FieldPlatformQuotas) {
+		fields = append(fields, redeemcode.FieldPlatformQuotas)
+	}
 	return fields
 }
 
@@ -39929,6 +39996,9 @@ func (m *RedeemCodeMutation) ClearField(name string) error {
 		return nil
 	case redeemcode.FieldGroupID:
 		m.ClearGroupID()
+		return nil
+	case redeemcode.FieldPlatformQuotas:
+		m.ClearPlatformQuotas()
 		return nil
 	}
 	return fmt.Errorf("unknown RedeemCode nullable field %s", name)
@@ -39970,6 +40040,9 @@ func (m *RedeemCodeMutation) ResetField(name string) error {
 		return nil
 	case redeemcode.FieldValidityDays:
 		m.ResetValidityDays()
+		return nil
+	case redeemcode.FieldPlatformQuotas:
+		m.ResetPlatformQuotas()
 		return nil
 	}
 	return fmt.Errorf("unknown RedeemCode field %s", name)

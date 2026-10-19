@@ -85,6 +85,8 @@ func (f *fakeQuotaRepo) UpsertForUser(_ context.Context, _ int64, _ []UserPlatfo
 	return nil
 }
 
+func (f *fakeQuotaRepo) QuotaWeekMode(context.Context) string { return "registration" }
+
 func (f *fakeQuotaRepo) ResetExpiredWindow(_ context.Context, _ int64, _ string, _ string, _ time.Time) error {
 	return nil
 }

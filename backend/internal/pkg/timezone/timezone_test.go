@@ -136,6 +136,23 @@ func TestDSTAwareness(t *testing.T) {
 	_ = StartOfDay(Now())
 }
 
+func TestWeeklyPeriodStart_FromRegistration(t *testing.T) {
+	anchor := time.Date(2026, 5, 18, 15, 4, 0, 0, time.UTC)
+	if got := WeeklyPeriodStart(anchor, anchor.Add(6*24*time.Hour)); !got.Equal(anchor) {
+		t.Fatalf("inside first week: got %s", got)
+	}
+	second := anchor.Add(WeeklyPeriod)
+	if got := WeeklyPeriodStart(anchor, second.Add(time.Hour)); !got.Equal(second) {
+		t.Fatalf("second week: got %s want %s", got, second)
+	}
+	if !WeeklyPeriodExpired(&anchor, second) {
+		t.Fatal("period should expire at anchor+7d")
+	}
+	if WeeklyPeriodExpired(&anchor, second.Add(-time.Second)) {
+		t.Fatal("one second before the boundary is still the first week")
+	}
+}
+
 func TestStartOfWeek_Boundaries(t *testing.T) {
 	if err := Init("Asia/Shanghai"); err != nil {
 		t.Fatalf("Init: %v", err)

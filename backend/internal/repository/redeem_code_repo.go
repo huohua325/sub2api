@@ -23,7 +23,7 @@ func NewRedeemCodeRepository(client *dbent.Client) service.RedeemCodeRepository 
 }
 
 func (r *redeemCodeRepository) Create(ctx context.Context, code *service.RedeemCode) error {
-	created, err := r.client.RedeemCode.Create().
+	builder := r.client.RedeemCode.Create().
 		SetCode(code.Code).
 		SetType(code.Type).
 		SetValue(code.Value).
@@ -33,8 +33,11 @@ func (r *redeemCodeRepository) Create(ctx context.Context, code *service.RedeemC
 		SetNillableExpiresAt(code.ExpiresAt).
 		SetNillableUsedBy(code.UsedBy).
 		SetNillableUsedAt(code.UsedAt).
-		SetNillableGroupID(code.GroupID).
-		Save(ctx)
+		SetNillableGroupID(code.GroupID)
+	if len(code.PlatformWeeklyLimits) > 0 {
+		builder.SetPlatformQuotas(code.PlatformWeeklyLimits)
+	}
+	created, err := builder.Save(ctx)
 	if err == nil {
 		code.ID = created.ID
 		code.CreatedAt = created.CreatedAt
@@ -61,6 +64,9 @@ func (r *redeemCodeRepository) CreateBatch(ctx context.Context, codes []service.
 			SetNillableUsedBy(c.UsedBy).
 			SetNillableUsedAt(c.UsedAt).
 			SetNillableGroupID(c.GroupID)
+		if len(c.PlatformWeeklyLimits) > 0 {
+			b.SetPlatformQuotas(c.PlatformWeeklyLimits)
+		}
 		builders = append(builders, b)
 	}
 
@@ -413,18 +419,19 @@ func redeemCodeEntityToService(m *dbent.RedeemCode) *service.RedeemCode {
 		return nil
 	}
 	out := &service.RedeemCode{
-		ID:           m.ID,
-		Code:         m.Code,
-		Type:         m.Type,
-		Value:        m.Value,
-		Status:       m.Status,
-		UsedBy:       m.UsedBy,
-		UsedAt:       m.UsedAt,
-		Notes:        derefString(m.Notes),
-		CreatedAt:    m.CreatedAt,
-		ExpiresAt:    m.ExpiresAt,
-		GroupID:      m.GroupID,
-		ValidityDays: m.ValidityDays,
+		ID:                   m.ID,
+		Code:                 m.Code,
+		Type:                 m.Type,
+		Value:                m.Value,
+		Status:               m.Status,
+		UsedBy:               m.UsedBy,
+		UsedAt:               m.UsedAt,
+		Notes:                derefString(m.Notes),
+		CreatedAt:            m.CreatedAt,
+		ExpiresAt:            m.ExpiresAt,
+		GroupID:              m.GroupID,
+		ValidityDays:         m.ValidityDays,
+		PlatformWeeklyLimits: m.PlatformQuotas,
 	}
 	if m.Edges.User != nil {
 		out.User = userEntityToService(m.Edges.User)

@@ -421,6 +421,10 @@ export default {
         defaultPlatformQuotas: '默认平台限额（注册时分配）',
         defaultPlatformQuotasHint: '新用户注册时自动获得这里配置的限额；已有用户不受影响。留空 = 该平台该窗口不限制。',
         platformQuotaNotice: '月限额为 30 天滚动窗口，非自然月',
+        platformQuotaWeekMode: '周限额刷新方式',
+        platformQuotaWeekModeHint: '只影响平台周限额。从注册时刻起每 7 天刷新，或每个周一 0 点刷新。已有用户的下一次计费会按这里的选择对齐。',
+        platformQuotaWeekRegistration: '从注册时刻起，每 7 天',
+        platformQuotaWeekMonday: '每个周一 0 点',
       },
       platformQuota: {
         platform:    '平台',

@@ -660,6 +660,16 @@ func ValidityDaysLTE(v int) predicate.RedeemCode {
 	return predicate.RedeemCode(sql.FieldLTE(FieldValidityDays, v))
 }
 
+// PlatformQuotasIsNil applies the IsNil predicate on the "platform_quotas" field.
+func PlatformQuotasIsNil() predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldIsNull(FieldPlatformQuotas))
+}
+
+// PlatformQuotasNotNil applies the NotNil predicate on the "platform_quotas" field.
+func PlatformQuotasNotNil() predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldNotNull(FieldPlatformQuotas))
+}
+
 // HasUser applies the HasEdge predicate on the "user" edge.
 func HasUser() predicate.RedeemCode {
 	return predicate.RedeemCode(func(s *sql.Selector) {

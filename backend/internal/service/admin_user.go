@@ -1293,6 +1293,9 @@ func (s *adminServiceImpl) GenerateRedeemCodes(ctx context.Context, input *Gener
 				code.ValidityDays = 30 // 默认30天
 			}
 		}
+		if input.Type == RedeemTypeInvitation {
+			code.PlatformWeeklyLimits = normalizeInvitationWeeklyLimits(input.PlatformWeeklyLimits)
+		}
 		if err := s.redeemCodeRepo.Create(ctx, &code); err != nil {
 			return nil, err
 		}

@@ -1223,6 +1223,13 @@ func circuitStateString(state billingCircuitBreakerState) string {
 //     免除 DB 查询。
 //  2. cache MISS 或旧版 entry（SchemaVersion==0）→ 查 DB 回填完整 entry（含 limits/window_start）。
 //  3. Redis 故障（err != nil）→ fail-open，查 DB 做一次性检查，不回填。
+func (s *BillingCacheService) platformQuotaWeekMode(ctx context.Context) string {
+	if s == nil || s.userPlatformQuotaRepo == nil {
+		return PlatformQuotaWeekModeRegistration
+	}
+	return NormalizePlatformQuotaWeekMode(s.userPlatformQuotaRepo.QuotaWeekMode(ctx))
+}
+
 func (s *BillingCacheService) checkUserPlatformQuotaEligibility(
 	ctx context.Context,
 	userID int64,
@@ -1247,6 +1254,7 @@ func (s *BillingCacheService) checkUserPlatformQuotaEligibility(
 	}
 
 	// --- cache HIT with current schema → 直接用 entry，不查 DB ---
+	weekMode := s.platformQuotaWeekMode(ctx)
 	if cacheErr == nil && ok && entry != nil && entry.SchemaVersion == UserPlatformQuotaCacheSchemaV1 {
 		now := time.Now()
 		dailyUsage := entry.DailyUsageUSD
@@ -1266,10 +1274,10 @@ func (s *BillingCacheService) checkUserPlatformQuotaEligibility(
 			dayStart := timezone.StartOfDay(now)
 			newDailyStart = &dayStart
 		}
-		if quotaWindowExpired(entry.WeeklyWindowStart, timezone.StartOfWeek(now)) {
+		if weeklyQuotaExpired(entry.WeeklyWindowStart, now, weekMode) {
 			weeklyUsage = 0
 			windowExpired = true
-			weekStart := timezone.StartOfWeek(now)
+			weekStart := renewWeeklyWindow(entry.WeeklyWindowStart, now, weekMode)
 			newWeeklyStart = &weekStart
 		}
 		if monthlyQuotaWindowExpired(entry.MonthlyWindowStart, now) {
@@ -1315,7 +1323,7 @@ func (s *BillingCacheService) checkUserPlatformQuotaEligibility(
 			return withWindowResetsMetadata(ErrUserPlatformDailyQuotaExhausted, nextDailyReset(now))
 		}
 		if entry.WeeklyLimitUSD != nil && weeklyUsage >= *entry.WeeklyLimitUSD {
-			return withWindowResetsMetadata(ErrUserPlatformWeeklyQuotaExhausted, nextWeeklyReset(now))
+			return withWindowResetsMetadata(ErrUserPlatformWeeklyQuotaExhausted, nextWeeklyResetFrom(newWeeklyStart, now, weekMode))
 		}
 		if entry.MonthlyLimitUSD != nil && monthlyUsage >= *entry.MonthlyLimitUSD {
 			return withWindowResetsMetadata(ErrUserPlatformMonthlyQuotaExhausted, nextMonthlyResetFrom(entry.MonthlyWindowStart, now))
@@ -1389,7 +1397,7 @@ func (s *BillingCacheService) checkUserPlatformQuotaEligibility(
 	if quotaWindowExpired(rec.DailyWindowStart, timezone.StartOfDay(now)) {
 		dailyUsage = 0
 	}
-	if quotaWindowExpired(rec.WeeklyWindowStart, timezone.StartOfWeek(now)) {
+	if weeklyQuotaExpired(rec.WeeklyWindowStart, now, weekMode) {
 		weeklyUsage = 0
 	}
 	if monthlyQuotaWindowExpired(rec.MonthlyWindowStart, now) {
@@ -1402,7 +1410,7 @@ func (s *BillingCacheService) checkUserPlatformQuotaEligibility(
 			return withWindowResetsMetadata(ErrUserPlatformDailyQuotaExhausted, nextDailyReset(now))
 		}
 		if rec.WeeklyLimitUSD != nil && weeklyUsage >= *rec.WeeklyLimitUSD {
-			return withWindowResetsMetadata(ErrUserPlatformWeeklyQuotaExhausted, nextWeeklyReset(now))
+			return withWindowResetsMetadata(ErrUserPlatformWeeklyQuotaExhausted, nextWeeklyResetFrom(rec.WeeklyWindowStart, now, weekMode))
 		}
 		if rec.MonthlyLimitUSD != nil && monthlyUsage >= *rec.MonthlyLimitUSD {
 			return withWindowResetsMetadata(ErrUserPlatformMonthlyQuotaExhausted, nextMonthlyResetFrom(rec.MonthlyWindowStart, now))
@@ -1439,7 +1447,7 @@ func (s *BillingCacheService) checkUserPlatformQuotaEligibility(
 		return withWindowResetsMetadata(ErrUserPlatformDailyQuotaExhausted, nextDailyReset(now))
 	}
 	if rec.WeeklyLimitUSD != nil && weeklyUsage >= *rec.WeeklyLimitUSD {
-		return withWindowResetsMetadata(ErrUserPlatformWeeklyQuotaExhausted, nextWeeklyReset(now))
+		return withWindowResetsMetadata(ErrUserPlatformWeeklyQuotaExhausted, nextWeeklyResetFrom(rec.WeeklyWindowStart, now, weekMode))
 	}
 	if rec.MonthlyLimitUSD != nil && monthlyUsage >= *rec.MonthlyLimitUSD {
 		return withWindowResetsMetadata(ErrUserPlatformMonthlyQuotaExhausted, nextMonthlyResetFrom(rec.MonthlyWindowStart, now))
@@ -1464,10 +1472,35 @@ func nextDailyReset(now time.Time) time.Time {
 	return timezone.StartOfDay(now).AddDate(0, 0, 1)
 }
 
-// nextWeeklyReset 计算下一个周窗口起点（下周一全局时区 0 点）。
-// 必须与 timezone.StartOfWeek 同口径，否则 Retry-After 会偏差。
-func nextWeeklyReset(now time.Time) time.Time {
-	return timezone.StartOfWeek(now).AddDate(0, 0, 7)
+func weeklyQuotaExpired(start *time.Time, now time.Time, mode string) bool {
+	if NormalizePlatformQuotaWeekMode(mode) == PlatformQuotaWeekModeMonday {
+		if start == nil || start.IsZero() {
+			return false
+		}
+		return start.Before(timezone.StartOfWeek(now))
+	}
+	return timezone.WeeklyPeriodExpired(start, now)
+}
+
+func renewWeeklyWindow(start *time.Time, now time.Time, mode string) time.Time {
+	if NormalizePlatformQuotaWeekMode(mode) == PlatformQuotaWeekModeMonday {
+		return timezone.StartOfWeek(now)
+	}
+	if start == nil || start.IsZero() {
+		return now
+	}
+	return timezone.WeeklyPeriodStart(*start, now)
+}
+
+// nextWeeklyResetFrom 返回当前周窗口的下次重置时间。
+func nextWeeklyResetFrom(start *time.Time, now time.Time, mode string) time.Time {
+	if NormalizePlatformQuotaWeekMode(mode) == PlatformQuotaWeekModeMonday {
+		return timezone.StartOfWeek(now).AddDate(0, 0, 7)
+	}
+	if start == nil || start.IsZero() || timezone.WeeklyPeriodExpired(start, now) {
+		return now.Add(timezone.WeeklyPeriod)
+	}
+	return start.Add(timezone.WeeklyPeriod)
 }
 
 // nextMonthlyResetFrom 返回 30 天滚动窗口的下次重置时间（start + 30d）。

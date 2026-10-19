@@ -1904,6 +1904,7 @@ export interface RedeemCode {
   validity_days?: number // 订阅类型专用
   user?: User
   group?: Group // 关联的分组
+  platform_quotas?: Record<string, number>
 }
 
 export interface GenerateRedeemCodesRequest {
@@ -1914,6 +1915,7 @@ export interface GenerateRedeemCodesRequest {
   validity_days?: number // 订阅类型专用
   expires_at?: string | null
   expires_in_days?: number
+  platform_quotas?: Record<string, number>
 }
 
 export interface BatchUpdateRedeemCodeFields {

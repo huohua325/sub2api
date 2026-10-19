@@ -71,6 +71,8 @@ type UserPlatformQuotaRepository interface {
 	// BatchSnapshotUsage 把整批 usage 以绝对值覆盖写入既有活跃行(非累加)；行不存在或已软删的 (user,platform) 跳过。
 	// usage/window_start 直接取 Redis 当前窗口快照。整批共用 now 作 updated_at。要求 snapshots 内 (user,platform) 不重复。
 	BatchSnapshotUsage(ctx context.Context, snapshots []UserPlatformQuotaSnapshot, now time.Time) error
+	// QuotaWeekMode 是 registration 或 monday。
+	QuotaWeekMode(ctx context.Context) string
 }
 
 type userPlatformQuotaRepository struct {
@@ -130,8 +132,32 @@ func (r *userPlatformQuotaRepository) BulkInsertInitial(ctx context.Context, rec
 			monthly_limit_usd = COALESCE(user_platform_quotas.monthly_limit_usd, EXCLUDED.monthly_limit_usd),
 			updated_at        = EXCLUDED.updated_at`)
 
-	_, err := client.ExecContext(ctx, sb.String(), args...)
-	return err
+	if _, err := client.ExecContext(ctx, sb.String(), args...); err != nil {
+		return err
+	}
+	// 有周限额的新行，把窗口起点写成注册时刻。已有窗口不改。
+	seen := map[int64]struct{}{}
+	for _, rec := range records {
+		if rec.WeeklyLimitUSD == nil {
+			continue
+		}
+		if _, ok := seen[rec.UserID]; ok {
+			continue
+		}
+		seen[rec.UserID] = struct{}{}
+		if _, err := client.ExecContext(ctx, `
+UPDATE user_platform_quotas q
+SET weekly_window_start = u.created_at
+FROM users u
+WHERE q.user_id = u.id
+  AND q.user_id = $1
+  AND q.deleted_at IS NULL
+  AND q.weekly_window_start IS NULL
+  AND q.weekly_limit_usd IS NOT NULL`, rec.UserID); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // GetByUserPlatform 通过 ent 查询单条配额（排除软删除）。未找到返回 (nil, nil)。
@@ -196,7 +222,8 @@ func (r *userPlatformQuotaRepository) IncrementUsageWithReset(ctx context.Contex
 		}
 
 		newDaily := maybeReset(existing.DailyUsageUsd, existing.DailyWindowStart, timezone.StartOfDay(now), cost)
-		newWeekly := maybeReset(existing.WeeklyUsageUsd, existing.WeeklyWindowStart, timezone.StartOfWeek(now), cost)
+		weekStart := r.currentWeeklyWindowStart(txCtx, txClient, userID, now)
+		newWeekly := maybeReset(existing.WeeklyUsageUsd, existing.WeeklyWindowStart, weekStart, cost)
 		// 30 天滚动月度窗口：过期时重置为 cost 并以 now 为新起始，否则累加保留原起始
 		newMonthly, newMonthlyStart := monthlyMaybeReset(existing.MonthlyUsageUsd, existing.MonthlyWindowStart, cost, now)
 
@@ -205,7 +232,7 @@ func (r *userPlatformQuotaRepository) IncrementUsageWithReset(ctx context.Contex
 			SetWeeklyUsageUsd(newWeekly).
 			SetMonthlyUsageUsd(newMonthly).
 			SetDailyWindowStart(timezone.StartOfDay(now)).
-			SetWeeklyWindowStart(timezone.StartOfWeek(now)).
+			SetWeeklyWindowStart(weekStart).
 			SetMonthlyWindowStart(newMonthlyStart). // 30 天滚动：仅过期时更新起始
 			Save(txCtx)
 		return e

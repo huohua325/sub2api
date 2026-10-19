@@ -39,6 +39,13 @@ func (a *userPlatformQuotaServiceAdapter) IncrementUsageWithReset(ctx context.Co
 	return a.inner.IncrementUsageWithReset(ctx, userID, platform, cost, now)
 }
 
+func (a *userPlatformQuotaServiceAdapter) QuotaWeekMode(ctx context.Context) string {
+	if a == nil || a.inner == nil {
+		return service.PlatformQuotaWeekModeRegistration
+	}
+	return a.inner.QuotaWeekMode(ctx)
+}
+
 // ListByUser 查询用户的所有平台配额记录。
 func (a *userPlatformQuotaServiceAdapter) ListByUser(ctx context.Context, userID int64) ([]service.UserPlatformQuotaRecord, error) {
 	rows, err := a.inner.ListByUser(ctx, userID)
@@ -182,6 +189,13 @@ func (a *genericUserPlatformQuotaAdapter) UpsertForUser(ctx context.Context, use
 }
 
 // ResetExpiredWindow 转发至 repository.ResetExpiredWindow（通用 adapter），并包装 sentinel。
+func (a *genericUserPlatformQuotaAdapter) QuotaWeekMode(ctx context.Context) string {
+	if a == nil || a.inner == nil {
+		return service.PlatformQuotaWeekModeRegistration
+	}
+	return a.inner.QuotaWeekMode(ctx)
+}
+
 func (a *genericUserPlatformQuotaAdapter) ResetExpiredWindow(ctx context.Context, userID int64, platform string, window string, newStart time.Time) error {
 	err := a.inner.ResetExpiredWindow(ctx, userID, platform, window, newStart)
 	if errors.Is(err, ErrUserPlatformQuotaNotFound) {

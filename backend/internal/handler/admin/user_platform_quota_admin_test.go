@@ -49,6 +49,10 @@ func (r *upsertCapturingQuotaRepo) UpsertForUser(_ context.Context, userID int64
 	r.upsertCalls = append(r.upsertCalls, upsertCall{userID: userID, records: cloned})
 	return r.upsertErr
 }
+func (r *upsertCapturingQuotaRepo) QuotaWeekMode(context.Context) string {
+	return "registration"
+}
+
 func (r *upsertCapturingQuotaRepo) ResetExpiredWindow(_ context.Context, userID int64, platform string, window string, newStart time.Time) error {
 	r.resetCalls = append(r.resetCalls, resetCall{userID, platform, window, newStart})
 	return r.resetErr

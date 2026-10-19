@@ -105,6 +105,30 @@ func EndOfDay(t time.Time) time.Time {
 	return time.Date(t.Year(), t.Month(), t.Day(), 23, 59, 59, 999999999, loc)
 }
 
+// WeeklyPeriod is the length of a user quota week counted from registration.
+const WeeklyPeriod = 7 * 24 * time.Hour
+
+// WeeklyPeriodStart is the start of the 7-day period containing now, counted from anchor.
+// The anchor is the account registration time. A period ends at the same clock time 7 days later.
+func WeeklyPeriodStart(anchor, now time.Time) time.Time {
+	if anchor.IsZero() {
+		return now
+	}
+	if now.Before(anchor) {
+		return anchor
+	}
+	periods := int64(now.Sub(anchor) / WeeklyPeriod)
+	return anchor.Add(time.Duration(periods) * WeeklyPeriod)
+}
+
+// WeeklyPeriodExpired reports whether a stored week start has reached its 7-day end.
+func WeeklyPeriodExpired(start *time.Time, now time.Time) bool {
+	if start == nil || start.IsZero() {
+		return false
+	}
+	return now.Sub(*start) >= WeeklyPeriod
+}
+
 // StartOfWeek returns the start of the week (Monday 00:00:00) for the given time.
 func StartOfWeek(t time.Time) time.Time {
 	loc := Location()

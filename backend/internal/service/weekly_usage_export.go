@@ -357,7 +357,7 @@ func (s *WeeklyUsageExportService) collect(ctx context.Context, tx *sql.Tx, star
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	applyQuotas(users, quotas, now, current)
+	applyQuotas(users, quotas, now, current, quotaWeekModeTx(ctx, tx))
 	synthetics, err := loadSyntheticUsers(ctx, tx, start, upper, now, current)
 	if err != nil {
 		return nil, nil, nil, err
@@ -850,7 +850,7 @@ WHERE deleted_at IS NULL AND platform IN ('openai', 'grok') AND user_id = ANY($1
 	return out, rows.Err()
 }
 
-func applyQuotas(rows []WeeklyUserInput, quotas map[string]quotaRow, now time.Time, current bool) {
+func applyQuotas(rows []WeeklyUserInput, quotas map[string]quotaRow, now time.Time, current bool, mode string) {
 	for i := range rows {
 		rows[i].CurrentWeek = current
 		if !current {
@@ -860,7 +860,7 @@ func applyQuotas(rows []WeeklyUserInput, quotas map[string]quotaRow, now time.Ti
 		if !ok {
 			continue
 		}
-		view := lazyZeroWeekly(quota, now)
+		view := lazyZeroWeekly(quota, now, mode)
 		rows[i].HasQuota = true
 		rows[i].WeeklyLimit = view.limit
 		rows[i].WeeklyUsage = view.usage
@@ -872,13 +872,24 @@ type lazyWeeklyView struct {
 	usage float64
 }
 
-func lazyZeroWeekly(row quotaRow, now time.Time) lazyWeeklyView {
+func quotaWeekModeTx(ctx context.Context, tx *sql.Tx) string {
+	if tx == nil {
+		return PlatformQuotaWeekModeRegistration
+	}
+	var raw string
+	if err := tx.QueryRowContext(ctx, `SELECT value FROM settings WHERE key = $1`, SettingKeyPlatformQuotaWeekMode).Scan(&raw); err != nil {
+		return PlatformQuotaWeekModeRegistration
+	}
+	return NormalizePlatformQuotaWeekMode(raw)
+}
+
+func lazyZeroWeekly(row quotaRow, now time.Time, mode string) lazyWeeklyView {
 	rec := UserPlatformQuotaRecord{
 		UserID: row.UserID, Platform: row.Platform,
 		WeeklyLimitUSD: row.Limit, WeeklyUsageUSD: row.Usage, WeeklyWindowStart: row.Window,
 	}
 	// 与学生卡片相同：过期周窗口的已用按 0 显示，不写回数据库。
-	if rec.WeeklyWindowStart != nil && rec.WeeklyWindowStart.Before(timezone.StartOfWeek(now)) {
+	if weeklyQuotaExpired(rec.WeeklyWindowStart, now, mode) {
 		rec.WeeklyUsageUSD = 0
 	}
 	return lazyWeeklyView{limit: rec.WeeklyLimitUSD, usage: rec.WeeklyUsageUSD}
@@ -904,6 +915,7 @@ WHERE q.deleted_at IS NULL AND q.platform IN ('openai', 'grok') AND q.weekly_lim
 		return nil, err
 	}
 	defer rows.Close()
+	mode := quotaWeekModeTx(ctx, tx)
 	var out []WeeklyUserInput
 	for rows.Next() {
 		var item WeeklyUserInput
@@ -920,7 +932,7 @@ WHERE q.deleted_at IS NULL AND q.platform IN ('openai', 'grok') AND q.weekly_lim
 			t := window.Time
 			quota.Window = &t
 		}
-		view := lazyZeroWeekly(quota, now)
+		view := lazyZeroWeekly(quota, now, mode)
 		item.Synthetic = true
 		item.CurrentWeek = true
 		item.HasQuota = true
@@ -1335,6 +1347,7 @@ WHERE q.deleted_at IS NULL AND q.platform IN ('openai', 'grok') AND q.weekly_lim
 		return nil, nil, err
 	}
 	defer rows.Close()
+	mode := quotaWeekModeTx(ctx, tx)
 	limits := map[string]float64{}
 	blocked := map[string]float64{}
 	for rows.Next() {
@@ -1349,7 +1362,7 @@ WHERE q.deleted_at IS NULL AND q.platform IN ('openai', 'grok') AND q.weekly_lim
 			t := window.Time
 			row.Window = &t
 		}
-		view := lazyZeroWeekly(row, now)
+		view := lazyZeroWeekly(row, now, mode)
 		if view.limit == nil || *view.limit <= 0 {
 			continue
 		}

@@ -13,6 +13,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/handler/dto"
 	"github.com/Wei-Shaw/sub2api/internal/handler/quotaview"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
 	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
@@ -940,12 +941,26 @@ func (h *UserHandler) ResetUserPlatformQuotaWindow(c *gin.Context) {
 
 	ctx := c.Request.Context()
 	// 校验用户是否存在，避免对不存在的用户执行操作返回误导性的 500。
-	if _, err := h.adminService.GetUser(ctx, userID); err != nil {
+	user, err := h.adminService.GetUser(ctx, userID)
+	if err != nil {
 		response.ErrorFrom(c, err)
 		return
 	}
 	now := time.Now().UTC()
-	if err := h.userPlatformQuotaRepo.ResetExpiredWindow(ctx, userID, req.Platform, req.Window, now); err != nil {
+	newStart := now
+	if req.Window == "weekly" {
+		mode := service.PlatformQuotaWeekModeRegistration
+		if h.settingService != nil {
+			mode = h.settingService.GetPlatformQuotaWeekMode(ctx)
+		}
+		if mode == service.PlatformQuotaWeekModeMonday {
+			newStart = timezone.StartOfWeek(now)
+		} else if user != nil && !user.CreatedAt.IsZero() {
+			// 手动重置只清已用。下一周仍从注册时刻对齐。
+			newStart = timezone.WeeklyPeriodStart(user.CreatedAt, now)
+		}
+	}
+	if err := h.userPlatformQuotaRepo.ResetExpiredWindow(ctx, userID, req.Platform, req.Window, newStart); err != nil {
 		if errors.Is(err, service.ErrUserPlatformQuotaNotFound) {
 			response.NotFound(c, "user platform quota not found")
 			return

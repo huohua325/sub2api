@@ -12,6 +12,7 @@ import (
 	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/ent/schema/mixins"
 	"github.com/Wei-Shaw/sub2api/ent/userplatformquota"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/stretchr/testify/require"
 )
@@ -231,12 +232,14 @@ func TestUserPlatformQuotaRepository_IncrementUsageWithReset_WeeklyReset(t *test
 	repo := NewUserPlatformQuotaRepository(client)
 	mustSeedQuotaRow(t, ctx, repo, userID, "openai")
 
-	// 5月22日（周五）和 5月25日（下周一），不同周
-	fri := time.Date(2026, 5, 22, 10, 0, 0, 0, time.UTC)
-	nextMon := time.Date(2026, 5, 25, 10, 0, 0, 0, time.UTC) // 下一周周一
+	// 周窗口从注册时刻起每 7 天滚动，不再按周一切开。
+	registered := time.Date(2026, 5, 18, 10, 0, 0, 0, time.UTC)
+	require.NoError(t, client.User.UpdateOneID(userID).SetCreatedAt(registered).Exec(ctx))
+	inside := registered.Add(2 * 24 * time.Hour)
+	nextWeek := registered.Add(timezone.WeeklyPeriod).Add(time.Hour)
 
-	require.NoError(t, repo.IncrementUsageWithReset(ctx, userID, "openai", 5.0, fri))
-	require.NoError(t, repo.IncrementUsageWithReset(ctx, userID, "openai", 2.0, nextMon))
+	require.NoError(t, repo.IncrementUsageWithReset(ctx, userID, "openai", 5.0, inside))
+	require.NoError(t, repo.IncrementUsageWithReset(ctx, userID, "openai", 2.0, nextWeek))
 
 	rec, err := repo.GetByUserPlatform(ctx, userID, "openai")
 	require.NoError(t, err)

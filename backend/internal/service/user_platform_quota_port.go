@@ -73,4 +73,6 @@ type UserPlatformQuotaRepository interface {
 	ResetExpiredWindow(ctx context.Context, userID int64, platform string, window string, newStart time.Time) error
 	// BatchSnapshotUsage 绝对值覆盖写入整批 usage 快照到既有活跃行；行不存在或已软删的 (user,platform) 跳过。
 	BatchSnapshotUsage(ctx context.Context, snapshots []UserPlatformQuotaSnapshot, now time.Time) error
+	// QuotaWeekMode 是 registration 或 monday。
+	QuotaWeekMode(ctx context.Context) string
 }

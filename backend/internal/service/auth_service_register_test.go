@@ -111,6 +111,8 @@ func (s *userPlatformQuotaRepoStub) UpsertForUser(context.Context, int64, []User
 	panic("unexpected UpsertForUser call")
 }
 
+func (s *userPlatformQuotaRepoStub) QuotaWeekMode(context.Context) string { return "registration" }
+
 func (s *userPlatformQuotaRepoStub) ResetExpiredWindow(context.Context, int64, string, string, time.Time) error {
 	panic("unexpected ResetExpiredWindow call")
 }

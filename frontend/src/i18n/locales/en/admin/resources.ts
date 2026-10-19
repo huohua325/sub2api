@@ -250,7 +250,10 @@ export default {
       concurrency: 'Concurrency',
       subscription: 'Subscription',
       invitation: 'Invitation',
-      invitationHint: 'Invitation codes are used to restrict user registration. They are automatically marked as used after use.',
+      invitationHint: 'Invitation codes restrict registration and are marked used after signup. The weekly limits below are written at registration. Leave blank to use the system default.',
+      invitationOpenAIWeekly: 'OpenAI weekly limit',
+      invitationGrokWeekly: 'Grok weekly limit',
+      invitationWeeklyPlaceholder: 'Blank = system default',
       unused: 'Unused',
       used: 'Used',
       columns: {
