@@ -1856,6 +1856,15 @@ export interface AdminUsageLog extends UsageLog {
   channel_id?: number | null
   billing_tier?: string | null
 
+  // 这一笔计费时订阅账号的官方额度（仅管理员可见）
+  official_account_id?: number | null
+  official_used_percent?: number | null
+  official_remaining_percent?: number | null
+  official_reset_at?: string | null
+  official_window_reset?: boolean | null
+  official_observed_at?: string | null
+  official_source?: string | null
+
   // 最小账号信息（仅管理员接口返回）
   account?: UsageLogAccountSummary
 }

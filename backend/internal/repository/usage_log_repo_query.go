@@ -19,7 +19,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/service"
 )
 
-const usageLogSelectColumns = "id, user_id, api_key_id, account_id, request_id, model, requested_model, upstream_model, upstream_response_model, upstream_model_mismatch, group_id, subscription_id, input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens, cache_creation_5m_tokens, cache_creation_1h_tokens, image_output_tokens, image_output_cost, image_input_tokens, image_input_cost, input_cost, output_cost, cache_creation_cost, cache_read_cost, total_cost, actual_cost, rate_multiplier, account_rate_multiplier, billing_type, request_type, stream, openai_ws_mode, duration_ms, first_token_ms, user_agent, ip_address, image_count, image_size, image_input_size, image_output_size, image_size_source, image_size_breakdown, video_count, video_resolution, video_duration_seconds, service_tier, reasoning_effort, requested_reasoning_effort, inbound_endpoint, upstream_endpoint, cache_ttl_overridden, long_context_billing_applied, channel_id, model_mapping_chain, billing_tier, billing_mode, account_stats_cost, upstream_request_id, session_id, native_compaction_v2, created_at"
+const usageLogSelectColumns = "id, user_id, api_key_id, account_id, request_id, model, requested_model, upstream_model, upstream_response_model, upstream_model_mismatch, group_id, subscription_id, input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens, cache_creation_5m_tokens, cache_creation_1h_tokens, image_output_tokens, image_output_cost, image_input_tokens, image_input_cost, input_cost, output_cost, cache_creation_cost, cache_read_cost, total_cost, actual_cost, rate_multiplier, account_rate_multiplier, billing_type, request_type, stream, openai_ws_mode, duration_ms, first_token_ms, user_agent, ip_address, image_count, image_size, image_input_size, image_output_size, image_size_source, image_size_breakdown, video_count, video_resolution, video_duration_seconds, service_tier, reasoning_effort, requested_reasoning_effort, inbound_endpoint, upstream_endpoint, cache_ttl_overridden, long_context_billing_applied, channel_id, model_mapping_chain, billing_tier, billing_mode, account_stats_cost, upstream_request_id, session_id, native_compaction_v2, official_account_id, official_used_percent, official_remaining_percent, official_reset_at, official_window_reset, official_observed_at, official_source, created_at"
 
 func (r *usageLogRepository) GetByID(ctx context.Context, id int64) (log *service.UsageLog, err error) {
 	query := "SELECT " + usageLogSelectColumns + " FROM usage_logs WHERE id = $1"
@@ -502,6 +502,13 @@ func scanUsageLog(scanner interface{ Scan(...any) error }) (*service.UsageLog, e
 		upstreamRequestID         sql.NullString
 		sessionID                 sql.NullString
 		nativeCompactionV2        bool
+		officialAccountID         sql.NullInt64
+		officialUsedPercent       sql.NullFloat64
+		officialRemainingPercent  sql.NullFloat64
+		officialResetAt           sql.NullTime
+		officialWindowReset       sql.NullBool
+		officialObservedAt        sql.NullTime
+		officialSource            sql.NullString
 		createdAt                 time.Time
 	)
 
@@ -568,6 +575,13 @@ func scanUsageLog(scanner interface{ Scan(...any) error }) (*service.UsageLog, e
 		&upstreamRequestID,
 		&sessionID,
 		&nativeCompactionV2,
+		&officialAccountID,
+		&officialUsedPercent,
+		&officialRemainingPercent,
+		&officialResetAt,
+		&officialWindowReset,
+		&officialObservedAt,
+		&officialSource,
 		&createdAt,
 	); err != nil {
 		return nil, err
@@ -601,6 +615,13 @@ func scanUsageLog(scanner interface{ Scan(...any) error }) (*service.UsageLog, e
 		BillingType:               int8(billingType),
 		RequestType:               service.RequestTypeFromInt16(requestTypeRaw),
 		NativeCompactionV2:        nativeCompactionV2,
+		OfficialAccountID:         nullInt64FromSQL(officialAccountID),
+		OfficialUsedPercent:       nullFloat64Ptr(officialUsedPercent),
+		OfficialRemainingPercent:  nullFloat64Ptr(officialRemainingPercent),
+		OfficialResetAt:           nullTimeFromSQL(officialResetAt),
+		OfficialWindowReset:       nullBoolFromSQL(officialWindowReset),
+		OfficialObservedAt:        nullTimeFromSQL(officialObservedAt),
+		OfficialSource:            nullStringFromSQL(officialSource),
 		ImageCount:                imageCount,
 		VideoCount:                videoCount,
 		CacheTTLOverridden:        cacheTTLOverridden,
@@ -728,6 +749,38 @@ func nullFloat64Ptr(v sql.NullFloat64) *float64 {
 		return nil
 	}
 	out := v.Float64
+	return &out
+}
+
+func nullInt64FromSQL(v sql.NullInt64) *int64 {
+	if !v.Valid {
+		return nil
+	}
+	out := v.Int64
+	return &out
+}
+
+func nullBoolFromSQL(v sql.NullBool) *bool {
+	if !v.Valid {
+		return nil
+	}
+	out := v.Bool
+	return &out
+}
+
+func nullTimeFromSQL(v sql.NullTime) *time.Time {
+	if !v.Valid {
+		return nil
+	}
+	out := v.Time
+	return &out
+}
+
+func nullStringFromSQL(v sql.NullString) *string {
+	if !v.Valid {
+		return nil
+	}
+	out := v.String
 	return &out
 }
 

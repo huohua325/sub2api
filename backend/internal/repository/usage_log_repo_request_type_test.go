@@ -959,7 +959,14 @@ func TestScanUsageLogRequestTypeAndLegacyFallback(t *testing.T) {
 			sql.NullFloat64{},
 			sql.NullString{}, // upstream_request_id
 			sql.NullString{},
-			false, // native_compaction_v2
+			false,             // native_compaction_v2
+			sql.NullInt64{},   // official_account_id
+			sql.NullFloat64{}, // official_used_percent
+			sql.NullFloat64{}, // official_remaining_percent
+			sql.NullTime{},    // official_reset_at
+			sql.NullBool{},    // official_window_reset
+			sql.NullTime{},    // official_observed_at
+			sql.NullString{},  // official_source
 			now,
 		}})
 		require.NoError(t, err)
@@ -1040,6 +1047,13 @@ func TestScanUsageLogRequestTypeAndLegacyFallback(t *testing.T) {
 			sql.NullString{},  // upstream_request_id
 			sql.NullString{},  // session_id
 			false,             // native_compaction_v2
+			sql.NullInt64{},   // official_account_id
+			sql.NullFloat64{}, // official_used_percent
+			sql.NullFloat64{}, // official_remaining_percent
+			sql.NullTime{},    // official_reset_at
+			sql.NullBool{},    // official_window_reset
+			sql.NullTime{},    // official_observed_at
+			sql.NullString{},  // official_source
 			now,
 		}})
 		require.NoError(t, err)
@@ -1103,6 +1117,13 @@ func TestScanUsageLogRequestTypeAndLegacyFallback(t *testing.T) {
 			sql.NullString{},  // upstream_request_id
 			sql.NullString{},  // session_id
 			true,              // native_compaction_v2
+			sql.NullInt64{},   // official_account_id
+			sql.NullFloat64{}, // official_used_percent
+			sql.NullFloat64{}, // official_remaining_percent
+			sql.NullTime{},    // official_reset_at
+			sql.NullBool{},    // official_window_reset
+			sql.NullTime{},    // official_observed_at
+			sql.NullString{},  // official_source
 			now,
 		}})
 		require.NoError(t, err)
@@ -1167,6 +1188,13 @@ func TestScanUsageLogRequestTypeAndLegacyFallback(t *testing.T) {
 			sql.NullString{},  // upstream_request_id
 			sql.NullString{},  // session_id
 			false,             // native_compaction_v2
+			sql.NullInt64{},   // official_account_id
+			sql.NullFloat64{}, // official_used_percent
+			sql.NullFloat64{}, // official_remaining_percent
+			sql.NullTime{},    // official_reset_at
+			sql.NullBool{},    // official_window_reset
+			sql.NullTime{},    // official_observed_at
+			sql.NullString{},  // official_source
 			now,
 		}})
 		require.NoError(t, err)

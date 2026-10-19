@@ -208,6 +208,16 @@ type UsageLog struct {
 	VideoResolution      *string
 	VideoDurationSeconds *int
 
+	// 这一笔计费发生时，订阅账号的官方额度。官方账号是母账号；
+	// 影子账号的 account_id 仍是实际应答的账号。空百分比表示当时没有未过期读数。
+	OfficialAccountID        *int64
+	OfficialUsedPercent      *float64
+	OfficialRemainingPercent *float64
+	OfficialResetAt          *time.Time
+	OfficialWindowReset      *bool
+	OfficialObservedAt       *time.Time
+	OfficialSource           *string
+
 	CreatedAt time.Time
 
 	User         *User

@@ -472,6 +472,8 @@ type OpenAIGatewayService struct {
 	liveAttestationCipher SecretEncryptor
 
 	openaiWSPoolOnce               sync.Once
+	officialWindowsOnce            sync.Once
+	officialWindows                *officialWindowTracker
 	openaiWSStateStoreOnce         sync.Once
 	openaiSchedulerOnce            sync.Once
 	openaiProxyStreamCircuitOnce   sync.Once

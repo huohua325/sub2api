@@ -703,6 +703,15 @@ type AdminUsageLog struct {
 	// AccountStatsCost 自定义定价规则计算的账号统计费用（nil 表示使用默认公式）
 	AccountStatsCost *float64 `json:"account_stats_cost,omitempty"`
 
+	// 这一笔计费时订阅账号的官方额度。官方账号是母账号。
+	OfficialAccountID        *int64     `json:"official_account_id,omitempty"`
+	OfficialUsedPercent      *float64   `json:"official_used_percent,omitempty"`
+	OfficialRemainingPercent *float64   `json:"official_remaining_percent,omitempty"`
+	OfficialResetAt          *time.Time `json:"official_reset_at,omitempty"`
+	OfficialWindowReset      *bool      `json:"official_window_reset,omitempty"`
+	OfficialObservedAt       *time.Time `json:"official_observed_at,omitempty"`
+	OfficialSource           *string    `json:"official_source,omitempty"`
+
 	// IPAddress 用户请求 IP
 	IPAddress *string `json:"ip_address,omitempty"`
 

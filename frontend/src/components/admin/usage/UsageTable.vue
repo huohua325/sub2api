@@ -258,6 +258,22 @@
           <span class="text-sm text-gray-600 dark:text-gray-400">{{ formatDateTime(value) }}</span>
         </template>
 
+        <template #cell-official_quota="{ row }">
+          <div v-if="row.official_used_percent != null" class="text-xs leading-4 tabular-nums" :title="officialQuotaTitle(row)">
+            <div>{{ t('admin.usage.officialUsed', { percent: formatOfficialPercent(row.official_used_percent) }) }}</div>
+            <div v-if="row.official_remaining_percent != null" class="text-gray-500 dark:text-gray-400">
+              {{ t('admin.usage.officialRemaining', { percent: formatOfficialPercent(row.official_remaining_percent) }) }}
+            </div>
+            <div v-if="row.official_reset_at" class="text-gray-500 dark:text-gray-400">
+              {{ t('admin.usage.officialWindowUntil', { time: formatDateTime(row.official_reset_at) }) }}
+            </div>
+            <div v-if="row.official_window_reset" class="font-medium text-amber-600 dark:text-amber-400">
+              {{ t('admin.usage.officialWindowReset') }}
+            </div>
+          </div>
+          <span v-else class="text-sm text-gray-400 dark:text-gray-500">-</span>
+        </template>
+
         <template #cell-request_id="{ row }">
           <div v-if="row.request_id" class="flex max-w-[160px] items-center gap-1.5">
             <span class="truncate font-mono text-xs text-gray-500 dark:text-gray-400" :title="row.request_id">
@@ -646,6 +662,17 @@ const isLikelyModelVariant = (row: AdminUsageLog): boolean => {
   const response = row.upstream_response_model?.trim() || ''
   return sent !== '' && response !== '' && normalizeModelVariant(sent) === normalizeModelVariant(response)
 }
+
+const formatOfficialPercent = (value: number | null | undefined): string => {
+  if (value == null || Number.isNaN(value)) return ''
+  return Number(value.toFixed(2)).toString()
+}
+
+const officialQuotaTitle = (row: AdminUsageLog): string => [
+  row.official_source ? `${t('admin.usage.officialSource')}: ${row.official_source}` : '',
+  row.official_reset_at ? `${t('admin.usage.officialResetAt')}: ${formatDateTime(row.official_reset_at)}` : '',
+  row.official_observed_at ? `${t('admin.usage.officialObservedAt')}: ${formatDateTime(row.official_observed_at)}` : '',
+].filter(Boolean).join('\n')
 
 const modelAuditTitle = (row: AdminUsageLog): string => [
   `${t('usage.requestedModel')}: ${row.model || '-'}`,

@@ -475,6 +475,7 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 
 	// 添加 SessionID（客户端显式会话标识；缺失/无效时保持 nil）
 	usageLog.SessionID = optionalTrimmedStringPtr(input.SessionID)
+	stampOfficialQuota(usageLog, account, billingAccount, result.ResponseHeaders, time.Now().UTC(), s.officialWindowTracker())
 
 	if apiKey.GroupID != nil {
 		usageLog.GroupID = apiKey.GroupID
