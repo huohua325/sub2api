@@ -222,7 +222,7 @@ func (r *userPlatformQuotaRepository) IncrementUsageWithReset(ctx context.Contex
 		}
 
 		newDaily := maybeReset(existing.DailyUsageUsd, existing.DailyWindowStart, timezone.StartOfDay(now), cost)
-		weekStart := r.currentWeeklyWindowStart(txCtx, txClient, userID, now)
+		weekStart := r.currentWeeklyWindowStart(txCtx, txClient, userID, existing.WeeklyWindowStart, now)
 		newWeekly := maybeReset(existing.WeeklyUsageUsd, existing.WeeklyWindowStart, weekStart, cost)
 		// 30 天滚动月度窗口：过期时重置为 cost 并以 now 为新起始，否则累加保留原起始
 		newMonthly, newMonthlyStart := monthlyMaybeReset(existing.MonthlyUsageUsd, existing.MonthlyWindowStart, cost, now)

@@ -53,9 +53,13 @@ func (r *userPlatformQuotaRepository) QuotaWeekMode(ctx context.Context) string 
 	return mode
 }
 
-func (r *userPlatformQuotaRepository) currentWeeklyWindowStart(ctx context.Context, txClient *dbent.Client, userID int64, now time.Time) time.Time {
+func (r *userPlatformQuotaRepository) currentWeeklyWindowStart(ctx context.Context, txClient *dbent.Client, userID int64, stored *time.Time, now time.Time) time.Time {
 	if r.QuotaWeekMode(ctx) == service.PlatformQuotaWeekModeMonday {
 		return timezone.StartOfWeek(now)
+	}
+	// 已有起点就接着它每 7 天滚动。管理员重置会把起点改成点击时刻。
+	if stored != nil && !stored.IsZero() {
+		return timezone.WeeklyPeriodStart(*stored, now)
 	}
 	anchor := now
 	if owner, err := txClient.User.Get(ctx, userID); err == nil && !owner.CreatedAt.IsZero() {

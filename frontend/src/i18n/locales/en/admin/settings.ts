@@ -427,7 +427,7 @@ export default {
         defaultPlatformQuotasHint: 'Applied to new users on signup; existing users are not affected. Leave blank = no limit for that platform and window.',
         platformQuotaNotice: 'Monthly quota uses a 30-day rolling window, not a calendar month.',
         platformQuotaWeekMode: 'Weekly quota reset',
-        platformQuotaWeekModeHint: 'Applies only to platform weekly limits. Reset every 7 days from signup, or every Monday at 00:00. The next billed request for an existing user follows this choice.',
+        platformQuotaWeekModeHint: 'Applies only to platform weekly limits. New users reset every 7 days from signup, or every Monday at 00:00. After an admin reset, the next 7 days start at the reset time.',
         platformQuotaWeekRegistration: 'Every 7 days from signup',
         platformQuotaWeekMonday: 'Every Monday at 00:00',
       },
