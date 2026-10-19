@@ -941,7 +941,8 @@ func (h *UserHandler) ResetUserPlatformQuotaWindow(c *gin.Context) {
 
 	ctx := c.Request.Context()
 	// 校验用户是否存在，避免对不存在的用户执行操作返回误导性的 500。
-	if _, err := h.adminService.GetUser(ctx, userID); err != nil {
+	user, err := h.adminService.GetUser(ctx, userID)
+	if err != nil {
 		response.ErrorFrom(c, err)
 		return
 	}
@@ -954,8 +955,10 @@ func (h *UserHandler) ResetUserPlatformQuotaWindow(c *gin.Context) {
 		}
 		if mode == service.PlatformQuotaWeekModeMonday {
 			newStart = timezone.StartOfWeek(now)
+		} else if user != nil && !user.CreatedAt.IsZero() {
+			// 重置只清已用。下一次刷新仍对齐注册时刻，不从点击时刻重算 7 天。
+			newStart = timezone.WeeklyPeriodStart(user.CreatedAt, now)
 		}
-		// registration 模式：newStart 保持为现在。之后每 7 天从这次重置起算。
 	}
 	if err := h.userPlatformQuotaRepo.ResetExpiredWindow(ctx, userID, req.Platform, req.Window, newStart); err != nil {
 		if errors.Is(err, service.ErrUserPlatformQuotaNotFound) {

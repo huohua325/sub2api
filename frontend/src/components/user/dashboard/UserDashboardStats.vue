@@ -25,6 +25,13 @@
               :style="{ width: Math.min(100, meter.quota.usedPercent) + '%' }"
             />
           </div>
+          <p
+            v-if="meter.quota.configured && meter.quota.resetsAt"
+            class="mt-1 text-[10px] tabular-nums text-gray-400"
+            :title="formatResetTime(meter.quota.resetsAt)"
+          >
+            {{ resetCountdownLabel(meter.quota.resetsAt) }}
+          </p>
         </div>
       </div>
     </div>
@@ -241,8 +248,12 @@
                     :style="{ width: calcPercent((quotaVal(item.quota, `${w}_usage_usd`) as number) ?? 0, quotaVal(item.quota, `${w}_limit_usd`) as number) + '%' }"
                   />
                 </div>
-                <p v-if="quotaVal(item.quota, `${w}_window_resets_at`)" class="text-[10px] text-gray-400">
-                  {{ t('dashboard.platformQuota.resetsAt', { time: formatResetTime(quotaVal(item.quota, `${w}_window_resets_at`) as string) }) }}
+                <p
+                  v-if="quotaVal(item.quota, `${w}_window_resets_at`)"
+                  class="text-[10px] tabular-nums text-gray-400"
+                  :title="formatResetTime(quotaVal(item.quota, `${w}_window_resets_at`) as string)"
+                >
+                  {{ resetCountdownLabel(quotaVal(item.quota, `${w}_window_resets_at`) as string) }}
                 </p>
               </template>
             </div>
@@ -254,7 +265,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
 import type { PlatformDashboardStats, UserDashboardStats as UserStatsType } from '@/api/usage'
@@ -449,6 +460,34 @@ function formatResetTime(iso: string | null | undefined): string {
     minute: '2-digit',
     hour12: false,
   })
+}
+
+const nowMs = ref(Date.now())
+let resetCountdownTimer: ReturnType<typeof setInterval> | null = null
+onMounted(() => {
+  resetCountdownTimer = setInterval(() => {
+    nowMs.value = Date.now()
+  }, 30_000)
+})
+onUnmounted(() => {
+  if (resetCountdownTimer) clearInterval(resetCountdownTimer)
+})
+
+function resetCountdownLabel(iso: string | null | undefined): string {
+  if (!iso) return ''
+  const end = new Date(iso).getTime()
+  if (Number.isNaN(end)) return ''
+  const remaining = end - nowMs.value
+  if (remaining <= 60_000) return t('dashboard.platformQuota.resetSoon')
+  const totalMinutes = Math.floor(remaining / 60_000)
+  const days = Math.floor(totalMinutes / 1440)
+  const hours = Math.floor((totalMinutes % 1440) / 60)
+  const minutes = totalMinutes % 60
+  const parts: string[] = []
+  if (days > 0) parts.push(t('dashboard.platformQuota.countdownDay', { count: days }))
+  if (hours > 0 || days > 0) parts.push(t('dashboard.platformQuota.countdownHour', { count: hours }))
+  parts.push(t('dashboard.platformQuota.countdownMinute', { count: minutes }))
+  return t('dashboard.platformQuota.resetsAt', { time: parts.join('') })
 }
 
 const formatBalance = (b: number) =>
