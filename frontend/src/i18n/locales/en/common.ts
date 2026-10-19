@@ -166,6 +166,7 @@ export default {
     dashboard: 'Dashboard',
     backHome: 'Back to home',
     announcements: 'Announcements',
+    gettingStarted: 'Get started',
     apiKeys: 'API Keys',
     batchImage: 'Batch Images',
     usage: 'Usage',

@@ -166,6 +166,7 @@ export default {
     dashboard: '仪表盘',
     backHome: '返回首页',
     announcements: '公告',
+    gettingStarted: '开始使用',
     apiKeys: 'API 密钥',
     batchImage: '批量生图',
     usage: '使用记录',

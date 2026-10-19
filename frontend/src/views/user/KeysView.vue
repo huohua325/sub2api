@@ -28,6 +28,12 @@
             :api-base-url="publicSettings?.api_base_url || ''"
             :custom-endpoints="publicSettings?.custom_endpoints || []"
           />
+          <router-link
+            to="/guide"
+            class="inline-flex text-sm font-medium text-primary-600 underline-offset-4 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40 dark:text-primary-400"
+          >
+            {{ t('guide.keysHint') }}
+          </router-link>
           <div v-if="selectedIds.length" class="flex flex-wrap items-center gap-3 text-sm">
             <span class="text-gray-600 dark:text-gray-300">
               {{ t('keys.bulkEdit.selectedCount', { count: selectedIds.length }) }}
