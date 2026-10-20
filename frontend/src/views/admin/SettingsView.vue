@@ -8084,7 +8084,7 @@
                       v-model="form.payment_product_name_prefix"
                       type="text"
                       class="input"
-                      placeholder="Sub2API"
+                      placeholder="MILE Lab"
                     />
                   </div>
                   <div>
@@ -8106,7 +8106,7 @@
                       class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600 dark:border-dark-600 dark:bg-dark-800 dark:text-gray-300"
                     >
                       {{
-                        (form.payment_product_name_prefix || "Sub2API") +
+                        (form.payment_product_name_prefix || "MILE Lab") +
                         " 100 " +
                         (form.payment_product_name_suffix || "CNY")
                       }}
@@ -9953,9 +9953,9 @@ const form = reactive<SettingsForm>({
   default_subscriptions: [],
   force_email_on_third_party_signup: false,
   default_user_rpm_limit: 0,
-  site_name: "Sub2API",
+  site_name: "MILE Lab",
   site_logo: "",
-  site_subtitle: "Subscription to API Conversion Platform",
+  site_subtitle: "Every Mile Matters.",
   api_base_url: "",
   contact_info: "",
   doc_url: "",

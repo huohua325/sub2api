@@ -23,7 +23,7 @@ describe('resolveDocumentTitle', () => {
   it('站点名为空时，只保留页面标题', () => {
     expect(resolveDocumentTitle('Dashboard', '')).toBe('Dashboard')
     expect(resolveDocumentTitle('Dashboard', '   ')).toBe('Dashboard')
-    expect(resolveDocumentTitle(undefined, '   ')).toBe('Sub2API')
+    expect(resolveDocumentTitle(undefined, '   ')).toBe('MILE Lab')
   })
 
   it('站点名变更时仅影响后续路由标题计算', () => {

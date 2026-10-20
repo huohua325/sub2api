@@ -92,7 +92,7 @@ func TestSettingService_GetPublicSettings_BlankSiteNameStaysBlank(t *testing.T) 
 	missing, err := NewSettingService(&settingPublicRepoStub{values: map[string]string{}}, &config.Config{}).
 		GetPublicSettings(context.Background())
 	require.NoError(t, err)
-	require.Equal(t, "Sub2API", missing.SiteName)
+	require.Equal(t, "MILE Lab", missing.SiteName)
 }
 
 func TestSettingService_GetPublicSettings_ExposesCompactHomeEnabled(t *testing.T) {

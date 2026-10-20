@@ -27,7 +27,7 @@ export function resolveDocumentTitle(routeTitle: unknown, siteName?: string, tit
   if (pageTitle) {
     return pageTitle
   }
-  return normalizedSiteName || 'Sub2API'
+  return normalizedSiteName || 'MILE Lab'
 }
 
 export interface RouteTitleOptions {

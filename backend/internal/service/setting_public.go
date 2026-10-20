@@ -20,7 +20,7 @@ func publicSiteName(settings map[string]string) string {
 	if value, ok := settings[SettingKeySiteName]; ok {
 		return strings.TrimSpace(value)
 	}
-	return "Sub2API"
+	return "MILE Lab"
 }
 
 func normalizeLoginAgreementMode(raw string) string {
@@ -338,7 +338,7 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		AliyunCaptchaRegion:                 normalizeAliyunCaptchaRegion(settings[SettingKeyAliyunCaptchaRegion]),
 		SiteName:                            publicSiteName(settings),
 		SiteLogo:                            settings[SettingKeySiteLogo],
-		SiteSubtitle:                        s.getStringOrDefault(settings, SettingKeySiteSubtitle, "Subscription to API Conversion Platform"),
+		SiteSubtitle:                        s.getStringOrDefault(settings, SettingKeySiteSubtitle, "Every Mile Matters."),
 		APIBaseURL:                          settings[SettingKeyAPIBaseURL],
 		ContactInfo:                         settings[SettingKeyContactInfo],
 		DocURL:                              settings[SettingKeyDocURL],
