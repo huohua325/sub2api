@@ -163,7 +163,7 @@ export default {
         emailAllowlistEnabledHint: 'When on, only the emails added below can register, and they do not need an invitation code. Every other email is rejected.',
         emailAllowlist: 'Approved emails',
         emailAllowlistHint: 'Add full email addresses by hand. After the switch above is on, only these addresses can register.',
-        emailAllowlistPlaceholder: 'name@example.com',
+        emailAllowlistPlaceholder: "name{'@'}example.com",
         emailAllowlistInputHint: 'Press Enter after each address. You can paste several addresses separated by commas or spaces.',
         emailSuffixWhitelistInputHint: 'Leave empty for no restriction. Use *.edu.cn to match edu.cn and its subdomains.',
         emailDomainQuota: 'Non-allowlist Domain Quota',

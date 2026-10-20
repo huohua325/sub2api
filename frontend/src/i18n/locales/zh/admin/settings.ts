@@ -164,7 +164,7 @@ export default {
         emailAllowlistEnabledHint: '打开后，只有下面手动添加的邮箱可以注册，并且不用邀请码。其他邮箱不能注册。',
         emailAllowlist: '可注册邮箱',
         emailAllowlistHint: '管理员手动添加完整邮箱。打开上面的开关后，只有这些邮箱可以注册。',
-        emailAllowlistPlaceholder: 'name@example.com',
+        emailAllowlistPlaceholder: "name{'@'}example.com",
         emailAllowlistInputHint: '输入完整邮箱后回车。可一次粘贴多个，用逗号或空格分开。',
         emailDomainQuota: '非白名单域名限量注册',
         emailDomainQuotaHint:
