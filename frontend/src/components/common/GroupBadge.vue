@@ -32,6 +32,7 @@ import { useI18n } from 'vue-i18n'
 import type { SubscriptionType, GroupPlatform } from '@/types'
 import { useAppStore } from '@/stores/app'
 import { formatPeakRateWindow, serverTimezoneLabel } from '@/utils/peak-rate'
+import { showConsoleMoney } from '@/utils/showConsoleMoney'
 import PlatformIcon from './PlatformIcon.vue'
 
 interface Props {
@@ -82,8 +83,10 @@ const hasCustomRate = computed(() => {
 
 const appStore = useAppStore()
 
+const showBillingRate = computed(() => props.showRate && showConsoleMoney())
+
 const hasPeakRate = computed(() => {
-  return Boolean(props.showRate && props.peakRateEnabled && props.peakStart && props.peakEnd)
+  return Boolean(showBillingRate.value && props.peakRateEnabled && props.peakStart && props.peakEnd)
 })
 
 const peakRateText = computed(() => {
@@ -105,8 +108,9 @@ const peakRateTitle = computed(() => {
 // 是否显示右侧标签
 const showLabel = computed(() => {
   if (!props.showRate) return false
-  // 订阅类型：显示天数或"订阅"
-  if (isSubscription.value) return true
+  // 订阅类型：显示天数或"订阅"。天数不是倍率，普通用户也看得到。
+  if (isSubscription.value && !props.alwaysShowRate) return true
+  if (!showBillingRate.value) return false
   // 标准类型：显示倍率（包括专属倍率）
   return props.rateMultiplier !== undefined || hasCustomRate.value
 })

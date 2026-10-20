@@ -135,7 +135,7 @@ export default {
     providerHints: {
       codex: 'For Codex. This is the GPT coding-agent group, not the API group.',
       grok_build: 'For Grok Build. This is the Grok coding-agent group, not the API group.',
-      experiment: 'Call API models for experiments. The GPT and Grok API groups are here, along with Claude, DeepSeek, Kimi, GLM, and Qwen.'
+      experiment: 'Call API models for experiments. Includes DeepSeek, Kimi, GLM, Qwen, GPT, Grok, and Claude.'
     },
     selectGroup: 'Select a group',
     statusLabel: 'Status',

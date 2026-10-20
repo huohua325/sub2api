@@ -45,11 +45,11 @@
 
       <!-- Group quota info (compact) -->
       <div class="mb-3 grid grid-cols-2 gap-x-3 gap-y-1 rounded-lg bg-gray-50 px-3 py-2 text-xs dark:bg-dark-700/50">
-        <div class="flex items-center justify-between">
+        <div v-if="showBillingRate" class="flex items-center justify-between">
           <span class="text-gray-400 dark:text-dark-500">{{ t('payment.planCard.rate') }}</span>
           <span class="font-medium text-gray-700 dark:text-gray-300">{{ rateDisplay }}</span>
         </div>
-        <div v-if="hasPeakRate" class="col-span-2 flex items-center justify-between gap-2">
+        <div v-if="showBillingRate && hasPeakRate" class="col-span-2 flex items-center justify-between gap-2">
           <span class="text-gray-400 dark:text-dark-500">{{ t('payment.planCard.peakRate') }}</span>
           <span class="text-right font-medium text-amber-700 dark:text-amber-300">{{ peakRateDisplay }}</span>
         </div>
@@ -111,6 +111,7 @@ import type { SubscriptionPlan } from '@/types/payment'
 import type { UserSubscription } from '@/types'
 import { useAppStore } from '@/stores/app'
 import { hasPeakRate as groupHasPeakRate, formatPeakRateWindow, serverTimezoneLabel } from '@/utils/peak-rate'
+import { showConsoleMoney } from '@/utils/showConsoleMoney'
 import { planValiditySuffix } from './validity'
 import { currencySymbol } from '@/components/payment/currency'
 import {
@@ -155,6 +156,7 @@ const rateDisplay = computed(() => {
 })
 
 const appStore = useAppStore()
+const showBillingRate = computed(() => showConsoleMoney())
 const planCurrencySymbol = computed(() => currencySymbol(props.plan.currency || 'USD'))
 
 const hasPeakRate = computed(() => groupHasPeakRate(props.plan))

@@ -135,7 +135,7 @@ export default {
     providerHints: {
       codex: '用于 Codex。这是 GPT 的编程助手分组，不是接口调用分组。',
       grok_build: '用于 Grok Build。这是 Grok 的编程助手分组，不是接口调用分组。',
-      experiment: '调用 API 模型做实验。GPT 和 Grok 的接口分组在这里，也包括 Claude、DeepSeek、Kimi、GLM、Qwen。'
+      experiment: '调用 API 模型做实验。包括 DeepSeek、Kimi、GLM、Qwen、GPT、Grok、Claude'
     },
     selectGroup: '选择分组',
     statusLabel: '状态',

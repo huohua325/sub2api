@@ -9,7 +9,7 @@
         <col class="w-[11%]" />
         <col class="w-[8%]" />
         <col class="w-[14%]" />
-        <col class="w-[8%]" />
+        <col v-if="showBillingRate" class="w-[8%]" />
       </colgroup>
       <thead>
         <tr
@@ -37,6 +37,7 @@
             </div>
           </th>
           <th
+            v-if="showBillingRate"
             rowspan="2"
             class="border-l border-gray-100 py-2.5 pl-3 pr-5 text-right align-middle dark:border-dark-700/60"
           >
@@ -100,7 +101,7 @@
                 {{ t('modelPlaza.table.marginalBadge') }}
               </span>
               <span
-                v-for="([effort, multiplier]) in reasoningEffortMultipliers(m)"
+                v-for="([effort, multiplier]) in (showBillingRate ? reasoningEffortMultipliers(m) : [])"
                 :key="effort"
                 class="rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/20 dark:text-amber-300"
                 :title="t('modelPlaza.table.reasoningMultiplierHint', { effort, multiplier })"
@@ -280,6 +281,7 @@
 
           <!-- 折扣倍率(分时时段行展示 生效倍率×时段倍率;生图独立倍率行展示独立倍率;专属倍率划线展示原倍率) -->
           <td
+            v-if="showBillingRate"
             class="border-l border-gray-100 py-2.5 pl-3 pr-5 text-right align-middle font-mono text-xs dark:border-dark-700/60"
           >
             <span
@@ -308,6 +310,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { showConsoleMoney } from '@/utils/showConsoleMoney'
 import { formatScaled, resolveIntervalPrices } from '@/utils/pricing'
 import { platformAccentColor, platformBadgeLightClass, platformLabel } from '@/utils/platformColors'
 import {
@@ -329,6 +332,8 @@ function reasoningEffortMultipliers(model: PlazaModel): [string, number][] {
       : []
   })
 }
+
+const showBillingRate = computed(() => showConsoleMoney())
 
 const props = defineProps<{
   models: PlazaModel[]

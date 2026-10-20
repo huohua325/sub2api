@@ -26,7 +26,7 @@
     <div class="flex shrink-0 items-center gap-2 pt-0.5">
       <div class="flex shrink-0 flex-col items-end gap-1">
         <!-- Rate pill (platform color) -->
-        <span v-if="rateMultiplier !== undefined" :class="['inline-flex items-center whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold', ratePillClass]">
+        <span v-if="showBillingRate && rateMultiplier !== undefined" :class="['inline-flex items-center whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold', ratePillClass]">
           <template v-if="hasCustomRate">
             <span class="mr-1 line-through opacity-50">{{ rateMultiplier }}x</span>
             <span class="font-bold">{{ userRateMultiplier }}x</span>
@@ -36,7 +36,7 @@
           </template>
         </span>
         <span
-          v-if="hasPeakRate"
+          v-if="showBillingRate && hasPeakRate"
           class="inline-flex items-center whitespace-nowrap rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700 dark:bg-amber-900/20 dark:text-amber-300"
           :title="peakRateTitle"
         >
@@ -65,6 +65,7 @@ import GroupBadge from './GroupBadge.vue'
 import type { SubscriptionType, GroupPlatform } from '@/types'
 import { useAppStore } from '@/stores/app'
 import { formatPeakRateWindow, serverTimezoneLabel } from '@/utils/peak-rate'
+import { showConsoleMoney } from '@/utils/showConsoleMoney'
 
 const { t } = useI18n()
 
@@ -102,6 +103,7 @@ const hasCustomRate = computed(() => {
 })
 
 const appStore = useAppStore()
+const showBillingRate = computed(() => showConsoleMoney())
 
 const hasPeakRate = computed(() => {
   return Boolean(props.peakRateEnabled && props.peakStart && props.peakEnd)

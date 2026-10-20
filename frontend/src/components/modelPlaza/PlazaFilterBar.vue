@@ -51,8 +51,8 @@
       </div>
     </div>
 
-    <!-- 三级:倍率(当前组合下不存在的置灰) -->
-    <div class="flex items-start gap-2">
+    <!-- 三级:倍率(当前组合下不存在的置灰)。普通用户不看倍率。 -->
+    <div v-if="showBillingRate" class="flex items-start gap-2">
       <span class="w-10 shrink-0 pt-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-dark-500">
         {{ t('modelPlaza.filters.rateLabel') }}
       </span>
@@ -111,11 +111,15 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
 import { platformAccentColor } from '@/utils/platformColors'
+import { showConsoleMoney } from '@/utils/showConsoleMoney'
 import type { GroupPlatform } from '@/types'
+
+const showBillingRate = computed(() => showConsoleMoney())
 
 const props = defineProps<{
   /** 数据中出现的平台(去重排序后)。 */

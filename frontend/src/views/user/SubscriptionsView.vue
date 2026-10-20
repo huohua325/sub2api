@@ -50,8 +50,8 @@
                   {{ subscription.group.description }}
                 </p>
                 <div class="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-gray-400 dark:text-gray-500">
-                  <span>{{ t('payment.planCard.rate') }}: ×{{ subscription.group?.rate_multiplier ?? 1 }}</span>
-                  <span v-if="subscriptionHasPeakRate(subscription)" class="text-amber-700 dark:text-amber-300">
+                  <span v-if="showBillingRate">{{ t('payment.planCard.rate') }}: ×{{ subscription.group?.rate_multiplier ?? 1 }}</span>
+                  <span v-if="showBillingRate && subscriptionHasPeakRate(subscription)" class="text-amber-700 dark:text-amber-300">
                     {{ t('payment.planCard.peakRate') }}: {{ subscriptionPeakRateLabel(subscription) }}
                   </span>
                 </div>
@@ -248,7 +248,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
@@ -258,7 +258,10 @@ import AppLayout from '@/components/layout/AppLayout.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { formatDateTimeToMinute } from '@/utils/format'
 import { hasPeakRate, formatPeakRateWindow, serverTimezoneLabel } from '@/utils/peak-rate'
+import { showConsoleMoney } from '@/utils/showConsoleMoney'
 import { platformBorderClass, platformBadgeClass, platformButtonClass, platformLabel } from '@/utils/platformColors'
+
+const showBillingRate = computed(() => showConsoleMoney())
 import {
   getExpirationDateRelation,
   getRemainingDurationParts,
