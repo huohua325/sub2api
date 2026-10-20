@@ -311,17 +311,15 @@ type SendVerifyCodeResult struct {
 	Countdown int `json:"countdown"` // 倒计时秒数
 }
 
-// SendVerifyCode 发送邮箱验证码（同步方式）
-func (s *AuthService) SendVerifyCode(ctx context.Context, email string, locale ...string) error {
-	// 检查是否开放注册（默认关闭）
+// CheckRegistrationEmail 在发送验证码或进入验证码页之前检查这个邮箱能不能注册。
+// 已注册的邮箱返回邮箱已存在。白名单开启时，名单外的邮箱返回尚未开通注册。
+func (s *AuthService) CheckRegistrationEmail(ctx context.Context, email string) error {
 	if s.settingService == nil || !s.settingService.IsRegistrationEnabled(ctx) {
 		return ErrRegDisabled
 	}
-
 	if isReservedEmail(email) {
 		return ErrEmailReserved
 	}
-	// 检查邮箱是否已存在（含 +别名 / Gmail 点号变体归一化，防止单个收件箱批量派生注册）
 	existsEmail, err := s.existsByEmailOrAlias(ctx, email)
 	if err != nil {
 		logger.LegacyPrintf("service.auth", "[Auth] Database error checking email exists: %v", err)
@@ -330,7 +328,12 @@ func (s *AuthService) SendVerifyCode(ctx context.Context, email string, locale .
 	if existsEmail {
 		return ErrEmailExists
 	}
-	if err := s.validateRegistrationEmailQuota(ctx, email); err != nil {
+	return s.validateRegistrationEmailQuota(ctx, email)
+}
+
+// SendVerifyCode 发送邮箱验证码（同步方式）
+func (s *AuthService) SendVerifyCode(ctx context.Context, email string, locale ...string) error {
+	if err := s.CheckRegistrationEmail(ctx, email); err != nil {
 		return err
 	}
 
@@ -352,26 +355,8 @@ func (s *AuthService) SendVerifyCode(ctx context.Context, email string, locale .
 func (s *AuthService) SendVerifyCodeAsync(ctx context.Context, email string, locale ...string) (*SendVerifyCodeResult, error) {
 	logger.LegacyPrintf("service.auth", "[Auth] SendVerifyCodeAsync called for email: %s", email)
 
-	// 检查是否开放注册（默认关闭）
-	if s.settingService == nil || !s.settingService.IsRegistrationEnabled(ctx) {
-		logger.LegacyPrintf("service.auth", "%s", "[Auth] Registration is disabled")
-		return nil, ErrRegDisabled
-	}
-
-	if isReservedEmail(email) {
-		return nil, ErrEmailReserved
-	}
-	// 检查邮箱是否已存在（含 +别名 / Gmail 点号变体归一化；在发信前拦截，避免批量脚本消耗发信配额）
-	existsEmail, err := s.existsByEmailOrAlias(ctx, email)
-	if err != nil {
-		logger.LegacyPrintf("service.auth", "[Auth] Database error checking email exists: %v", err)
-		return nil, ErrServiceUnavailable
-	}
-	if existsEmail {
-		logger.LegacyPrintf("service.auth", "[Auth] Email already exists: %s", email)
-		return nil, ErrEmailExists
-	}
-	if err := s.validateRegistrationEmailQuota(ctx, email); err != nil {
+	if err := s.CheckRegistrationEmail(ctx, email); err != nil {
+		logger.LegacyPrintf("service.auth", "[Auth] Registration email rejected: %s err=%v", email, err)
 		return nil, err
 	}
 

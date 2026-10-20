@@ -234,6 +234,21 @@ func (h *AuthHandler) SendVerifyCode(c *gin.Context) {
 	})
 }
 
+// CheckRegistrationEmail 在进入验证码页之前检查邮箱能否注册。
+// POST /api/v1/auth/check-registration-email
+func (h *AuthHandler) CheckRegistrationEmail(c *gin.Context) {
+	var req SendVerifyCodeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+	if err := h.authService.CheckRegistrationEmail(c.Request.Context(), req.Email); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, gin.H{"ok": true})
+}
+
 // Login handles user login
 // POST /api/v1/auth/login
 func (h *AuthHandler) Login(c *gin.Context) {

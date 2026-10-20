@@ -583,6 +583,14 @@ async function sendCode(): Promise<void> {
     showResendTurnstile.value = false
   } catch (error: unknown) {
     errorMessage.value = buildRegistrationErrorMessage(error, t('auth.sendCodeFailed'))
+    const code = extractApiErrorCode(error)
+    if (code === 'EMAIL_NOT_APPROVED' || code === 'EMAIL_EXISTS') {
+      sessionStorage.setItem('register_block_message', errorMessage.value)
+      sessionStorage.removeItem('register_data')
+      appStore.showError(errorMessage.value)
+      await router.replace('/register')
+      return
+    }
 
     appStore.showError(errorMessage.value)
   } finally {
@@ -785,6 +793,12 @@ function buildEmailSuffixNotAllowedMessage(): string {
 function buildRegistrationErrorMessage(error: unknown, fallback: string): string {
   if (extractApiErrorCode(error) === 'EMAIL_DOMAIN_REGISTRATION_LIMIT') {
     return t('auth.emailDomainRegistrationLimit')
+  }
+  if (extractApiErrorCode(error) === 'EMAIL_NOT_APPROVED') {
+    return t('auth.emailNotApproved')
+  }
+  if (extractApiErrorCode(error) === 'EMAIL_EXISTS') {
+    return t('auth.emailAlreadyRegistered')
   }
   return buildAuthErrorMessage(error, { fallback })
 }

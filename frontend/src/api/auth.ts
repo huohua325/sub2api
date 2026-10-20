@@ -470,6 +470,10 @@ export function resolveWeChatOAuthStartStrict(
  * @param request - Email and optional Turnstile token
  * @returns Response with countdown seconds
  */
+export async function checkRegistrationEmail(email: string): Promise<void> {
+  await apiClient.post('/auth/check-registration-email', { email })
+}
+
 export async function sendVerifyCode(
   request: SendVerifyCodeRequest
 ): Promise<SendVerifyCodeResponse> {

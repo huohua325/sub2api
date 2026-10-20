@@ -388,7 +388,8 @@ import {
   startOAuthLogin,
   type OAuthLoginStart,
   validatePromoCode,
-  validateInvitationCode
+  validateInvitationCode,
+  checkRegistrationEmail
 } from '@/api/auth'
 import { buildAuthErrorMessage } from '@/utils/authError'
 import { extractApiErrorCode, extractI18nErrorMessage } from '@/utils/apiError'
@@ -564,6 +565,12 @@ function syncAffiliateReferralCode(): string {
 // ==================== Lifecycle ====================
 
 onMounted(async () => {
+  const blockedMessage = sessionStorage.getItem('register_block_message')
+  if (blockedMessage) {
+    sessionStorage.removeItem('register_block_message')
+    errorMessage.value = blockedMessage
+    appStore.showError(blockedMessage)
+  }
   syncAffiliateReferralCode()
 
   try {
@@ -1058,8 +1065,10 @@ async function handleRegister(): Promise<void> {
       formData.aff_code = affCode
     }
 
-    // If email verification is enabled, redirect to verification page
+    // If email verification is enabled, reject unknown or existing emails
+    // before opening the verification page.
     if (emailVerifyEnabled.value) {
+      await checkRegistrationEmail(formData.email.trim())
       // Store registration data in sessionStorage
       sessionStorage.setItem(
         'register_data',
@@ -1117,6 +1126,12 @@ async function handleRegister(): Promise<void> {
 function buildRegistrationErrorMessage(error: unknown, fallback: string): string {
   if (extractApiErrorCode(error) === 'EMAIL_DOMAIN_REGISTRATION_LIMIT') {
     return t('auth.emailDomainRegistrationLimit')
+  }
+  if (extractApiErrorCode(error) === 'EMAIL_NOT_APPROVED') {
+    return t('auth.emailNotApproved')
+  }
+  if (extractApiErrorCode(error) === 'EMAIL_EXISTS') {
+    return t('auth.emailAlreadyRegistered')
   }
   return buildAuthErrorMessage(error, { fallback })
 }

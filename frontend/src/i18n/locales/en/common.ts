@@ -300,6 +300,8 @@ export default {
     promoCodeValidating: 'Promo code is being validated, please wait',
     promoCodeInvalidCannotRegister: 'Invalid promo code. Please check and try again or clear the promo code field',
     emailAllowlistOnly: 'Only an email approved by an administrator can register.',
+    emailNotApproved: 'This email is not approved for registration',
+    emailAlreadyRegistered: 'This email is already registered',
     invitationCodeLabel: 'Invitation Code',
     invitationCodePlaceholder: 'Enter invitation code',
     invitationCodeRequired: 'Invitation code is required',
