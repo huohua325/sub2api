@@ -39,19 +39,18 @@
           <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('guide.manual.codex.title') }}</h3>
           <p class="mt-2 max-w-[40rem] text-sm leading-6 text-gray-600 dark:text-gray-300">{{ t('guide.manual.codex.ready') }}</p>
           <p class="mt-4 max-w-[40rem] text-sm leading-6 text-gray-600 dark:text-gray-300">{{ t('guide.manual.codex.install') }}</p>
-          <div class="mt-4 grid gap-3 sm:grid-cols-2">
-            <GuideCommand :label="t('guide.manual.windows')" :command="codexInstall" />
-            <GuideCommand :label="t('guide.manual.unix')" :command="codexInstall" />
-          </div>
-          <GuideCommand class="mt-3" label="codex --version" :command="'codex --version'" />
-          <p class="mt-2 text-sm leading-6 text-gray-500 dark:text-gray-400">{{ t('guide.manual.codex.version') }}</p>
+          <GuideCommand class="mt-4" :label="`${t('guide.manual.windows')} / ${t('guide.manual.unix')}`" :command="codexInstall" />
+          <p class="mt-4 max-w-[40rem] text-sm leading-6 text-gray-600 dark:text-gray-300">{{ t('guide.manual.codex.firstRun') }}</p>
+          <GuideCommand class="mt-3" label="codex" command="codex" />
+          <p class="mt-4 max-w-[40rem] text-sm leading-6 text-gray-600 dark:text-gray-300">{{ t('guide.manual.codex.version') }}</p>
+          <GuideCommand class="mt-3" label="codex --version" command="codex --version" />
 
           <h4 class="mt-8 text-sm font-semibold text-gray-900 dark:text-white">{{ t('guide.manual.openFolder') }}</h4>
           <div class="mt-3 grid gap-3 sm:grid-cols-2">
             <GuideCommand :label="t('guide.manual.windows')" command="%USERPROFILE%\.codex" />
             <GuideCommand :label="t('guide.manual.unix')" command="~/.codex" />
           </div>
-          <p class="mt-4 max-w-[40rem] text-sm leading-6 text-gray-600 dark:text-gray-300">{{ t('guide.manual.codex.files') }} {{ t('guide.manual.missingFile') }}</p>
+          <p class="mt-4 max-w-[40rem] text-sm leading-6 text-gray-600 dark:text-gray-300">{{ t('guide.manual.codex.files') }}</p>
 
           <GuideFile
             class="mt-4"
@@ -72,6 +71,9 @@
             :copied="copiedId === 'codex-auth'"
             @copy="copyText(authJson, 'codex-auth')"
           />
+          <p class="mt-4 max-w-[40rem] text-sm leading-6 text-gray-600 dark:text-gray-300">{{ t('guide.manual.codex.authNote') }}</p>
+          <h4 class="mt-8 text-sm font-semibold text-gray-900 dark:text-white">{{ t('guide.manual.fieldsTitle') }}</h4>
+          <GuideFields :items="codexFields" />
           <p class="mt-4 max-w-[40rem] text-sm leading-6 text-gray-600 dark:text-gray-300">{{ t('guide.manual.codex.sandbox') }}</p>
           <p class="mt-3 max-w-[40rem] text-sm leading-6 text-gray-600 dark:text-gray-300">{{ t('guide.manual.codex.test') }}</p>
           <GuideCommand class="mt-3" label="codex" command="codex" />
@@ -93,7 +95,7 @@
             <GuideCommand :label="t('guide.manual.windows')" command="%USERPROFILE%\.grok" />
             <GuideCommand :label="t('guide.manual.unix')" command="~/.grok" />
           </div>
-          <p class="mt-4 max-w-[40rem] text-sm leading-6 text-gray-600 dark:text-gray-300">{{ t('guide.manual.grok.files') }} {{ t('guide.manual.missingFile') }}</p>
+          <p class="mt-4 max-w-[40rem] text-sm leading-6 text-gray-600 dark:text-gray-300">{{ t('guide.manual.grok.files') }}</p>
           <GuideFile
             class="mt-4"
             :filename="t('guide.manual.grok.configFile')"
@@ -103,9 +105,14 @@
             :copied="copiedId === 'grok-config'"
             @copy="copyText(grokConfig, 'grok-config')"
           />
+          <p class="mt-4 max-w-[40rem] text-sm leading-6 text-gray-600 dark:text-gray-300">{{ t('guide.manual.grok.envKey') }}</p>
+          <h4 class="mt-8 text-sm font-semibold text-gray-900 dark:text-white">{{ t('guide.manual.fieldsTitle') }}</h4>
+          <GuideFields :items="grokFields" />
           <p class="mt-4 max-w-[40rem] text-sm leading-6 text-gray-600 dark:text-gray-300">{{ t('guide.manual.grok.effort') }}</p>
           <p class="mt-3 max-w-[40rem] text-sm leading-6 text-gray-600 dark:text-gray-300">{{ t('guide.manual.grok.search') }}</p>
-          <p class="mt-3 max-w-[40rem] text-sm leading-6 text-gray-600 dark:text-gray-300">{{ t('guide.manual.grok.test') }}</p>
+          <p class="mt-3 max-w-[40rem] text-sm leading-6 text-gray-600 dark:text-gray-300">{{ t('guide.manual.grok.inspect') }}</p>
+          <GuideCommand class="mt-3" label="grok inspect" command="grok inspect" />
+          <p class="mt-4 max-w-[40rem] text-sm leading-6 text-gray-600 dark:text-gray-300">{{ t('guide.manual.grok.test') }}</p>
           <GuideCommand class="mt-3" label="grok" :command="grokProbe" />
         </section>
 
@@ -191,6 +198,19 @@ const GuideFile = defineComponent({
         translate: 'no',
       }, [h('code', props.code)]),
     ])
+  },
+})
+
+const GuideFields = defineComponent({
+  props: {
+    items: { type: Array as () => Array<{ name: string; text: string }>, required: true },
+  },
+  setup(props) {
+    return () => h('dl', { class: 'mt-3 divide-y divide-gray-100 border-y border-gray-100 dark:divide-dark-700 dark:border-dark-700' },
+      props.items.map((item) => h('div', { class: 'grid gap-1 py-3 sm:grid-cols-[13rem_minmax(0,1fr)] sm:gap-6' }, [
+        h('dt', { class: 'font-mono text-xs leading-6 text-gray-900 dark:text-gray-100', translate: 'no' }, item.name),
+        h('dd', { class: 'text-sm leading-6 text-gray-600 dark:text-gray-300' }, item.text),
+      ])))
   },
 })
 
@@ -290,6 +310,44 @@ const toc = computed(() => [
   { id: 'guide-grok', title: t('guide.manual.grok.title') },
   { id: 'guide-check', title: t('guide.manual.check.title') },
 ])
+
+const codexFieldNames = [
+  'model',
+  'model_provider',
+  'model_reasoning_effort',
+  'model_verbosity',
+  'disable_response_storage',
+  'web_search_request',
+  'base_url',
+  'wire_api',
+  'requires_openai_auth',
+  'screen_reader_detection_done',
+]
+const grokFieldNames = [
+  ['default', 'default'],
+  ['web_search', 'web_search'],
+  ['models_base_url', 'models_base_url'],
+  ['model', 'model'],
+  ['name_description', 'name / description'],
+  ['api_key', 'api_key'],
+  ['api_backend', 'api_backend'],
+  ['context_window', 'context_window'],
+  ['supports_reasoning_effort', 'supports_reasoning_effort'],
+  ['supports_backend_search', 'supports_backend_search'],
+  ['installer', 'installer'],
+  ['auto_update', 'auto_update'],
+  ['yolo', 'yolo'],
+  ['marketplace', 'marketplace'],
+] as const
+
+const codexFields = computed(() => codexFieldNames.map((name) => ({
+  name,
+  text: t(`guide.manual.codex.fields.${name}`),
+})))
+const grokFields = computed(() => grokFieldNames.map(([key, name]) => ({
+  name,
+  text: t(`guide.manual.grok.fields.${key}`),
+})))
 
 const troubleItems = computed(() => [
   t('guide.troubleshoot.quota'),
