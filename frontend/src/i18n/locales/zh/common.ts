@@ -301,6 +301,7 @@ export default {
     emailAllowlistOnly: '只有管理员开通的邮箱可以注册。',
     emailNotApproved: '该邮箱尚未开通注册',
     emailAlreadyRegistered: '该邮箱已经注册',
+    checkingRegistrationEmail: '正在确认这个邮箱能否注册…',
     invitationCodeLabel: '邀请码',
     invitationCodePlaceholder: '请输入邀请码',
     invitationCodeRequired: '请输入邀请码',

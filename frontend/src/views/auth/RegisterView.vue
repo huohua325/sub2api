@@ -48,8 +48,14 @@
               class="input pl-11"
               :class="{ 'input-error': errors.email }"
               :placeholder="t('auth.emailPlaceholder')"
+              :aria-invalid="errors.email ? 'true' : undefined"
+              :aria-describedby="errors.email ? 'email-error' : undefined"
+              @input="errors.email = ''"
             />
           </div>
+          <p v-if="errors.email" id="email-error" role="alert" class="mt-2 text-sm text-red-600 dark:text-red-400">
+            {{ errors.email }}
+          </p>
         </div>
 
         <!-- Password Input -->
@@ -565,11 +571,19 @@ function syncAffiliateReferralCode(): string {
 // ==================== Lifecycle ====================
 
 onMounted(async () => {
+  const blockedCode = sessionStorage.getItem('register_block_code')
   const blockedMessage = sessionStorage.getItem('register_block_message')
-  if (blockedMessage) {
-    sessionStorage.removeItem('register_block_message')
-    errorMessage.value = blockedMessage
-    appStore.showError(blockedMessage)
+  sessionStorage.removeItem('register_block_code')
+  sessionStorage.removeItem('register_block_message')
+  const message =
+    blockedCode === 'EMAIL_NOT_APPROVED'
+      ? t('auth.emailNotApproved')
+      : blockedCode === 'EMAIL_EXISTS'
+        ? t('auth.emailAlreadyRegistered')
+        : blockedMessage
+  if (message) {
+    errorMessage.value = message
+    errors.email = message
   }
   syncAffiliateReferralCode()
 
@@ -1110,11 +1124,14 @@ async function handleRegister(): Promise<void> {
     // Redirect to dashboard
     await router.push('/dashboard')
   } catch (error: unknown) {
-    // Handle registration error
-    errorMessage.value = buildRegistrationErrorMessage(error, t('auth.registrationFailed'))
-
-    // Also show error toast
-    appStore.showError(errorMessage.value)
+    const message = buildRegistrationErrorMessage(error, t('auth.registrationFailed'))
+    errorMessage.value = message
+    const code = extractApiErrorCode(error)
+    if (code === 'EMAIL_NOT_APPROVED' || code === 'EMAIL_EXISTS' || code === 'EMAIL_DOMAIN_REGISTRATION_LIMIT') {
+      errors.email = message
+    } else {
+      appStore.showError(message)
+    }
   } finally {
     if (captchaEnabled.value) {
       resetCaptchaProof()

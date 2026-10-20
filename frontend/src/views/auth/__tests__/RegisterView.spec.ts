@@ -8,6 +8,7 @@ const {
   showErrorMock,
   pushMock,
   verifyActionMock,
+  checkRegistrationEmailMock,
   appStoreMock
 } = vi.hoisted(() => ({
   getPublicSettingsMock: vi.fn(),
@@ -15,6 +16,7 @@ const {
   showErrorMock: vi.fn(),
   pushMock: vi.fn(),
   verifyActionMock: vi.fn(),
+  checkRegistrationEmailMock: vi.fn(),
   appStoreMock: {
     cachedPublicSettings: null as { promo_code_enabled?: boolean } | null,
     showError: (...args: unknown[]) => showErrorMock(...args),
@@ -69,7 +71,8 @@ vi.mock('@/api/auth', async () => {
   const actual = await vi.importActual<typeof import('@/api/auth')>('@/api/auth')
   return {
     ...actual,
-    getPublicSettings: (...args: unknown[]) => getPublicSettingsMock(...args)
+    getPublicSettings: (...args: unknown[]) => getPublicSettingsMock(...args),
+    checkRegistrationEmail: (...args: unknown[]) => checkRegistrationEmailMock(...args)
   }
 })
 
@@ -102,6 +105,8 @@ describe('RegisterView', () => {
     showErrorMock.mockReset()
     pushMock.mockReset()
     verifyActionMock.mockReset()
+    checkRegistrationEmailMock.mockReset()
+    checkRegistrationEmailMock.mockResolvedValue(undefined)
     appStoreMock.cachedPublicSettings = null
     sessionStorage.removeItem('register_data')
     verifyActionMock.mockResolvedValue({ token: 'ticket', randstr: 'randstr' })
@@ -205,7 +210,40 @@ describe('RegisterView', () => {
       password: 'secret-123'
     })
     expect(pushMock).toHaveBeenCalledWith('/email-verify')
+    expect(checkRegistrationEmailMock).toHaveBeenCalledWith('user@example.com')
     expect(registerMock).not.toHaveBeenCalled()
+  })
+
+  it('keeps an unapproved email on the register form', async () => {
+    getPublicSettingsMock.mockResolvedValueOnce({
+      ...publicSettings,
+      turnstile_enabled: false,
+      email_verify_enabled: true
+    })
+    checkRegistrationEmailMock.mockRejectedValueOnce({
+      reason: 'EMAIL_NOT_APPROVED',
+      message: '该邮箱尚未开通注册'
+    })
+    const wrapper = mountRegister()
+    await flushPromises()
+    await wrapper.get('#email').setValue('student@school.edu')
+    await wrapper.get('#password').setValue('secret-123')
+    await wrapper.get('#confirmPassword').setValue('secret-123')
+    await wrapper.get('form').trigger('submit.prevent')
+    await flushPromises()
+
+    expect(pushMock).not.toHaveBeenCalled()
+    expect(sessionStorage.getItem('register_data')).toBeNull()
+    expect(wrapper.get('#email-error').text()).toBe('auth.emailNotApproved')
+  })
+
+  it('shows an already-registered email on the register form', async () => {
+    sessionStorage.setItem('register_block_code', 'EMAIL_EXISTS')
+    const wrapper = mountRegister()
+    await flushPromises()
+
+    expect(sessionStorage.getItem('register_block_code')).toBeNull()
+    expect(wrapper.get('#email-error').text()).toBe('auth.emailAlreadyRegistered')
   })
 
   it('keeps the optional affiliate invitation field before Turnstile', async () => {

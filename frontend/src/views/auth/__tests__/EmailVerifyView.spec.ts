@@ -15,6 +15,8 @@ const {
   sendVerifyCodeMock,
   sendPendingOAuthVerifyCodeMock,
   persistOAuthTokenContextMock,
+  checkRegistrationEmailMock,
+  replaceMock,
   apiClientPostMock,
   authStoreState,
   createTurnstileResetMock,
@@ -31,6 +33,8 @@ const {
   sendVerifyCodeMock: vi.fn(),
   sendPendingOAuthVerifyCodeMock: vi.fn(),
   persistOAuthTokenContextMock: vi.fn(),
+  checkRegistrationEmailMock: vi.fn(),
+  replaceMock: vi.fn(),
   apiClientPostMock: vi.fn(),
   createTurnstileResetMock: vi.fn(),
   verifyActionMock: vi.fn(),
@@ -50,6 +54,7 @@ const {
 vi.mock('vue-router', () => ({
   useRouter: () => ({
     push: pushMock,
+    replace: replaceMock,
   }),
 }))
 
@@ -92,6 +97,7 @@ vi.mock('@/api/auth', async () => {
   return {
     ...actual,
     getPublicSettings: (...args: any[]) => getPublicSettingsMock(...args),
+    checkRegistrationEmail: (...args: any[]) => checkRegistrationEmailMock(...args),
     sendVerifyCode: (...args: any[]) => sendVerifyCodeMock(...args),
     sendPendingOAuthVerifyCode: (...args: any[]) => sendPendingOAuthVerifyCodeMock(...args),
     persistOAuthTokenContext: (...args: any[]) => persistOAuthTokenContextMock(...args),
@@ -117,6 +123,9 @@ describe('EmailVerifyView', () => {
     sendVerifyCodeMock.mockReset()
     sendPendingOAuthVerifyCodeMock.mockReset()
     persistOAuthTokenContextMock.mockReset()
+    checkRegistrationEmailMock.mockReset()
+    checkRegistrationEmailMock.mockResolvedValue(undefined)
+    replaceMock.mockReset()
     apiClientPostMock.mockReset()
     createTurnstileResetMock.mockReset()
     verifyActionMock.mockReset()
@@ -839,7 +848,40 @@ describe('EmailVerifyView', () => {
       invitation_code: 'INVITE',
     })
     expect(apiClientPostMock).not.toHaveBeenCalled()
+    expect(checkRegistrationEmailMock).toHaveBeenCalledWith('normal@example.com')
     expect(pushMock).toHaveBeenCalledWith('/dashboard')
+  })
+
+  it('returns to the register form before showing the code page when the email is not approved', async () => {
+    sessionStorage.setItem(
+      'register_data',
+      JSON.stringify({
+        email: 'student@school.edu',
+        password: 'secret-123',
+      })
+    )
+    checkRegistrationEmailMock.mockRejectedValueOnce({
+      reason: 'EMAIL_NOT_APPROVED',
+      message: '该邮箱尚未开通注册',
+    })
+
+    const wrapper = mount(EmailVerifyView, {
+      global: {
+        stubs: {
+          AuthLayout: { template: '<div><slot /><slot name="footer" /></div>' },
+          Icon: true,
+          TurnstileWidget: true,
+          transition: false,
+        },
+      },
+    })
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('auth.verifyYourEmail')
+    expect(sendVerifyCodeMock).not.toHaveBeenCalled()
+    expect(sessionStorage.getItem('register_data')).toBeNull()
+    expect(sessionStorage.getItem('register_block_code')).toBe('EMAIL_NOT_APPROVED')
+    expect(replaceMock).toHaveBeenCalledWith('/register')
   })
 
   it('does not require another Tencent proof for final email registration', async () => {

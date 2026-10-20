@@ -1,6 +1,9 @@
 <template>
   <AuthLayout>
-    <div class="space-y-6">
+    <div v-if="registrationChecking" class="py-8 text-center text-sm text-gray-500 dark:text-dark-400">
+      {{ t('auth.checkingRegistrationEmail') }}
+    </div>
+    <div v-else class="space-y-6">
       <!-- Title -->
       <div class="text-center">
         <h2 class="text-2xl font-bold text-gray-900 dark:text-white">
@@ -190,6 +193,7 @@ import {
   getPublicSettings,
   isOAuthLoginCompletion,
   type PendingOAuthSendVerifyCodeResponse,
+  checkRegistrationEmail,
   sendPendingOAuthVerifyCode,
   sendVerifyCode,
 } from '@/api/auth'
@@ -259,6 +263,7 @@ const pendingAdoptionDecision = ref<{
   adoptAvatar?: boolean
 } | null>(null)
 const hasRegisterData = ref<boolean>(false)
+const registrationChecking = ref<boolean>(true)
 
 // Public settings
 const turnstileEnabled = ref<boolean>(false)
@@ -325,6 +330,7 @@ watch(validationToastMessage, (value, previousValue) => {
 
 onMounted(async () => {
   const activePendingSession = authStore.pendingAuthSession as PendingAuthSessionSummary | null
+  let parsedRegisterData = false
 
   // Load registration data from sessionStorage
   const registerDataStr = sessionStorage.getItem('register_data')
@@ -349,9 +355,9 @@ onMounted(async () => {
             adoptAvatar: registerData.pending_adoption_decision.adopt_avatar === true
           }
         : null
-      hasRegisterData.value = !!(email.value && password.value)
+      parsedRegisterData = !!(email.value && password.value)
     } catch {
-      hasRegisterData.value = false
+      parsedRegisterData = false
     }
   } else if (activePendingSession) {
     pendingAuthToken.value = activePendingSession.token
@@ -380,6 +386,26 @@ onMounted(async () => {
   } catch (error) {
     console.error('Failed to load public settings:', error)
   }
+
+  // Keep the code form hidden until this address is allowed to register.
+  if (parsedRegisterData && !isPendingOAuthFlow()) {
+    try {
+      await checkRegistrationEmail(email.value.trim())
+    } catch (error: unknown) {
+      const code = extractApiErrorCode(error)
+      if (code === 'EMAIL_NOT_APPROVED' || code === 'EMAIL_EXISTS') {
+        sessionStorage.setItem('register_block_code', code)
+        sessionStorage.removeItem('register_data')
+        errorMessage.value = buildRegistrationErrorMessage(error, t('auth.sendCodeFailed'))
+        appStore.showError(errorMessage.value)
+        await router.replace('/register')
+        return
+      }
+    }
+  }
+
+  hasRegisterData.value = parsedRegisterData
+  registrationChecking.value = false
 
   // Auto-send verification code if we have valid data
   if (hasRegisterData.value) {
@@ -585,6 +611,7 @@ async function sendCode(): Promise<void> {
     errorMessage.value = buildRegistrationErrorMessage(error, t('auth.sendCodeFailed'))
     const code = extractApiErrorCode(error)
     if (code === 'EMAIL_NOT_APPROVED' || code === 'EMAIL_EXISTS') {
+      sessionStorage.setItem('register_block_code', code)
       sessionStorage.setItem('register_block_message', errorMessage.value)
       sessionStorage.removeItem('register_data')
       appStore.showError(errorMessage.value)

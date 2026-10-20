@@ -1548,46 +1548,91 @@
               </div>
 
               <div v-show="form.registration_email_allowlist_enabled" class="border-t border-gray-100 pt-4 dark:border-dark-700">
-                <label class="font-medium text-gray-900 dark:text-white">{{
+                <label for="registration-email-allowlist" class="font-medium text-gray-900 dark:text-white">{{
                   t("admin.settings.registration.emailAllowlist")
                 }}</label>
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
                   {{ t("admin.settings.registration.emailAllowlistHint") }}
                 </p>
-                <div
-                  class="mt-3 rounded-lg border border-gray-300 bg-white p-2 dark:border-dark-500 dark:bg-dark-700"
-                >
-                  <div class="flex flex-wrap items-center gap-2">
-                    <span
-                      v-for="email in registrationEmailAllowlistView"
-                      :key="email"
-                      class="inline-flex items-center gap-1 rounded bg-gray-100 px-2 py-1 font-mono text-xs text-gray-700 dark:bg-dark-600 dark:text-gray-200"
+                <div class="mt-3 flex flex-col gap-2 sm:flex-row sm:items-start">
+                  <div class="min-w-0 flex-1">
+                    <input
+                      id="registration-email-allowlist"
+                      v-model="registrationEmailAllowlistDraft"
+                      type="email"
+                      name="registration-email-allowlist"
+                      autocomplete="off"
+                      spellcheck="false"
+                      class="input w-full font-mono"
+                      :placeholder="t('admin.settings.registration.emailAllowlistPlaceholder')"
+                      :aria-invalid="registrationEmailAllowlistError ? 'true' : undefined"
+                      :aria-describedby="registrationEmailAllowlistError ? 'registration-email-allowlist-error' : undefined"
+                      @keydown="handleRegistrationEmailAllowlistKeydown"
+                      @paste="handleRegistrationEmailAllowlistPaste"
+                    />
+                    <p
+                      v-if="registrationEmailAllowlistError"
+                      id="registration-email-allowlist-error"
+                      role="alert"
+                      class="mt-1 text-xs text-red-600 dark:text-red-400"
                     >
-                      <span>{{ email }}</span>
-                      <button
-                        type="button"
-                        class="rounded-full text-gray-500 hover:bg-gray-200 hover:text-gray-700 dark:text-gray-300 dark:hover:bg-dark-500 dark:hover:text-white"
-                        @click="removeRegistrationEmailAllowlistTag(email)"
-                      >
-                        <Icon name="x" size="xs" class="h-3.5 w-3.5" :stroke-width="2" />
-                      </button>
-                    </span>
-                    <div class="flex min-w-[220px] flex-1 items-center gap-1 rounded border border-transparent px-2 py-1 focus-within:border-primary-300 dark:focus-within:border-primary-700">
-                      <input
-                        v-model="registrationEmailAllowlistDraft"
-                        type="email"
-                        class="w-full bg-transparent font-mono text-sm text-gray-900 outline-none placeholder:text-gray-400 dark:text-white dark:placeholder:text-gray-500"
-                        :placeholder="t('admin.settings.registration.emailAllowlistPlaceholder')"
-                        @keydown="handleRegistrationEmailAllowlistKeydown"
-                        @blur="commitRegistrationEmailAllowlistDraft"
-                        @paste="handleRegistrationEmailAllowlistPaste"
-                      />
-                    </div>
+                      {{ registrationEmailAllowlistError }}
+                    </p>
                   </div>
+                  <button
+                    type="button"
+                    class="btn btn-secondary shrink-0"
+                    @click="commitRegistrationEmailAllowlistDraft"
+                  >
+                    {{ t("admin.settings.registration.emailAllowlistAdd") }}
+                  </button>
                 </div>
                 <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
                   {{ t("admin.settings.registration.emailAllowlistInputHint") }}
                 </p>
+                <div class="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <p class="text-sm tabular-nums text-gray-700 dark:text-gray-200">
+                    {{ t("admin.settings.registration.emailAllowlistCount", { count: registrationEmailAllowlistView.length }) }}
+                  </p>
+                  <input
+                    v-if="registrationEmailAllowlistView.length > 0"
+                    v-model="registrationEmailAllowlistQuery"
+                    type="search"
+                    autocomplete="off"
+                    spellcheck="false"
+                    class="input input-sm w-full sm:w-64"
+                    :aria-label="t('admin.settings.registration.emailAllowlistSearch')"
+                    :placeholder="t('admin.settings.registration.emailAllowlistSearch')"
+                  />
+                </div>
+                <div class="mt-2 max-h-80 overflow-y-auto rounded-lg border border-gray-200 dark:border-dark-600">
+                  <p
+                    v-if="registrationEmailAllowlistFiltered.length === 0"
+                    class="px-3 py-6 text-center text-sm text-gray-500 dark:text-gray-400"
+                  >
+                    {{
+                      registrationEmailAllowlistView.length === 0
+                        ? t("admin.settings.registration.emailAllowlistEmpty")
+                        : t("admin.settings.registration.emailAllowlistNoMatch")
+                    }}
+                  </p>
+                  <ul v-else class="divide-y divide-gray-100 dark:divide-dark-700">
+                    <li
+                      v-for="email in registrationEmailAllowlistFiltered"
+                      :key="email"
+                      class="flex items-center justify-between gap-3 px-3 py-2"
+                    >
+                      <span class="min-w-0 break-all font-mono text-sm text-gray-900 dark:text-gray-100" translate="no">{{ email }}</span>
+                      <button
+                        type="button"
+                        class="btn btn-ghost btn-xs shrink-0 text-red-600 hover:text-red-700 dark:text-red-400"
+                        @click="askRemoveRegistrationEmailAllowlist(email)"
+                      >
+                        {{ t("admin.settings.registration.emailAllowlistRemove") }}
+                      </button>
+                    </li>
+                  </ul>
+                </div>
               </div>
 
               <!-- Email Domain Quota -->
@@ -9025,6 +9070,15 @@
         @cancel="showDeleteProviderDialog = false"
       />
       <ConfirmDialog
+        :show="registrationEmailAllowlistPendingRemove !== ''"
+        :title="t('admin.settings.registration.emailAllowlistRemoveTitle')"
+        :message="registrationEmailAllowlistRemoveMessage"
+        :confirm-text="t('admin.settings.registration.emailAllowlistRemove')"
+        danger
+        @confirm="confirmRemoveRegistrationEmailAllowlist"
+        @cancel="registrationEmailAllowlistPendingRemove = ''"
+      />
+      <ConfirmDialog
         :show="affiliateConfirmDialog.show"
         :title="affiliateConfirmDialog.title"
         :message="affiliateConfirmDialog.message"
@@ -9241,9 +9295,23 @@ const registrationEmailSuffixWhitelistTags = ref<string[]>([]);
 const registrationEmailSuffixWhitelistDraft = ref("");
 const registrationEmailAllowlistTags = ref<string[]>([]);
 const registrationEmailAllowlistDraft = ref("");
+const registrationEmailAllowlistQuery = ref("");
+const registrationEmailAllowlistError = ref("");
+const registrationEmailAllowlistPendingRemove = ref("");
 const registrationEmailAllowlistView = computed(() =>
   Array.isArray(registrationEmailAllowlistTags.value) ? registrationEmailAllowlistTags.value : [],
 );
+const registrationEmailAllowlistFiltered = computed(() => {
+  const query = registrationEmailAllowlistQuery.value.trim().toLowerCase();
+  const emails = registrationEmailAllowlistView.value;
+  if (!query) return emails;
+  return emails.filter((email) => email.includes(query));
+});
+const registrationEmailAllowlistRemoveMessage = computed(() => {
+  const email = registrationEmailAllowlistPendingRemove.value;
+  if (!email) return t("admin.settings.registration.emailAllowlistRemoveMessage");
+  return `${t("admin.settings.registration.emailAllowlistRemoveMessage")}\n${email}`;
+});
 const forwardedClientIpHeaderDraft = ref("");
 const tablePageSizeOptionsInput = ref("10, 20, 50, 100");
 
@@ -10636,33 +10704,49 @@ function isRegistrationEmailAddress(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
-function addRegistrationEmailAllowlistTag(raw: string) {
+function addRegistrationEmailAllowlistTag(raw: string): "added" | "duplicate" | "invalid" | "empty" {
   const email = normalizeRegistrationEmailAddress(raw);
-  if (!isRegistrationEmailAddress(email) || registrationEmailAllowlistTags.value.includes(email)) {
-    return;
-  }
+  if (!email) return "empty";
+  if (!isRegistrationEmailAddress(email)) return "invalid";
+  if (registrationEmailAllowlistTags.value.includes(email)) return "duplicate";
   registrationEmailAllowlistTags.value = [...registrationEmailAllowlistTags.value, email];
+  return "added";
 }
 
-function removeRegistrationEmailAllowlistTag(email: string) {
+function askRemoveRegistrationEmailAllowlist(email: string) {
+  registrationEmailAllowlistPendingRemove.value = email;
+}
+
+function confirmRemoveRegistrationEmailAllowlist() {
+  const email = registrationEmailAllowlistPendingRemove.value;
+  registrationEmailAllowlistPendingRemove.value = "";
+  if (!email) return;
   registrationEmailAllowlistTags.value = registrationEmailAllowlistTags.value.filter((item) => item !== email);
 }
 
 function commitRegistrationEmailAllowlistDraft() {
-  if (!registrationEmailAllowlistDraft.value) return;
-  addRegistrationEmailAllowlistTag(registrationEmailAllowlistDraft.value);
+  const result = addRegistrationEmailAllowlistTag(registrationEmailAllowlistDraft.value);
+  if (result === "empty") {
+    registrationEmailAllowlistError.value = "";
+    return;
+  }
+  if (result === "invalid") {
+    registrationEmailAllowlistError.value = t("admin.settings.registration.emailAllowlistInvalid");
+    return;
+  }
+  if (result === "duplicate") {
+    registrationEmailAllowlistError.value = t("admin.settings.registration.emailAllowlistDuplicate");
+    return;
+  }
   registrationEmailAllowlistDraft.value = "";
+  registrationEmailAllowlistError.value = "";
 }
 
 function handleRegistrationEmailAllowlistKeydown(event: KeyboardEvent) {
   if (event.isComposing) return;
-  if (registrationEmailSuffixWhitelistSeparatorKeys.has(event.key)) {
+  if (event.key === "Enter" || event.key === "," || event.key === "，") {
     event.preventDefault();
     commitRegistrationEmailAllowlistDraft();
-    return;
-  }
-  if (event.key === "Backspace" && !registrationEmailAllowlistDraft.value && registrationEmailAllowlistTags.value.length > 0) {
-    registrationEmailAllowlistTags.value.pop();
   }
 }
 
@@ -10670,8 +10754,16 @@ function handleRegistrationEmailAllowlistPaste(event: ClipboardEvent) {
   const text = event.clipboardData?.getData("text") ?? "";
   if (!/[\s,，]/.test(text)) return;
   event.preventDefault();
-  text.split(/[\s,，]+/).forEach((part) => addRegistrationEmailAllowlistTag(part));
+  let added = 0;
+  let invalid = 0;
+  text.split(/[\s,，]+/).forEach((part) => {
+    const result = addRegistrationEmailAllowlistTag(part);
+    if (result === "added") added += 1;
+    else if (result === "invalid") invalid += 1;
+  });
   registrationEmailAllowlistDraft.value = "";
+  registrationEmailAllowlistError.value =
+    added === 0 && invalid > 0 ? t("admin.settings.registration.emailAllowlistInvalid") : "";
 }
 
 function handleRegistrationEmailSuffixWhitelistPaste(event: ClipboardEvent) {
@@ -11254,6 +11346,9 @@ async function loadSettings() {
       .map((email) => normalizeRegistrationEmailAddress(String(email)))
       .filter((email) => isRegistrationEmailAddress(email));
     registrationEmailAllowlistDraft.value = "";
+    registrationEmailAllowlistQuery.value = "";
+    registrationEmailAllowlistError.value = "";
+    registrationEmailAllowlistPendingRemove.value = "";
     form.forwarded_client_ip_headers = normalizeForwardedClientIpHeaders(
       settings.forwarded_client_ip_headers,
     );

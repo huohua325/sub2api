@@ -12,6 +12,7 @@ import { useNavigationLoadingState } from '@/composables/useNavigationLoading'
 import { useRoutePrefetch } from '@/composables/useRoutePrefetch'
 import { getSetupStatus } from '@/api/setup'
 import { resolveCompletedSetupRedirectPath } from './setupRedirect'
+import { registrationEmailGateRedirect } from './registrationEmailGate'
 import { resolveRouteDocumentTitle } from './title'
 
 /**
@@ -63,6 +64,10 @@ const routes: RouteRecordRaw[] = [
     path: '/email-verify',
     name: 'EmailVerify',
     component: () => import('@/views/auth/EmailVerifyView.vue'),
+    beforeEnter: async () => {
+      const redirect = await registrationEmailGateRedirect()
+      if (redirect) return redirect
+    },
     meta: {
       requiresAuth: false,
       title: 'Verify Email'
