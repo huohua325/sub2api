@@ -167,6 +167,7 @@ export default {
     backHome: '返回首页',
     announcements: '公告',
     gettingStarted: '开始使用',
+    models: '模型',
     apiKeys: 'API 密钥',
     batchImage: '批量生图',
     usage: '使用记录',

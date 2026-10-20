@@ -43,5 +43,37 @@ export default {
       group: 'Whether the key belongs to this group',
       model: 'Whether the group allows that model name'
     }
+  },
+  models: {
+    title: 'Models',
+    lead: 'Put the name in the model field. The limits are on the dashboard.',
+    search: 'Search model names',
+    count: '{count} models',
+    empty: 'No model with that name',
+    copy: 'Copy',
+    copied: 'Copied',
+    familyLabel: 'Family',
+    useLabel: 'Use',
+    footnote: 'Create the key in the matching group. Groups are added by an admin. GPT and Codex share the OpenAI weekly limit. Grok and Grok Build share the Grok weekly limit.',
+    families: {
+      all: 'All',
+      gpt: 'GPT',
+      grok: 'Grok',
+      qwen: 'Qwen',
+      kimi: 'Kimi',
+      deepseek: 'DeepSeek',
+      glm: 'GLM'
+    },
+    uses: {
+      all: 'All uses',
+      chat: 'Chat',
+      coding: 'Coding',
+      image: 'Image',
+      video: 'Video'
+    },
+    sources: {
+      subscription: 'Subscription account',
+      experiment: 'Experiment API'
+    }
   }
 }

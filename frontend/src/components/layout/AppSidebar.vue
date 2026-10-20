@@ -273,6 +273,21 @@ const DashboardIcon = {
     )
 }
 
+const ModelsIcon = {
+  render: () =>
+    h(
+      'svg',
+      { fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor', 'stroke-width': '1.5' },
+      [
+        h('path', {
+          'stroke-linecap': 'round',
+          'stroke-linejoin': 'round',
+          d: 'M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5'
+        })
+      ]
+    )
+}
+
 const GuideIcon = {
   render: () =>
     h(
@@ -730,6 +745,7 @@ function buildSelfNavItems(withDashboard: boolean): NavItem[] {
   }
   items.push(
     { path: '/guide', label: t('nav.gettingStarted'), icon: GuideIcon },
+    { path: '/models', label: t('nav.models'), icon: ModelsIcon },
     { path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon },
     { path: '/batch-image', label: t('nav.batchImage'), icon: BatchImageIcon, hideInSimpleMode: true, featureFlag: flagBatchImageAccess },
     { path: '/usage', label: t('nav.usage'), icon: ChartIcon, hideInSimpleMode: true },

@@ -167,6 +167,7 @@ export default {
     backHome: 'Back to home',
     announcements: 'Announcements',
     gettingStarted: 'Get started',
+    models: 'Models',
     apiKeys: 'API Keys',
     batchImage: 'Batch Images',
     usage: 'Usage',

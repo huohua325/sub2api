@@ -43,5 +43,37 @@ export default {
       group: '密钥是不是这个分组的',
       model: '模型名是不是该分组允许的'
     }
+  },
+  models: {
+    title: '模型',
+    lead: '把名字填进 model。额度看仪表盘。',
+    search: '搜索模型名',
+    count: '{count} 个模型',
+    empty: '没有这个模型名',
+    copy: '复制',
+    copied: '已复制',
+    familyLabel: '家族',
+    useLabel: '用途',
+    footnote: '密钥要建在对应分组，分组随后由管理员添加。GPT 与 Codex 共用仪表盘上的 OpenAI 周限额，Grok 与 Grok Build 共用 Grok 周限额。',
+    families: {
+      all: '全部',
+      gpt: 'GPT',
+      grok: 'Grok',
+      qwen: 'Qwen',
+      kimi: 'Kimi',
+      deepseek: 'DeepSeek',
+      glm: 'GLM'
+    },
+    uses: {
+      all: '全部用途',
+      chat: '对话',
+      coding: '编程',
+      image: '图像',
+      video: '视频'
+    },
+    sources: {
+      subscription: '订阅账号',
+      experiment: '实验接口'
+    }
   }
 }
