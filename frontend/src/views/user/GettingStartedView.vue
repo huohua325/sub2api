@@ -1,112 +1,144 @@
 <template>
   <AppLayout>
-    <div class="grid w-full items-start gap-6 xl:grid-cols-[minmax(0,42rem)_minmax(20rem,1fr)]">
+    <div class="grid w-full items-start gap-8 xl:grid-cols-[minmax(0,46rem)_16rem]">
       <article class="card px-6 py-8 sm:px-10 sm:py-10">
         <h2 class="text-2xl font-semibold tracking-tight text-gray-900 dark:text-white">
           {{ t('guide.title') }}
         </h2>
         <p class="mt-3 max-w-[40rem] text-sm leading-6 text-gray-600 dark:text-gray-300">
-          {{ t('guide.lead') }}
+          {{ t('guide.manual.lead') }}
         </p>
 
         <nav :aria-label="t('guide.tocLabel')" class="mt-6 flex flex-wrap gap-x-4 gap-y-2 border-b border-gray-100 pb-4 dark:border-dark-700 xl:hidden">
           <a
-            v-for="step in steps"
-            :key="step.id"
-            :href="`#${step.id}`"
+            v-for="item in toc"
+            :key="item.id"
+            :href="`#${item.id}`"
             class="text-sm text-gray-600 underline-offset-4 hover:text-gray-900 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40 dark:text-gray-300 dark:hover:text-white"
           >
-            {{ step.index }} {{ step.title }}
+            {{ item.title }}
           </a>
         </nav>
 
-        <ol class="mt-8 space-y-8">
-          <li
-            v-for="step in steps"
-            :id="step.id"
-            :key="step.id"
-            data-testid="guide-step"
-            class="grid scroll-mt-24 grid-cols-[2.25rem_minmax(0,1fr)] gap-4"
-          >
-            <span class="flex h-9 w-9 items-center justify-center rounded-full bg-gray-900 text-sm font-medium text-white dark:bg-white dark:text-gray-900" aria-hidden="true">
-              {{ step.index }}
-            </span>
-            <div class="min-w-0">
-              <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ step.title }}</h3>
-              <p class="mt-2 max-w-[38rem] text-sm leading-6 text-gray-600 dark:text-gray-300">{{ step.body }}</p>
-
-              <router-link
-                v-if="step.link"
-                :to="step.link.to"
-                class="mt-3 inline-flex text-sm font-medium text-primary-600 underline-offset-4 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40 dark:text-primary-400"
-              >
-                {{ step.link.label }}
+        <section id="guide-prep" data-testid="guide-step" class="mt-10 scroll-mt-24">
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('guide.manual.prep.title') }}</h3>
+          <ol class="mt-4 max-w-[40rem] list-decimal space-y-3 pl-5 text-sm leading-6 text-gray-600 dark:text-gray-300">
+            <li>{{ t('guide.manual.prep.login') }}</li>
+            <li>{{ t('guide.manual.prep.quota') }}</li>
+            <li>
+              {{ t('guide.manual.prep.key') }}
+              <router-link to="/keys" class="ml-2 font-medium text-primary-600 underline-offset-4 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40 dark:text-primary-400">
+                {{ t('guide.manual.prep.link') }}
               </router-link>
+            </li>
+          </ol>
+          <p class="mt-4 max-w-[40rem] text-sm leading-6 text-gray-500 dark:text-gray-400">{{ t('guide.manual.keyHint') }}</p>
+        </section>
 
-              <div v-if="step.id === 'guide-call'" class="mt-4 xl:hidden">
-                <GuideCallSnippet
-                  :tabs="callTabs"
-                  :active="activeCall"
-                  :snippet="activeSnippet"
-                  :copied="copied"
-                  :copy-label="t('guide.copy')"
-                  :copied-label="t('guide.copied')"
-                  @select="activeCall = $event"
-                  @copy="copySnippet"
-                />
-              </div>
-              <p v-if="step.note" class="mt-3 max-w-[38rem] text-sm leading-6 text-gray-600 dark:text-gray-300">{{ step.note }}</p>
-              <div v-if="step.links" class="mt-3 flex flex-wrap gap-x-4 gap-y-2">
-                <router-link
-                  v-for="link in step.links"
-                  :key="link.to"
-                  :to="link.to"
-                  class="text-sm font-medium text-primary-600 underline-offset-4 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40 dark:text-primary-400"
-                >
-                  {{ link.label }}
-                </router-link>
-              </div>
-            </div>
-          </li>
-        </ol>
+        <section id="guide-codex" data-testid="guide-client" class="mt-12 scroll-mt-24 border-t border-gray-100 pt-10 dark:border-dark-700">
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('guide.manual.codex.title') }}</h3>
+          <p class="mt-2 max-w-[40rem] text-sm leading-6 text-gray-600 dark:text-gray-300">{{ t('guide.manual.codex.ready') }}</p>
+          <p class="mt-4 max-w-[40rem] text-sm leading-6 text-gray-600 dark:text-gray-300">{{ t('guide.manual.codex.install') }}</p>
+          <div class="mt-4 grid gap-3 sm:grid-cols-2">
+            <GuideCommand :label="t('guide.manual.windows')" :command="codexInstall" />
+            <GuideCommand :label="t('guide.manual.unix')" :command="codexInstall" />
+          </div>
+          <GuideCommand class="mt-3" label="codex --version" :command="'codex --version'" />
+          <p class="mt-2 text-sm leading-6 text-gray-500 dark:text-gray-400">{{ t('guide.manual.codex.version') }}</p>
 
-        <section class="mt-10 border-t border-gray-100 pt-6 dark:border-dark-700 xl:hidden">
-          <GuideTroubleshoot :title="t('guide.troubleshoot.title')" :items="troubleItems" />
+          <h4 class="mt-8 text-sm font-semibold text-gray-900 dark:text-white">{{ t('guide.manual.openFolder') }}</h4>
+          <div class="mt-3 grid gap-3 sm:grid-cols-2">
+            <GuideCommand :label="t('guide.manual.windows')" command="%USERPROFILE%\.codex" />
+            <GuideCommand :label="t('guide.manual.unix')" command="~/.codex" />
+          </div>
+          <p class="mt-4 max-w-[40rem] text-sm leading-6 text-gray-600 dark:text-gray-300">{{ t('guide.manual.codex.files') }} {{ t('guide.manual.missingFile') }}</p>
+
+          <GuideFile
+            class="mt-4"
+            :filename="t('guide.manual.codex.configFile')"
+            :code="codexConfig"
+            :copy-label="t('guide.copy')"
+            :copied-label="t('guide.copied')"
+            :copied="copiedId === 'codex-config'"
+            test-id="guide-snippet"
+            @copy="copyText(codexConfig, 'codex-config')"
+          />
+          <GuideFile
+            class="mt-4"
+            :filename="t('guide.manual.codex.authFile')"
+            :code="authJson"
+            :copy-label="t('guide.copy')"
+            :copied-label="t('guide.copied')"
+            :copied="copiedId === 'codex-auth'"
+            @copy="copyText(authJson, 'codex-auth')"
+          />
+          <p class="mt-4 max-w-[40rem] text-sm leading-6 text-gray-600 dark:text-gray-300">{{ t('guide.manual.codex.sandbox') }}</p>
+          <p class="mt-3 max-w-[40rem] text-sm leading-6 text-gray-600 dark:text-gray-300">{{ t('guide.manual.codex.test') }}</p>
+          <GuideCommand class="mt-3" label="codex" command="codex" />
+        </section>
+
+        <section id="guide-grok" data-testid="guide-client" class="mt-12 scroll-mt-24 border-t border-gray-100 pt-10 dark:border-dark-700">
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('guide.manual.grok.title') }}</h3>
+          <p class="mt-2 max-w-[40rem] text-sm leading-6 text-gray-600 dark:text-gray-300">{{ t('guide.manual.grok.ready') }}</p>
+          <p class="mt-4 max-w-[40rem] text-sm leading-6 text-gray-600 dark:text-gray-300">{{ t('guide.manual.grok.install') }}</p>
+          <div class="mt-4 grid gap-3 sm:grid-cols-2">
+            <GuideCommand :label="t('guide.manual.windows')" command="irm https://x.ai/cli/install.ps1 | iex" />
+            <GuideCommand :label="t('guide.manual.unix')" command="curl -fsSL https://x.ai/cli/install.sh | bash" />
+          </div>
+          <GuideCommand class="mt-3" label="grok --version" command="grok --version" />
+          <p class="mt-2 text-sm leading-6 text-gray-500 dark:text-gray-400">{{ t('guide.manual.grok.version') }}</p>
+
+          <h4 class="mt-8 text-sm font-semibold text-gray-900 dark:text-white">{{ t('guide.manual.openFolder') }}</h4>
+          <div class="mt-3 grid gap-3 sm:grid-cols-2">
+            <GuideCommand :label="t('guide.manual.windows')" command="%USERPROFILE%\.grok" />
+            <GuideCommand :label="t('guide.manual.unix')" command="~/.grok" />
+          </div>
+          <p class="mt-4 max-w-[40rem] text-sm leading-6 text-gray-600 dark:text-gray-300">{{ t('guide.manual.grok.files') }} {{ t('guide.manual.missingFile') }}</p>
+          <GuideFile
+            class="mt-4"
+            :filename="t('guide.manual.grok.configFile')"
+            :code="grokConfig"
+            :copy-label="t('guide.copy')"
+            :copied-label="t('guide.copied')"
+            :copied="copiedId === 'grok-config'"
+            @copy="copyText(grokConfig, 'grok-config')"
+          />
+          <p class="mt-4 max-w-[40rem] text-sm leading-6 text-gray-600 dark:text-gray-300">{{ t('guide.manual.grok.effort') }}</p>
+          <p class="mt-3 max-w-[40rem] text-sm leading-6 text-gray-600 dark:text-gray-300">{{ t('guide.manual.grok.search') }}</p>
+          <p class="mt-3 max-w-[40rem] text-sm leading-6 text-gray-600 dark:text-gray-300">{{ t('guide.manual.grok.test') }}</p>
+          <GuideCommand class="mt-3" label="grok" :command="grokProbe" />
+        </section>
+
+        <section id="guide-check" data-testid="guide-step" class="mt-12 scroll-mt-24 border-t border-gray-100 pt-10 dark:border-dark-700">
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('guide.manual.check.title') }}</h3>
+          <p class="mt-2 max-w-[40rem] text-sm leading-6 text-gray-600 dark:text-gray-300">{{ t('guide.manual.check.body') }}</p>
+          <div class="mt-3 flex flex-wrap gap-x-4 gap-y-2">
+            <router-link to="/usage" class="text-sm font-medium text-primary-600 underline-offset-4 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40 dark:text-primary-400">
+              {{ t('guide.manual.check.usage') }}
+            </router-link>
+            <router-link to="/dashboard" class="text-sm font-medium text-primary-600 underline-offset-4 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40 dark:text-primary-400">
+              {{ t('guide.manual.check.dashboard') }}
+            </router-link>
+          </div>
         </section>
       </article>
 
-      <aside class="hidden xl:sticky xl:top-24 xl:block xl:max-h-[calc(100vh-7rem)] xl:overflow-y-auto">
-        <div class="card p-4">
-          <nav :aria-label="t('guide.tocLabel')" class="space-y-1">
-            <a
-              v-for="step in steps"
-              :key="`rail-${step.id}`"
-              :href="`#${step.id}`"
-              class="flex items-center gap-3 rounded-xl px-3 py-2 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40"
-              :class="activeStep === step.id
-                ? 'bg-primary-50 font-medium text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
-                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-dark-700 dark:hover:text-white'"
-            >
-              <span class="w-4 tabular-nums" aria-hidden="true">{{ step.index }}</span>
-              <span>{{ step.title }}</span>
-            </a>
-          </nav>
-
-          <div class="mt-4 border-t border-gray-100 pt-4 dark:border-dark-700">
-            <GuideCallSnippet
-              :tabs="callTabs"
-              :active="activeCall"
-              :snippet="activeSnippet"
-              :copied="copied"
-              :copy-label="t('guide.copy')"
-              :copied-label="t('guide.copied')"
-              @select="activeCall = $event"
-              @copy="copySnippet"
-            />
-          </div>
-          <div class="mt-4 border-t border-gray-100 pt-4 dark:border-dark-700">
-            <GuideTroubleshoot :title="t('guide.troubleshoot.title')" :items="troubleItems" />
-          </div>
+      <aside class="hidden xl:sticky xl:top-24 xl:block">
+        <nav :aria-label="t('guide.tocLabel')" class="card space-y-1 p-3">
+          <a
+            v-for="item in toc"
+            :key="`rail-${item.id}`"
+            :href="`#${item.id}`"
+            class="block rounded-xl px-3 py-2 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40"
+            :class="activeStep === item.id
+              ? 'bg-primary-50 font-medium text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
+              : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-dark-700 dark:hover:text-white'"
+          >
+            {{ item.title }}
+          </a>
+        </nav>
+        <div class="card mt-4 p-4">
+          <GuideTroubleshoot :title="t('guide.troubleshoot.title')" :items="troubleItems" />
         </div>
       </aside>
     </div>
@@ -120,32 +152,33 @@ import AppLayout from '@/components/layout/AppLayout.vue'
 import { useClipboard } from '@/composables/useClipboard'
 import { useAppStore } from '@/stores/app'
 
-const GuideCallSnippet = defineComponent({
+const GuideCommand = defineComponent({
   props: {
-    tabs: { type: Array as () => Array<{ id: 'codex' | 'grok'; label: string }>, required: true },
-    active: { type: String as () => 'codex' | 'grok', required: true },
-    snippet: { type: String, required: true },
-    copied: { type: Boolean, required: true },
+    label: { type: String, required: true },
+    command: { type: String, required: true },
+  },
+  setup(props) {
+    return () => h('div', { class: 'rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 dark:border-dark-600 dark:bg-dark-800' }, [
+      h('p', { class: 'text-xs text-gray-500 dark:text-gray-400' }, props.label),
+      h('pre', { class: 'mt-1 overflow-x-auto font-mono text-[13px] leading-6 text-gray-900 dark:text-gray-100', translate: 'no' }, props.command),
+    ])
+  },
+})
+
+const GuideFile = defineComponent({
+  props: {
+    filename: { type: String, required: true },
+    code: { type: String, required: true },
     copyLabel: { type: String, required: true },
     copiedLabel: { type: String, required: true },
+    copied: { type: Boolean, required: true },
+    testId: { type: String, default: '' },
   },
-  emits: ['select', 'copy'],
+  emits: ['copy'],
   setup(props, { emit }) {
     return () => h('div', { class: 'overflow-hidden rounded-xl border border-gray-200 dark:border-dark-600' }, [
       h('div', { class: 'flex items-center justify-between gap-3 border-b border-gray-200 bg-gray-50 px-3 py-2 dark:border-dark-600 dark:bg-dark-800' }, [
-        h('div', { class: 'flex gap-1', role: 'tablist' }, props.tabs.map((tab) => h('button', {
-          key: tab.id,
-          type: 'button',
-          role: 'tab',
-          'aria-selected': props.active === tab.id,
-          class: [
-            'rounded-md px-2.5 py-1 text-xs font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40',
-            props.active === tab.id
-              ? 'bg-white text-gray-900 shadow-sm dark:bg-dark-700 dark:text-white'
-              : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200',
-          ],
-          onClick: () => emit('select', tab.id),
-        }, tab.label))),
+        h('span', { class: 'font-mono text-xs text-gray-700 dark:text-gray-200', translate: 'no' }, props.filename),
         h('button', {
           type: 'button',
           class: 'text-xs font-medium text-gray-600 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40 dark:text-gray-300 dark:hover:text-white',
@@ -153,9 +186,10 @@ const GuideCallSnippet = defineComponent({
         }, props.copied ? props.copiedLabel : props.copyLabel),
       ]),
       h('pre', {
-        'data-testid': 'guide-snippet',
+        'data-testid': props.testId || undefined,
         class: 'overflow-x-auto bg-gray-950 p-4 text-[13px] leading-6 text-gray-100',
-      }, [h('code', props.snippet)]),
+        translate: 'no',
+      }, [h('code', props.code)]),
     ])
   },
 })
@@ -178,9 +212,8 @@ const { t } = useI18n()
 const appStore = useAppStore()
 const { copyToClipboard } = useClipboard()
 
-const activeCall = ref<'codex' | 'grok'>('codex')
-const activeStep = ref('guide-login')
-const copied = ref(false)
+const activeStep = ref('guide-prep')
+const copiedId = ref('')
 let copiedTimer: number | undefined
 let stepObserver: IntersectionObserver | undefined
 
@@ -189,25 +222,73 @@ const apiV1 = computed(() => {
   return raw.endsWith('/v1') ? raw : `${raw}/v1`
 })
 
-function curl(model: string): string {
-  return [
-    `curl ${apiV1.value}/chat/completions \\`,
-    `  -H "Authorization: Bearer ${t('guide.keyToken')}" \\`,
-    '  -H "Content-Type: application/json" \\',
-    `  -d '{"model":"${model}","messages":[{"role":"user","content":"你好"}]}'`,
-  ].join('\n')
-}
+const keyPlaceholder = computed(() => `sk-${t('guide.keyToken')}`)
+const grokProbe = 'grok -p "只回复 ok" -m grok-4.7'
+const codexInstall = 'npm install -g @openai/codex@latest'
 
-const snippets = computed(() => ({
-  codex: curl('gpt-5.6-terra'),
-  grok: curl(t('guide.grokModelToken')),
-}))
+const codexConfig = computed(() => `disable_response_storage = true
+model = "gpt-6.1-sol"
+model_provider = "mile"
+model_reasoning_effort = "xhigh"
+model_verbosity = "high"
 
-const activeSnippet = computed(() => snippets.value[activeCall.value])
+[features]
+web_search_request = true
 
-const callTabs = computed(() => [
-  { id: 'codex' as const, label: t('guide.steps.call.codex') },
-  { id: 'grok' as const, label: t('guide.steps.call.grok') },
+[model_providers.mile]
+base_url = "${apiV1.value}"
+name = "mile"
+requires_openai_auth = true
+wire_api = "responses"
+
+[tui]
+screen_reader_detection_done = true
+
+[windows]
+sandbox = "elevated"`)
+
+const authJson = computed(() => `{
+  "OPENAI_API_KEY": "${keyPlaceholder.value}"
+}`)
+
+const grokConfig = computed(() => `[models]
+default = "grok-4.7"
+web_search = "grok-4.7"
+
+[endpoints]
+models_base_url = "${apiV1.value}"
+
+[model."grok-4.7"]
+model = "grok-4.7"
+name = "Grok 4.7"
+description = "Grok 4.7 via MILE"
+api_key = "${keyPlaceholder.value}"
+api_backend = "responses"
+context_window = 500000
+supports_reasoning_effort = true
+supports_backend_search = false
+
+[marketplace]
+default_skills_installs_purged = true
+official_marketplace_auto_installed = true
+
+[[marketplace.sources]]
+name = "xAI Official"
+git = "https://github.com/xai-org/plugin-marketplace.git"
+
+[cli]
+auto_update = true
+installer = "internal"
+
+[ui]
+yolo = true
+compact_mode = false`)
+
+const toc = computed(() => [
+  { id: 'guide-prep', title: t('guide.manual.prep.title') },
+  { id: 'guide-codex', title: t('guide.manual.codex.title') },
+  { id: 'guide-grok', title: t('guide.manual.grok.title') },
+  { id: 'guide-check', title: t('guide.manual.check.title') },
 ])
 
 const troubleItems = computed(() => [
@@ -216,52 +297,13 @@ const troubleItems = computed(() => [
   t('guide.troubleshoot.model'),
 ])
 
-const steps = computed(() => [
-  {
-    id: 'guide-login',
-    index: 1,
-    title: t('guide.steps.login.title'),
-    body: t('guide.steps.login.body'),
-  },
-  {
-    id: 'guide-quota',
-    index: 2,
-    title: t('guide.steps.quota.title'),
-    body: t('guide.steps.quota.body'),
-  },
-  {
-    id: 'guide-key',
-    index: 3,
-    title: t('guide.steps.key.title'),
-    body: t('guide.steps.key.body'),
-    link: { to: '/keys', label: t('guide.steps.key.link') },
-  },
-  {
-    id: 'guide-call',
-    index: 4,
-    title: t('guide.steps.call.title'),
-    body: t('guide.steps.call.body'),
-    note: t('guide.steps.call.client'),
-  },
-  {
-    id: 'guide-check',
-    index: 5,
-    title: t('guide.steps.check.title'),
-    body: t('guide.steps.check.body'),
-    links: [
-      { to: '/usage', label: t('guide.steps.check.usage') },
-      { to: '/dashboard', label: t('guide.steps.check.dashboard') },
-    ],
-  },
-])
-
-async function copySnippet() {
-  const ok = await copyToClipboard(activeSnippet.value, t('guide.copied'))
+async function copyText(value: string, id: string) {
+  const ok = await copyToClipboard(value, t('guide.copied'))
   if (!ok) return
-  copied.value = true
+  copiedId.value = id
   if (copiedTimer !== undefined) window.clearTimeout(copiedTimer)
   copiedTimer = window.setTimeout(() => {
-    copied.value = false
+    copiedId.value = ''
   }, 1800)
 }
 
@@ -272,9 +314,9 @@ onMounted(() => {
       .filter((entry) => entry.isIntersecting)
       .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0]
     if (visible?.target?.id) activeStep.value = visible.target.id
-  }, { rootMargin: '-20% 0px -55% 0px', threshold: [0.25, 0.6] })
-  for (const step of steps.value) {
-    const node = document.getElementById(step.id)
+  }, { rootMargin: '-20% 0px -55% 0px', threshold: [0.15, 0.4] })
+  for (const item of toc.value) {
+    const node = document.getElementById(item.id)
     if (node) stepObserver.observe(node)
   }
 })

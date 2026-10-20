@@ -28,20 +28,24 @@ vi.mock('@/components/layout/AppLayout.vue', () => ({
 import GettingStartedView from '../GettingStartedView.vue'
 
 describe('GettingStartedView', () => {
-  it('shows the five steps and a Codex call without a wallet balance', () => {
+  it('shows Codex and Grok Build setup without a wallet balance', () => {
     const wrapper = mount(GettingStartedView, {
       global: {
         stubs: { 'router-link': { props: ['to'], template: '<a :href="to"><slot /></a>' } },
       },
     })
 
-    const steps = wrapper.findAll('[data-testid="guide-step"]')
-    expect(steps).toHaveLength(5)
-    expect(wrapper.text()).toContain('guide.steps.quota.title')
+    expect(wrapper.findAll('[data-testid="guide-client"]')).toHaveLength(2)
+    expect(wrapper.text()).toContain('guide.manual.codex.ready')
     expect(wrapper.text()).not.toContain('余额')
+    expect(wrapper.text()).not.toContain('还不能调用')
     const snippet = wrapper.find('[data-testid="guide-snippet"]').text()
-    expect(snippet).toContain('https://gateway.example/v1/chat/completions')
-    expect(snippet).toContain('gpt-5.6-terra')
+    expect(snippet).toContain('https://gateway.example/v1')
+    expect(snippet).toContain('gpt-6.1-sol')
+    expect(snippet).toContain('model_provider = "mile"')
     expect(snippet).not.toContain('/v1/v1/')
+    expect(wrapper.text()).toContain('OPENAI_API_KEY')
+    expect(wrapper.text()).toContain('supports_backend_search = false')
+    expect(wrapper.text()).toContain('installer = "internal"')
   })
 })
