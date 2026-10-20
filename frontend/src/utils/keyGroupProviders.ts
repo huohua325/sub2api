@@ -1,36 +1,29 @@
 import type { GroupPlatform } from '@/types'
 
-export type KeyGroupProvider = 'anthropic' | 'openai' | 'domestic' | 'other'
+// Lab key picker. These are uses, not upstream vendors.
+// Codex and Grok Build are the subscription coding-agent groups.
+// GPT and Grok each also have an API-key group; those belong with the experiment models.
+export type KeyGroupProvider = 'codex' | 'grok_build' | 'experiment'
 
-export const KEY_GROUP_PROVIDERS = ['anthropic', 'openai', 'domestic', 'other'] as const
+export const KEY_GROUP_PROVIDERS = ['codex', 'grok_build', 'experiment'] as const
 
-// Classify by the configured upstream platform, never by a group's display name.
-const PROVIDER_BY_PLATFORM: Record<GroupPlatform, KeyGroupProvider> = {
-  anthropic: 'anthropic',
-  openai: 'openai',
-  kimi: 'domestic',
-  zhipu: 'domestic',
-  deepseek: 'domestic',
-  qwen: 'domestic',
-  minimax: 'domestic',
-  gemini: 'other',
-  grok: 'other',
-  antigravity: 'other',
-  composite: 'other',
-  opencode_go: 'other',
-  typesafe: 'other',
-  command_code: 'other',
-  cline: 'other'
+export function getKeyGroupProvider(group: { platform: GroupPlatform; name?: string | null }): KeyGroupProvider {
+  const name = (group.name ?? '').trim().toLowerCase()
+  if (group.platform === 'openai' && isCodexGroupName(name)) return 'codex'
+  if (group.platform === 'grok' && isGrokBuildGroupName(name)) return 'grok_build'
+  return 'experiment'
 }
 
-export function getKeyGroupProvider(platform: GroupPlatform): KeyGroupProvider {
-  return PROVIDER_BY_PLATFORM[platform] ?? 'other'
+function isCodexGroupName(name: string): boolean {
+  return name.includes('codex') || /pro\s*100/.test(name)
 }
 
-// Collections use representative provider marks rather than an invented brand logo.
+function isGrokBuildGroupName(name: string): boolean {
+  return name.includes('build') || name.includes('afk')
+}
+
 export const KEY_GROUP_PROVIDER_ICONS: Record<KeyGroupProvider, GroupPlatform[]> = {
-  anthropic: ['anthropic'],
-  openai: ['openai'],
-  domestic: ['deepseek', 'kimi'],
-  other: ['gemini', 'grok']
+  codex: ['openai'],
+  grok_build: ['grok'],
+  experiment: ['deepseek', 'kimi']
 }

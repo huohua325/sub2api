@@ -126,18 +126,16 @@ export default {
     nameLabel: '名称',
     namePlaceholder: '我的 API 密钥',
     groupLabel: '分组',
-    providerLabel: '厂商',
+    providerLabel: '用途',
     providers: {
-      anthropic: 'Anthropic',
-      openai: 'OpenAI',
-      domestic: '国产模型',
-      other: '其他'
+      codex: 'Codex',
+      grok_build: 'Grok Build',
+      experiment: 'API 实验'
     },
     providerHints: {
-      anthropic: '选择 Anthropic / Claude 的可用分组',
-      openai: '选择 OpenAI / GPT 的可用分组',
-      domestic: '包含 DeepSeek、Kimi、智谱 GLM、MiniMax',
-      other: '包含 Gemini、Grok、Antigravity、OpenCode 和混合分组'
+      codex: '用于 Codex。这是 GPT 的编程助手分组，不是接口调用分组。',
+      grok_build: '用于 Grok Build。这是 Grok 的编程助手分组，不是接口调用分组。',
+      experiment: '调用 API 模型做实验。GPT 和 Grok 的接口分组在这里，也包括 Claude、DeepSeek、Kimi、GLM、Qwen。'
     },
     selectGroup: '选择分组',
     statusLabel: '状态',

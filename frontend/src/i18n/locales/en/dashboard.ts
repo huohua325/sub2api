@@ -126,18 +126,16 @@ export default {
     nameLabel: 'Name',
     namePlaceholder: 'My API Key',
     groupLabel: 'Group',
-    providerLabel: 'Provider',
+    providerLabel: 'Use',
     providers: {
-      anthropic: 'Anthropic',
-      openai: 'OpenAI',
-      domestic: 'Chinese AI',
-      other: 'Other'
+      codex: 'Codex',
+      grok_build: 'Grok Build',
+      experiment: 'API experiments'
     },
     providerHints: {
-      anthropic: 'Choose an available Anthropic / Claude group',
-      openai: 'Choose an available OpenAI / GPT group',
-      domestic: 'Includes DeepSeek, Kimi, Zhipu GLM and MiniMax',
-      other: 'Includes Gemini, Grok, Antigravity, OpenCode and mixed groups'
+      codex: 'For Codex. This is the GPT coding-agent group, not the API group.',
+      grok_build: 'For Grok Build. This is the Grok coding-agent group, not the API group.',
+      experiment: 'Call API models for experiments. The GPT and Grok API groups are here, along with Claude, DeepSeek, Kimi, GLM, and Qwen.'
     },
     selectGroup: 'Select a group',
     statusLabel: 'Status',

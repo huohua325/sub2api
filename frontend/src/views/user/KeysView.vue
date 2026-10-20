@@ -493,7 +493,7 @@
 
         <fieldset v-if="!showEditModal" data-tour="key-form-provider">
           <legend class="input-label">{{ t('keys.providerLabel') }}</legend>
-          <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
             <label
               v-for="provider in createProviderOptions"
               :key="provider.value"
@@ -1537,16 +1537,16 @@ const groupOptions = computed(() =>
   }))
 )
 
-const createProvider = ref<KeyGroupProvider>('anthropic')
+const createProvider = ref<KeyGroupProvider>('codex')
 const createProviderOptions = computed(() => KEY_GROUP_PROVIDERS.map((value) => ({
   value,
   label: t(`keys.providers.${value}`),
-  count: groups.value.filter((group) => getKeyGroupProvider(group.platform) === value).length
+  count: groups.value.filter((group) => getKeyGroupProvider(group) === value).length
 })))
 
 const formGroupOptions = computed(() => showEditModal.value
   ? groupOptions.value
-  : groupOptions.value.filter((group) => getKeyGroupProvider(group.platform) === createProvider.value)
+  : groupOptions.value.filter((group) => getKeyGroupProvider({ platform: group.platform, name: group.label }) === createProvider.value)
 )
 
 const selectCreateProvider = (provider: KeyGroupProvider) => {
@@ -1559,7 +1559,7 @@ const selectCreateProvider = (provider: KeyGroupProvider) => {
 watch([showCreateModal, createProviderOptions], ([isOpen, providers], [wasOpen]) => {
   if (!isOpen) return
   if (!wasOpen || !providers.some((provider) => provider.value === createProvider.value && provider.count > 0)) {
-    selectCreateProvider(providers.find((provider) => provider.count > 0)?.value ?? 'anthropic')
+    selectCreateProvider(providers.find((provider) => provider.count > 0)?.value ?? 'codex')
   }
   if (!formGroupOptions.value.some((group) => group.value === formData.value.group_id)) {
     formData.value.group_id = null
