@@ -11,6 +11,7 @@ const PROVIDER_BY_PLATFORM: Record<GroupPlatform, KeyGroupProvider> = {
   kimi: 'domestic',
   zhipu: 'domestic',
   deepseek: 'domestic',
+  qwen: 'domestic',
   minimax: 'domestic',
   gemini: 'other',
   grok: 'other',

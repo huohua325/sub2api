@@ -481,6 +481,11 @@ export const CN_BASE_URL_PRESETS: Record<CnProviderPlatform, CnBaseUrlPreset[]> 
     { mode: 'payg', protocol: 'anthropic', label: 'DeepSeek Anthropic', url: 'https://api.deepseek.com/anthropic' },
     { mode: 'payg', protocol: 'responses', label: 'DeepSeek Responses', url: 'https://api.deepseek.com' }
   ],
+  qwen: [
+    { mode: 'payg', protocol: 'chat_completions', label: 'GlobalAI', url: 'https://globalai.vip/v1' },
+    { mode: 'payg', protocol: 'anthropic', label: 'GlobalAI', url: 'https://globalai.vip' },
+    { mode: 'payg', protocol: 'responses', label: 'GlobalAI', url: 'https://globalai.vip/v1' }
+  ],
   minimax: [
     { mode: 'payg', protocol: 'chat_completions', label: 'MiniMax CN', url: 'https://api.minimaxi.com/v1' },
     { mode: 'payg', protocol: 'anthropic', label: 'MiniMax CN Anthropic', url: 'https://api.minimaxi.com/anthropic' },
