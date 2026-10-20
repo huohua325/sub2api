@@ -129,6 +129,20 @@ var providerProfiles = map[string]*ProviderProfile{
 			},
 		},
 	},
+	PlatformQwen: {
+		Platform:    PlatformQwen,
+		DefaultMode: AccountModePayG,
+		Routing:     ProviderRoutingByInbound,
+		Modes: map[string]ProviderEndpoints{
+			AccountModePayG: {
+				BaseURLs: map[string]string{
+					APIProtocolChatCompletions: DefaultQwenBaseURL,
+					APIProtocolResponses:       DefaultQwenBaseURL,
+					APIProtocolAnthropic:       DefaultQwenAnthropicBaseURL,
+				},
+			},
+		},
+	},
 	PlatformDeepseek: {
 		Platform:    PlatformDeepseek,
 		DefaultMode: AccountModePayG,

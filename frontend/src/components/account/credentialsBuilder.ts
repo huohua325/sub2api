@@ -259,7 +259,7 @@ export const GROK_BASE_URL_PRESETS: GrokBaseUrlPreset[] = [
 
 export type CnAccountMode = 'payg' | 'coding'
 export type OpenCodeAccountMode = 'zen' | 'go'
-export type CnProviderPlatform = 'kimi' | 'zhipu' | 'deepseek' | 'minimax'
+export type CnProviderPlatform = 'kimi' | 'zhipu' | 'deepseek' | 'qwen' | 'minimax'
 
 /** adaptive 按入站协议（或按模型规则）选择原生端点。 */
 export type CnApiProtocol = 'adaptive' | 'chat_completions' | 'anthropic' | 'responses'
@@ -268,7 +268,7 @@ export type CnNativeApiProtocol = Exclude<CnApiProtocol, 'adaptive'>
 const NATIVE_API_PROTOCOLS: CnNativeApiProtocol[] = ['chat_completions', 'anthropic', 'responses']
 
 export function isCNProviderPlatform(platform: string): platform is CnProviderPlatform {
-  return platform === 'kimi' || platform === 'zhipu' || platform === 'deepseek' || platform === 'minimax'
+  return platform === 'kimi' || platform === 'zhipu' || platform === 'deepseek' || platform === 'qwen' || platform === 'minimax'
 }
 
 /** 平台是否为多协议 API Key 供应商（平台清单中带 profile）。 */

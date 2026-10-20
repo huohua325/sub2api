@@ -27,6 +27,7 @@ const (
 	PlatformKimi     = "kimi"     // Kimi (月之暗面 / Moonshot)
 	PlatformZhipu    = "zhipu"    // 智谱 GLM (bigmodel)
 	PlatformDeepseek = "deepseek" // DeepSeek
+	PlatformQwen     = "qwen"     // 通义千问
 	PlatformMiniMax  = "minimax"  // MiniMax (M 系列)
 	PlatformTypeSafe = "typesafe" // TypeSafe AI System One (Jev)
 	// PlatformOpenCodeGo 是 OpenCode 平台（账号类型 Zen 按量 / Go 订阅）。

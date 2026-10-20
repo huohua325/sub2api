@@ -26,7 +26,7 @@ type PlatformSpec struct {
 	ID          string          `json:"id"`
 	DisplayName string          `json:"display_name"`
 	Gateway     PlatformGateway `json:"gateway"`
-	// CNProvider 标识国产单一厂商（Kimi / 智谱 / DeepSeek / MiniMax），共享国产
+	// CNProvider 标识国产单一厂商（Kimi / 智谱 / DeepSeek / Qwen / MiniMax），共享国产
 	// 供应商的余额 / Coding Plan 等能力。
 	CNProvider bool `json:"cn_provider"`
 	// LiteLLMProvider 是定价目录中的 provider 名；空表示不支持从定价目录同步模型。
@@ -43,6 +43,7 @@ var platformList = []PlatformSpec{
 	{ID: PlatformKimi, DisplayName: "Kimi", Gateway: PlatformGatewayOpenAI, CNProvider: true, LiteLLMProvider: "moonshot"},
 	{ID: PlatformZhipu, DisplayName: "Zhipu GLM", Gateway: PlatformGatewayOpenAI, CNProvider: true, LiteLLMProvider: "zhipu"},
 	{ID: PlatformDeepseek, DisplayName: "DeepSeek", Gateway: PlatformGatewayOpenAI, CNProvider: true, LiteLLMProvider: "deepseek"},
+	{ID: PlatformQwen, DisplayName: "Qwen", Gateway: PlatformGatewayOpenAI, CNProvider: true, LiteLLMProvider: "dashscope"},
 	{ID: PlatformMiniMax, DisplayName: "MiniMax", Gateway: PlatformGatewayOpenAI, CNProvider: true, LiteLLMProvider: "minimax"},
 	{ID: PlatformOpenCodeGo, DisplayName: "OpenCode", Gateway: PlatformGatewayOpenAI, LiteLLMProvider: "opencode-go"},
 	{ID: PlatformTypeSafe, DisplayName: "TypeSafe / Jev", Gateway: PlatformGatewayAnthropic, LiteLLMProvider: "typesafe"},

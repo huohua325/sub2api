@@ -47,6 +47,7 @@ const (
 	PlatformKimi        = domain.PlatformKimi
 	PlatformZhipu       = domain.PlatformZhipu
 	PlatformDeepseek    = domain.PlatformDeepseek
+	PlatformQwen        = domain.PlatformQwen
 	PlatformMiniMax     = domain.PlatformMiniMax
 	PlatformOpenCodeGo  = domain.PlatformOpenCodeGo
 	PlatformTypeSafe    = domain.PlatformTypeSafe
@@ -82,6 +83,8 @@ const (
 	DefaultZhipuPayGBaseURL   = "https://open.bigmodel.cn/api/paas/v4"
 	DefaultZhipuCodingBaseURL = "https://open.bigmodel.cn/api/coding/paas/v4"
 	DefaultDeepseekBaseURL    = "https://api.deepseek.com"
+	// Qwen 实验分组走 GlobalAI。对话和 Responses 用 /v1，Anthropic 不加 /v1。
+	DefaultQwenBaseURL = "https://globalai.vip/v1"
 	// MiniMax 按量付费与 Coding/Token Plan 共用推理域名，靠 API Key 区分套餐。
 	DefaultMiniMaxBaseURL = "https://api.minimaxi.com/v1"
 	// OpenCode Go：Chat Completions / Responses / models 共用 /v1 基址。
@@ -101,6 +104,7 @@ const (
 	DefaultKimiCodingAnthropicBaseURL = "https://api.kimi.com/coding"
 	DefaultZhipuAnthropicBaseURL      = "https://open.bigmodel.cn/api/anthropic"
 	DefaultDeepseekAnthropicBaseURL   = "https://api.deepseek.com/anthropic"
+	DefaultQwenAnthropicBaseURL       = "https://globalai.vip"
 	DefaultMiniMaxAnthropicBaseURL    = "https://api.minimaxi.com/anthropic"
 	// OpenCode Go Anthropic 基址不含 /v1：nativeAnthropicTargetURL 会再拼 /v1/messages。
 	DefaultOpenCodeGoAnthropicBaseURL  = "https://opencode.ai/zen/go"

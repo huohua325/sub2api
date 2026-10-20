@@ -114,6 +114,27 @@
       }
     },
     {
+      "id": "qwen",
+      "display_name": "Qwen",
+      "gateway": "openai",
+      "cn_provider": true,
+      "litellm_provider": "dashscope",
+      "multi_protocol": {
+        "default_mode": "payg",
+        "routing": "by_inbound",
+        "modes": [
+          {
+            "mode": "payg",
+            "base_urls": {
+              "anthropic": "https://globalai.vip",
+              "chat_completions": "https://globalai.vip/v1",
+              "responses": "https://globalai.vip/v1"
+            }
+          }
+        ]
+      }
+    },
+    {
       "id": "minimax",
       "display_name": "MiniMax",
       "gateway": "openai",
@@ -289,6 +310,7 @@
     "kimi",
     "zhipu",
     "deepseek",
+    "qwen",
     "minimax",
     "opencode_go",
     "typesafe",
