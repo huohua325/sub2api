@@ -160,7 +160,7 @@ export default {
           "Only email addresses from the specified domains can register; leave empty for no restriction (for example, {'@'}qq.com, {'@'}gmail.com, *.edu.cn)",
         emailSuffixWhitelistPlaceholder: "{'@'}example.com, *.edu.cn",
         emailAllowlistEnabled: 'Email allowlist registration',
-        emailAllowlistEnabledHint: 'When on, only the emails added below can register, and they do not need an invitation code. Every other email is rejected.',
+        emailAllowlistEnabledHint: 'When on, only the emails added below can register. They do not need an invitation code or an email verification code. Every other email is rejected.',
         emailAllowlist: 'Approved emails',
         emailAllowlistHint: 'Add full email addresses by hand. After the switch above is on, only these addresses can register.',
         emailAllowlistPlaceholder: "name{'@'}example.com",

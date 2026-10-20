@@ -306,7 +306,7 @@
           {{
             isLoading
               ? t('auth.processing')
-              : emailVerifyEnabled
+              : emailCodeRequired
                 ? t('auth.continue')
                 : t('auth.createAccount')
           }}
@@ -442,6 +442,9 @@ const promoCodeEnabled = ref<boolean>(
 )
 const invitationCodeEnabled = ref<boolean>(false)
 const emailAllowlistEnabled = ref(false)
+const emailCodeRequired = computed(
+  () => emailVerifyEnabled.value && !emailAllowlistEnabled.value
+)
 const affiliateEnabled = ref<boolean>(false)
 const turnstileEnabled = ref<boolean>(false)
 const turnstileSiteKey = ref<string>('')
@@ -1079,9 +1082,9 @@ async function handleRegister(): Promise<void> {
       formData.aff_code = affCode
     }
 
-    // If email verification is enabled, reject unknown or existing emails
-    // before opening the verification page.
-    if (emailVerifyEnabled.value) {
+    // Allowlisted addresses are confirmed by an administrator, so they set a
+    // password here. Email codes remain only while the allowlist is off.
+    if (emailCodeRequired.value) {
       await checkRegistrationEmail(formData.email.trim())
       // Store registration data in sessionStorage
       sessionStorage.setItem(

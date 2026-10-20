@@ -298,7 +298,7 @@ export default {
     promoCodeAlreadyUsed: '您已使用过此优惠码',
     promoCodeValidating: '优惠码正在验证中，请稍候',
     promoCodeInvalidCannotRegister: '优惠码无效，请检查后重试或清空优惠码',
-    emailAllowlistOnly: '只有管理员开通的邮箱可以注册。',
+    emailAllowlistOnly: '只有管理员开通的邮箱可以注册。开通后直接设置密码，不用邮箱验证码。',
     emailNotApproved: '该邮箱尚未开通注册',
     emailAlreadyRegistered: '该邮箱已经注册',
     checkingRegistrationEmail: '正在确认这个邮箱能否注册…',

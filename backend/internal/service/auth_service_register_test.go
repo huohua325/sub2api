@@ -350,6 +350,22 @@ func TestAuthService_Register_EmailVerifyEnabledButServiceNotConfigured(t *testi
 	require.ErrorIs(t, err, ErrServiceUnavailable)
 }
 
+func TestAuthService_Register_AllowlistedEmailSkipsEmailVerification(t *testing.T) {
+	repo := &userRepoStub{nextID: 81}
+	service := newAuthService(repo, map[string]string{
+		SettingKeyRegistrationEnabled:               "true",
+		SettingKeyEmailVerifyEnabled:                "true",
+		SettingKeyRegistrationEmailAllowlistEnabled: "true",
+		SettingKeyRegistrationEmailAllowlist:        `["student@bupt.edu.cn"]`,
+	}, nil, nil)
+
+	_, user, err := service.Register(context.Background(), "student@bupt.edu.cn", "password")
+	require.NoError(t, err)
+	require.NotNil(t, user)
+	require.Equal(t, "student@bupt.edu.cn", user.Email)
+	require.Len(t, repo.created, 1)
+}
+
 func TestAuthService_Register_EmailVerifyRequired(t *testing.T) {
 	repo := &userRepoStub{}
 	cache := &emailCacheStub{} // 配置 emailService

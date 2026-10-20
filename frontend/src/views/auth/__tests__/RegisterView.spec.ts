@@ -214,6 +214,36 @@ describe('RegisterView', () => {
     expect(registerMock).not.toHaveBeenCalled()
   })
 
+  it('creates an allowlisted account without opening the verification page', async () => {
+    getPublicSettingsMock.mockResolvedValueOnce({
+      ...publicSettings,
+      turnstile_enabled: false,
+      email_verify_enabled: true,
+      registration_email_allowlist_enabled: true
+    })
+    const wrapper = mountRegister()
+    await flushPromises()
+    await wrapper.get('#email').setValue('student@bupt.edu.cn')
+    await wrapper.get('#password').setValue('secret-123')
+    await wrapper.get('#confirmPassword').setValue('secret-123')
+    await wrapper.get('form').trigger('submit.prevent')
+    await flushPromises()
+
+    expect(checkRegistrationEmailMock).not.toHaveBeenCalled()
+    expect(sessionStorage.getItem('register_data')).toBeNull()
+    expect(registerMock).toHaveBeenCalledWith({
+      email: 'student@bupt.edu.cn',
+      password: 'secret-123',
+      turnstile_token: undefined,
+      tencent_captcha_ticket: undefined,
+      tencent_captcha_randstr: undefined,
+      promo_code: undefined,
+      invitation_code: undefined
+    })
+    expect(pushMock).toHaveBeenCalledWith('/dashboard')
+    expect(pushMock).not.toHaveBeenCalledWith('/email-verify')
+  })
+
   it('keeps an unapproved email on the register form', async () => {
     getPublicSettingsMock.mockResolvedValueOnce({
       ...publicSettings,

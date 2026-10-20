@@ -299,7 +299,7 @@ export default {
     promoCodeAlreadyUsed: 'You have already used this promo code',
     promoCodeValidating: 'Promo code is being validated, please wait',
     promoCodeInvalidCannotRegister: 'Invalid promo code. Please check and try again or clear the promo code field',
-    emailAllowlistOnly: 'Only an email approved by an administrator can register.',
+    emailAllowlistOnly: 'Only an email approved by an administrator can register. Set a password directly. No email code is required.',
     emailNotApproved: 'This email is not approved for registration',
     emailAlreadyRegistered: 'This email is already registered',
     checkingRegistrationEmail: 'Checking whether this email can register…',

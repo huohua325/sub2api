@@ -161,7 +161,7 @@ export default {
         emailSuffixWhitelistPlaceholder: "{'@'}example.com, *.edu.cn",
         emailSuffixWhitelistInputHint: '留空则不限制。使用 *.edu.cn 可匹配 edu.cn 及其子域名。',
         emailAllowlistEnabled: '邮箱白名单注册',
-        emailAllowlistEnabledHint: '打开后，只有下面手动添加的邮箱可以注册，并且不用邀请码。其他邮箱不能注册。',
+        emailAllowlistEnabledHint: '打开后，只有下面手动添加的邮箱可以注册，不用邀请码，也不用邮箱验证码。其他邮箱不能注册。',
         emailAllowlist: '可注册邮箱',
         emailAllowlistHint: '管理员手动添加完整邮箱。打开上面的开关后，只有这些邮箱可以注册。',
         emailAllowlistPlaceholder: "name{'@'}example.com",
