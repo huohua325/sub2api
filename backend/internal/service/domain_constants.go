@@ -217,9 +217,11 @@ const DingTalkConnectSyntheticEmailDomain = "@dingtalk-connect.invalid"
 // Setting keys
 const (
 	// 注册设置
-	SettingKeyRegistrationEnabled              = "registration_enabled"                // 是否开放注册
-	SettingKeyEmailVerifyEnabled               = "email_verify_enabled"                // 是否开启邮件验证
-	SettingKeyRegistrationEmailSuffixWhitelist = "registration_email_suffix_whitelist" // 注册邮箱后缀白名单（JSON 数组）
+	SettingKeyRegistrationEnabled               = "registration_enabled"                 // 是否开放注册
+	SettingKeyEmailVerifyEnabled                = "email_verify_enabled"                 // 是否开启邮件验证
+	SettingKeyRegistrationEmailSuffixWhitelist  = "registration_email_suffix_whitelist"  // 注册邮箱后缀白名单（JSON 数组）
+	SettingKeyRegistrationEmailAllowlist        = "registration_email_allowlist"         // 管理员开通的完整邮箱（JSON 数组）
+	SettingKeyRegistrationEmailAllowlistEnabled = "registration_email_allowlist_enabled" // 只允许名单内邮箱注册
 	// 白名单非空时，是否放行非白名单域名按主域名限量注册（每域名 1 个账户）。
 	// 默认 false：非白名单域名直接拒绝（白名单严格模式）。
 	SettingKeyRegistrationEmailDomainQuotaEnabled = "registration_email_domain_quota_enabled"

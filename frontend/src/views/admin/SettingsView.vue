@@ -1535,6 +1535,61 @@
                 </p>
               </div>
 
+              <div class="flex items-center justify-between border-t border-gray-100 pt-4 dark:border-dark-700">
+                <div>
+                  <label class="font-medium text-gray-900 dark:text-white">{{
+                    t("admin.settings.registration.emailAllowlistEnabled")
+                  }}</label>
+                  <p class="text-sm text-gray-500 dark:text-gray-400">
+                    {{ t("admin.settings.registration.emailAllowlistEnabledHint") }}
+                  </p>
+                </div>
+                <Toggle v-model="form.registration_email_allowlist_enabled" />
+              </div>
+
+              <div v-if="form.registration_email_allowlist_enabled" class="border-t border-gray-100 pt-4 dark:border-dark-700">
+                <label class="font-medium text-gray-900 dark:text-white">{{
+                  t("admin.settings.registration.emailAllowlist")
+                }}</label>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                  {{ t("admin.settings.registration.emailAllowlistHint") }}
+                </p>
+                <div
+                  class="mt-3 rounded-lg border border-gray-300 bg-white p-2 dark:border-dark-500 dark:bg-dark-700"
+                >
+                  <div class="flex flex-wrap items-center gap-2">
+                    <span
+                      v-for="email in registrationEmailAllowlistTags"
+                      :key="email"
+                      class="inline-flex items-center gap-1 rounded bg-gray-100 px-2 py-1 font-mono text-xs text-gray-700 dark:bg-dark-600 dark:text-gray-200"
+                    >
+                      <span>{{ email }}</span>
+                      <button
+                        type="button"
+                        class="rounded-full text-gray-500 hover:bg-gray-200 hover:text-gray-700 dark:text-gray-300 dark:hover:bg-dark-500 dark:hover:text-white"
+                        @click="removeRegistrationEmailAllowlistTag(email)"
+                      >
+                        <Icon name="x" size="xs" class="h-3.5 w-3.5" :stroke-width="2" />
+                      </button>
+                    </span>
+                    <div class="flex min-w-[220px] flex-1 items-center gap-1 rounded border border-transparent px-2 py-1 focus-within:border-primary-300 dark:focus-within:border-primary-700">
+                      <input
+                        v-model="registrationEmailAllowlistDraft"
+                        type="email"
+                        class="w-full bg-transparent font-mono text-sm text-gray-900 outline-none placeholder:text-gray-400 dark:text-white dark:placeholder:text-gray-500"
+                        :placeholder="t('admin.settings.registration.emailAllowlistPlaceholder')"
+                        @keydown="handleRegistrationEmailAllowlistKeydown"
+                        @blur="commitRegistrationEmailAllowlistDraft"
+                        @paste="handleRegistrationEmailAllowlistPaste"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                  {{ t("admin.settings.registration.emailAllowlistInputHint") }}
+                </p>
+              </div>
+
               <!-- Email Domain Quota -->
               <div
                 class="flex items-center justify-between border-t border-gray-100 pt-4 dark:border-dark-700"
@@ -9184,6 +9239,8 @@ const smtpPasswordManuallyEdited = ref(false);
 const testEmailAddress = ref("");
 const registrationEmailSuffixWhitelistTags = ref<string[]>([]);
 const registrationEmailSuffixWhitelistDraft = ref("");
+const registrationEmailAllowlistTags = ref<string[]>([]);
+const registrationEmailAllowlistDraft = ref("");
 const forwardedClientIpHeaderDraft = ref("");
 const tablePageSizeOptionsInput = ref("10, 20, 50, 100");
 
@@ -9793,6 +9850,8 @@ const form = reactive<SettingsForm>({
   registration_enabled: true,
   email_verify_enabled: false,
   registration_email_suffix_whitelist: [],
+  registration_email_allowlist: [],
+  registration_email_allowlist_enabled: false,
   registration_email_domain_quota_enabled: false,
   promo_code_enabled: true,
   invitation_code_enabled: false,
@@ -10566,6 +10625,52 @@ function handleRegistrationEmailSuffixWhitelistDraftKeydown(
   }
 }
 
+function normalizeRegistrationEmailAddress(raw: string): string {
+  return raw.trim().toLowerCase();
+}
+
+function isRegistrationEmailAddress(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function addRegistrationEmailAllowlistTag(raw: string) {
+  const email = normalizeRegistrationEmailAddress(raw);
+  if (!isRegistrationEmailAddress(email) || registrationEmailAllowlistTags.value.includes(email)) {
+    return;
+  }
+  registrationEmailAllowlistTags.value = [...registrationEmailAllowlistTags.value, email];
+}
+
+function removeRegistrationEmailAllowlistTag(email: string) {
+  registrationEmailAllowlistTags.value = registrationEmailAllowlistTags.value.filter((item) => item !== email);
+}
+
+function commitRegistrationEmailAllowlistDraft() {
+  if (!registrationEmailAllowlistDraft.value) return;
+  addRegistrationEmailAllowlistTag(registrationEmailAllowlistDraft.value);
+  registrationEmailAllowlistDraft.value = "";
+}
+
+function handleRegistrationEmailAllowlistKeydown(event: KeyboardEvent) {
+  if (event.isComposing) return;
+  if (registrationEmailSuffixWhitelistSeparatorKeys.has(event.key)) {
+    event.preventDefault();
+    commitRegistrationEmailAllowlistDraft();
+    return;
+  }
+  if (event.key === "Backspace" && !registrationEmailAllowlistDraft.value && registrationEmailAllowlistTags.value.length > 0) {
+    registrationEmailAllowlistTags.value.pop();
+  }
+}
+
+function handleRegistrationEmailAllowlistPaste(event: ClipboardEvent) {
+  const text = event.clipboardData?.getData("text") ?? "";
+  if (!/[\s,，]/.test(text)) return;
+  event.preventDefault();
+  text.split(/[\s,，]+/).forEach((part) => addRegistrationEmailAllowlistTag(part));
+  registrationEmailAllowlistDraft.value = "";
+}
+
 function handleRegistrationEmailSuffixWhitelistPaste(event: ClipboardEvent) {
   const text = event.clipboardData?.getData("text") || "";
   if (!text.trim()) {
@@ -11140,6 +11245,11 @@ async function loadSettings() {
       normalizeRegistrationEmailSuffixDomains(
         settings.registration_email_suffix_whitelist,
       );
+    form.registration_email_allowlist_enabled = settings.registration_email_allowlist_enabled === true;
+    registrationEmailAllowlistTags.value = (settings.registration_email_allowlist || [])
+      .map((email) => normalizeRegistrationEmailAddress(email))
+      .filter((email) => isRegistrationEmailAddress(email));
+    registrationEmailAllowlistDraft.value = "";
     form.forwarded_client_ip_headers = normalizeForwardedClientIpHeaders(
       settings.forwarded_client_ip_headers,
     );
@@ -11500,6 +11610,8 @@ async function saveSettings() {
         registrationEmailSuffixWhitelistTags.value.map((suffix) =>
           suffix.startsWith("*.") ? suffix : `@${suffix}`,
         ),
+      registration_email_allowlist: registrationEmailAllowlistTags.value,
+      registration_email_allowlist_enabled: form.registration_email_allowlist_enabled,
       registration_email_domain_quota_enabled:
         form.registration_email_domain_quota_enabled,
       promo_code_enabled: form.promo_code_enabled,

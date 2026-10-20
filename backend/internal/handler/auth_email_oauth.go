@@ -300,7 +300,7 @@ func (h *AuthHandler) createEmailOAuthRegistrationPendingSession(
 		}
 	}
 
-	invitationRequired := h != nil && h.settingSvc != nil && h.settingSvc.IsInvitationCodeEnabled(c.Request.Context())
+	invitationRequired := h != nil && h.settingSvc != nil && h.settingSvc.IsInvitationCodeEnabled(c.Request.Context()) && !h.settingSvc.RegistrationEmailAllowlistActive(c.Request.Context())
 	pendingError := "registration_completion_required"
 	choiceReason := "registration_completion_required"
 	if invitationRequired {

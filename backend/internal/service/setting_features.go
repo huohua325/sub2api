@@ -43,6 +43,34 @@ func (s *SettingService) IsRegistrationEmailDomainQuotaEnabled(ctx context.Conte
 	return value == "true"
 }
 
+// GetRegistrationEmailAllowlist 返回管理员开通注册的完整邮箱。
+func (s *SettingService) GetRegistrationEmailAllowlist(ctx context.Context) []string {
+	value, err := s.settingRepo.GetValue(ctx, SettingKeyRegistrationEmailAllowlist)
+	if err != nil {
+		return []string{}
+	}
+	return ParseRegistrationEmailAllowlist(value)
+}
+
+// IsRegistrationEmailAllowlistEnabled 打开后，只有名单内的邮箱可以注册。
+func (s *SettingService) IsRegistrationEmailAllowlistEnabled(ctx context.Context) bool {
+	value, err := s.settingRepo.GetValue(ctx, SettingKeyRegistrationEmailAllowlistEnabled)
+	if err != nil {
+		return false
+	}
+	return value == "true"
+}
+
+// RegistrationEmailAllowlistActive 表示邮箱白名单注册功能已打开。
+func (s *SettingService) RegistrationEmailAllowlistActive(ctx context.Context) bool {
+	return s.IsRegistrationEmailAllowlistEnabled(ctx)
+}
+
+// IsRegistrationEmailAllowlisted 判断邮箱是否已被管理员开通注册。
+func (s *SettingService) IsRegistrationEmailAllowlisted(ctx context.Context, email string) bool {
+	return IsRegistrationEmailAllowlisted(email, s.GetRegistrationEmailAllowlist(ctx))
+}
+
 // GetRegistrationEmailSuffixWhitelist returns normalized registration email suffix whitelist.
 func (s *SettingService) GetRegistrationEmailSuffixWhitelist(ctx context.Context) []string {
 	value, err := s.settingRepo.GetValue(ctx, SettingKeyRegistrationEmailSuffixWhitelist)

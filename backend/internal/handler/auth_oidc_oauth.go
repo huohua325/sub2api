@@ -1240,9 +1240,6 @@ func (h *AuthHandler) tryOIDCVerifiedEmailFastPath(
 	if h.isForceEmailOnThirdPartySignup(ctx) {
 		return false
 	}
-	if h.settingSvc.IsInvitationCodeEnabled(ctx) {
-		return false
-	}
 	if err := h.ensureBackendModeAllowsNewUserLogin(ctx); err != nil {
 		log.Printf("[OIDC OAuth] verified-email fast path blocked by backend mode: reason=%s", infraerrors.Reason(err))
 		clearOAuthPendingSessionCookie(c, isRequestHTTPS(c))
@@ -1252,6 +1249,12 @@ func (h *AuthHandler) tryOIDCVerifiedEmailFastPath(
 	}
 
 	verifiedEmail := strings.TrimSpace(strings.ToLower(compatEmail))
+	if h.settingSvc.RegistrationEmailAllowlistActive(ctx) && !h.settingSvc.IsRegistrationEmailAllowlisted(ctx, verifiedEmail) {
+		return false
+	}
+	if h.settingSvc.IsInvitationCodeEnabled(ctx) && !h.settingSvc.IsRegistrationEmailAllowlisted(ctx, verifiedEmail) {
+		return false
+	}
 	upstreamMetadata := make(map[string]any, len(upstreamClaims)+1)
 	for k, v := range upstreamClaims {
 		upstreamMetadata[k] = v

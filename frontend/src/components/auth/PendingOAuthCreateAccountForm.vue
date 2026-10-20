@@ -348,7 +348,7 @@ function emitSwitchToBind() {
 onMounted(async () => {
   try {
     const settings = await getPublicSettings()
-    invitationCodeEnabled.value = settings.invitation_code_enabled === true
+    invitationCodeEnabled.value = settings.invitation_code_enabled === true && settings.registration_email_allowlist_enabled !== true
     emailVerifyEnabled.value = settings.email_verify_enabled !== false
     turnstileEnabled.value = settings.turnstile_enabled === true
     turnstileSiteKey.value = settings.turnstile_site_key || ''

@@ -42,12 +42,13 @@ var (
 		"EMAIL_DOMAIN_REGISTRATION_LIMIT",
 		"this email domain cannot register another account; use a mainstream email or contact support to add the enterprise domain",
 	)
-	ErrRegDisabled             = infraerrors.Forbidden("REGISTRATION_DISABLED", "registration is currently disabled")
-	ErrServiceUnavailable      = infraerrors.ServiceUnavailable("SERVICE_UNAVAILABLE", "service temporarily unavailable")
-	ErrInvitationCodeRequired  = infraerrors.BadRequest("INVITATION_CODE_REQUIRED", "invitation code is required")
-	ErrInvitationCodeInvalid   = infraerrors.BadRequest("INVITATION_CODE_INVALID", "invalid or used invitation code")
-	ErrOAuthInvitationRequired = infraerrors.Forbidden("OAUTH_INVITATION_REQUIRED", "invitation code required to complete oauth registration")
-	ErrCaptchaProviderConflict = infraerrors.ServiceUnavailable("CAPTCHA_PROVIDER_CONFLICT", "multiple captcha providers are enabled")
+	ErrRegDisabled                  = infraerrors.Forbidden("REGISTRATION_DISABLED", "registration is currently disabled")
+	ErrServiceUnavailable           = infraerrors.ServiceUnavailable("SERVICE_UNAVAILABLE", "service temporarily unavailable")
+	ErrInvitationCodeRequired       = infraerrors.BadRequest("INVITATION_CODE_REQUIRED", "invitation code is required")
+	ErrEmailRegistrationNotApproved = infraerrors.BadRequest("EMAIL_NOT_APPROVED", "该邮箱尚未开通注册")
+	ErrInvitationCodeInvalid        = infraerrors.BadRequest("INVITATION_CODE_INVALID", "invalid or used invitation code")
+	ErrOAuthInvitationRequired      = infraerrors.Forbidden("OAUTH_INVITATION_REQUIRED", "invitation code required to complete oauth registration")
+	ErrCaptchaProviderConflict      = infraerrors.ServiceUnavailable("CAPTCHA_PROVIDER_CONFLICT", "multiple captcha providers are enabled")
 )
 
 // maxTokenLength 限制 token 大小，避免超长 header 触发解析时的异常内存分配。
@@ -170,9 +171,14 @@ func (s *AuthService) RegisterWithVerification(ctx context.Context, email, passw
 	if isReservedEmail(email) {
 		return "", nil, ErrEmailReserved
 	}
+	// 开通名单非空时，只有名单内的邮箱可以注册，并且不再要求邀请码。
+	allowlistActive, emailApproved := s.registrationAllowlistState(ctx, email)
+	if allowlistActive && !emailApproved {
+		return "", nil, ErrEmailRegistrationNotApproved
+	}
 	// 检查是否需要邀请码
 	var invitationRedeemCode *RedeemCode
-	if s.settingService != nil && s.settingService.IsInvitationCodeEnabled(ctx) {
+	if !emailApproved && s.settingService != nil && s.settingService.IsInvitationCodeEnabled(ctx) {
 		if invitationCode == "" {
 			return "", nil, ErrInvitationCodeRequired
 		}
@@ -721,9 +727,13 @@ func (s *AuthService) loginOrRegisterOAuthWithTokenPair(ctx context.Context, ema
 				return nil, nil, ErrRegDisabled
 			}
 
+			allowlistActive, emailApproved := s.registrationAllowlistState(ctx, email)
+			if allowlistActive && !emailApproved {
+				return nil, nil, ErrEmailRegistrationNotApproved
+			}
 			// 检查是否需要邀请码
 			var invitationRedeemCode *RedeemCode
-			if s.settingService != nil && s.settingService.IsInvitationCodeEnabled(ctx) {
+			if !emailApproved && s.settingService != nil && s.settingService.IsInvitationCodeEnabled(ctx) {
 				if invitationCode == "" {
 					return nil, nil, ErrOAuthInvitationRequired
 				}
@@ -1195,8 +1205,24 @@ func inferLegacySignupSource(email string) string {
 	}
 }
 
+func (s *AuthService) registrationAllowlistState(ctx context.Context, email string) (active bool, approved bool) {
+	if s == nil || s.settingService == nil {
+		return false, false
+	}
+	if !s.settingService.IsRegistrationEmailAllowlistEnabled(ctx) {
+		return false, false
+	}
+	return true, IsRegistrationEmailAllowlisted(email, s.settingService.GetRegistrationEmailAllowlist(ctx))
+}
+
 func (s *AuthService) validateRegistrationEmailPolicy(ctx context.Context, email string) error {
 	if s.settingService == nil {
+		return nil
+	}
+	if active, approved := s.registrationAllowlistState(ctx, email); active {
+		if !approved {
+			return ErrEmailRegistrationNotApproved
+		}
 		return nil
 	}
 	whitelist := s.settingService.GetRegistrationEmailSuffixWhitelist(ctx)
@@ -1211,6 +1237,12 @@ func (s *AuthService) validateRegistrationEmailPolicy(ctx context.Context, email
 // 非白名单域名每个最多允许一个账户。
 func (s *AuthService) validateRegistrationEmailQuota(ctx context.Context, email string) error {
 	if s.settingService == nil {
+		return nil
+	}
+	if active, approved := s.registrationAllowlistState(ctx, email); active {
+		if !approved {
+			return ErrEmailRegistrationNotApproved
+		}
 		return nil
 	}
 	whitelist := s.settingService.GetRegistrationEmailSuffixWhitelist(ctx)
@@ -1248,6 +1280,9 @@ func (s *AuthService) validateRegistrationEmailQuota(ctx context.Context, email 
 func (s *AuthService) createUserWithRegistrationEmailGuard(ctx context.Context, user *User) error {
 	if s == nil || s.userRepo == nil {
 		return ErrServiceUnavailable
+	}
+	if active, approved := s.registrationAllowlistState(ctx, user.Email); active && approved {
+		return s.userRepo.CreateWithEmailAliasGuard(ctx, user)
 	}
 	whitelist := []string{}
 	if s.settingService != nil {

@@ -41,6 +41,12 @@ func diffSettings(before *service.SystemSettings, after *service.SystemSettings,
 	if !equalStringSlice(before.RegistrationEmailSuffixWhitelist, after.RegistrationEmailSuffixWhitelist) {
 		changed = append(changed, "registration_email_suffix_whitelist")
 	}
+	if !equalStringSlice(before.RegistrationEmailAllowlist, after.RegistrationEmailAllowlist) {
+		changed = append(changed, "registration_email_allowlist")
+	}
+	if before.RegistrationEmailAllowlistEnabled != after.RegistrationEmailAllowlistEnabled {
+		changed = append(changed, "registration_email_allowlist_enabled")
+	}
 	if before.RegistrationEmailDomainQuotaEnabled != after.RegistrationEmailDomainQuotaEnabled {
 		changed = append(changed, "registration_email_domain_quota_enabled")
 	}

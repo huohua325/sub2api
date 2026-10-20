@@ -48,6 +48,7 @@ func (h *SettingHandler) GetPublicSettings(c *gin.Context) {
 		EmailVerifyEnabled:                  settings.EmailVerifyEnabled,
 		ForceEmailOnThirdPartySignup:        settings.ForceEmailOnThirdPartySignup,
 		RegistrationEmailSuffixWhitelist:    settings.RegistrationEmailSuffixWhitelist,
+		RegistrationEmailAllowlistEnabled:   settings.RegistrationEmailAllowlistEnabled,
 		RegistrationEmailDomainQuotaEnabled: settings.RegistrationEmailDomainQuotaEnabled,
 		PromoCodeEnabled:                    settings.PromoCodeEnabled,
 		PasswordResetEnabled:                settings.PasswordResetEnabled,

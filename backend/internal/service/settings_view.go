@@ -15,6 +15,8 @@ type SystemSettings struct {
 	RegistrationEnabled                 bool
 	EmailVerifyEnabled                  bool
 	RegistrationEmailSuffixWhitelist    []string
+	RegistrationEmailAllowlist          []string
+	RegistrationEmailAllowlistEnabled   bool // 打开后只有名单内邮箱可以注册，且不需要邀请码
 	RegistrationEmailDomainQuotaEnabled bool // 白名单非空时放行非白名单域名限量注册（默认关闭）
 	PromoCodeEnabled                    bool
 	PasswordResetEnabled                bool
@@ -332,6 +334,7 @@ type PublicSettings struct {
 	EmailVerifyEnabled                  bool
 	ForceEmailOnThirdPartySignup        bool
 	RegistrationEmailSuffixWhitelist    []string
+	RegistrationEmailAllowlistEnabled   bool
 	RegistrationEmailDomainQuotaEnabled bool
 	PromoCodeEnabled                    bool
 	PasswordResetEnabled                bool

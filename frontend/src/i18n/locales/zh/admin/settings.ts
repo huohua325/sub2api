@@ -160,6 +160,12 @@ export default {
           "仅允许使用指定域名的邮箱注册账号；留空则不限制（例如 {'@'}qq.com, {'@'}gmail.com, *.edu.cn）",
         emailSuffixWhitelistPlaceholder: "{'@'}example.com, *.edu.cn",
         emailSuffixWhitelistInputHint: '留空则不限制。使用 *.edu.cn 可匹配 edu.cn 及其子域名。',
+        emailAllowlistEnabled: '邮箱白名单注册',
+        emailAllowlistEnabledHint: '打开后，只有下面手动添加的邮箱可以注册，并且不用邀请码。其他邮箱不能注册。',
+        emailAllowlist: '可注册邮箱',
+        emailAllowlistHint: '管理员手动添加完整邮箱。打开上面的开关后，只有这些邮箱可以注册。',
+        emailAllowlistPlaceholder: 'name@example.com',
+        emailAllowlistInputHint: '输入完整邮箱后回车。可一次粘贴多个，用逗号或空格分开。',
         emailDomainQuota: '非白名单域名限量注册',
         emailDomainQuotaHint:
           '开启后，白名单非空时，其他可注册主域名各限注册一个账户；关闭时非白名单域名直接拒绝注册。白名单为空时本开关无效果',

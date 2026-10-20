@@ -169,6 +169,17 @@ func (s *SettingService) buildSystemSettingsUpdates(ctx context.Context, setting
 		return nil, fmt.Errorf("marshal registration email suffix whitelist: %w", err)
 	}
 	updates[SettingKeyRegistrationEmailSuffixWhitelist] = string(registrationEmailSuffixWhitelistJSON)
+	registrationEmailAllowlist, err := NormalizeRegistrationEmailAllowlist(settings.RegistrationEmailAllowlist)
+	if err != nil {
+		return nil, err
+	}
+	settings.RegistrationEmailAllowlist = registrationEmailAllowlist
+	registrationEmailAllowlistJSON, err := json.Marshal(registrationEmailAllowlist)
+	if err != nil {
+		return nil, fmt.Errorf("marshal registration email allowlist: %w", err)
+	}
+	updates[SettingKeyRegistrationEmailAllowlist] = string(registrationEmailAllowlistJSON)
+	updates[SettingKeyRegistrationEmailAllowlistEnabled] = strconv.FormatBool(settings.RegistrationEmailAllowlistEnabled)
 	updates[SettingKeyRegistrationEmailDomainQuotaEnabled] = strconv.FormatBool(settings.RegistrationEmailDomainQuotaEnabled)
 	updates[SettingKeyPromoCodeEnabled] = strconv.FormatBool(settings.PromoCodeEnabled)
 	updates[SettingKeyPasswordResetEnabled] = strconv.FormatBool(settings.PasswordResetEnabled)

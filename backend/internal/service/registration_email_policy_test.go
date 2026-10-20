@@ -29,6 +29,19 @@ func TestParseRegistrationEmailSuffixWhitelist(t *testing.T) {
 	require.Equal(t, []string{"@example.com", "@foo.bar", "*.edu.cn"}, got)
 }
 
+func TestRegistrationEmailAllowlist(t *testing.T) {
+	list, err := NormalizeRegistrationEmailAllowlist([]string{" Student@School.edu ", "student@school.edu", "bad"})
+	require.Error(t, err)
+
+	list, err = NormalizeRegistrationEmailAllowlist([]string{" Student@School.edu ", "student@school.edu"})
+	require.NoError(t, err)
+	require.Equal(t, []string{"student@school.edu"}, list)
+	require.True(t, IsRegistrationEmailAllowlisted("STUDENT@school.edu", list))
+	require.False(t, IsRegistrationEmailAllowlisted("other@school.edu", list))
+	require.False(t, IsRegistrationEmailAllowlisted("student@school.edu", nil))
+	require.Equal(t, []string{"a@b.com"}, ParseRegistrationEmailAllowlist(`["A@b.com","nope"]`))
+}
+
 func TestIsRegistrationEmailSuffixAllowed(t *testing.T) {
 	require.True(t, IsRegistrationEmailSuffixAllowed("user@example.com", []string{"@example.com"}))
 	require.True(t, IsRegistrationEmailSuffixAllowed("user@example.com.", []string{"@example.com"}))

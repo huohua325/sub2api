@@ -119,6 +119,10 @@
           </div>
         </div>
 
+        <p v-if="emailAllowlistEnabled" class="text-sm leading-6 text-gray-500 dark:text-gray-400">
+          {{ t('auth.emailAllowlistOnly') }}
+        </p>
+
         <!-- Invitation Code Input (Required when enabled) -->
         <div v-if="invitationCodeEnabled">
           <label for="invitation_code" class="input-label">
@@ -430,6 +434,7 @@ const promoCodeEnabled = ref<boolean>(
   appStore.cachedPublicSettings?.promo_code_enabled === true
 )
 const invitationCodeEnabled = ref<boolean>(false)
+const emailAllowlistEnabled = ref(false)
 const affiliateEnabled = ref<boolean>(false)
 const turnstileEnabled = ref<boolean>(false)
 const turnstileSiteKey = ref<string>('')
@@ -566,7 +571,8 @@ onMounted(async () => {
     registrationEnabled.value = settings.registration_enabled
     emailVerifyEnabled.value = settings.email_verify_enabled
     promoCodeEnabled.value = settings.promo_code_enabled
-    invitationCodeEnabled.value = settings.invitation_code_enabled
+    emailAllowlistEnabled.value = settings.registration_email_allowlist_enabled === true
+    invitationCodeEnabled.value = settings.invitation_code_enabled && !emailAllowlistEnabled.value
     affiliateEnabled.value = settings.affiliate_enabled
     turnstileEnabled.value = settings.turnstile_enabled
     turnstileSiteKey.value = settings.turnstile_site_key || ''

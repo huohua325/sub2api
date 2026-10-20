@@ -298,6 +298,7 @@ export default {
     promoCodeAlreadyUsed: '您已使用过此优惠码',
     promoCodeValidating: '优惠码正在验证中，请稍候',
     promoCodeInvalidCannotRegister: '优惠码无效，请检查后重试或清空优惠码',
+    emailAllowlistOnly: '只有管理员开通的邮箱可以注册。',
     invitationCodeLabel: '邀请码',
     invitationCodePlaceholder: '请输入邀请码',
     invitationCodeRequired: '请输入邀请码',

@@ -74,6 +74,80 @@ func IsRegistrationEmailSuffixLimited(email string, whitelist []string) bool {
 	return len(whitelist) > 0 && !IsRegistrationEmailSuffixAllowed(email, whitelist)
 }
 
+// NormalizeRegistrationEmailAllowlist 校验并归一化管理员开通的完整邮箱。
+func NormalizeRegistrationEmailAllowlist(raw []string) ([]string, error) {
+	if len(raw) > 500 {
+		return nil, fmt.Errorf("registration email allowlist exceeds 500 addresses")
+	}
+	seen := make(map[string]struct{}, len(raw))
+	out := make([]string, 0, len(raw))
+	for _, item := range raw {
+		email, ok := normalizeRegistrationEmailAddress(item)
+		if !ok {
+			return nil, fmt.Errorf("invalid registration email: %s", strings.TrimSpace(item))
+		}
+		if _, exists := seen[email]; exists {
+			continue
+		}
+		seen[email] = struct{}{}
+		out = append(out, email)
+	}
+	return out, nil
+}
+
+// ParseRegistrationEmailAllowlist 读取已保存的邮箱名单。非法项会被忽略。
+func ParseRegistrationEmailAllowlist(raw string) []string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return []string{}
+	}
+	var items []string
+	if err := json.Unmarshal([]byte(raw), &items); err != nil {
+		return []string{}
+	}
+	normalized, err := NormalizeRegistrationEmailAllowlist(items)
+	if err != nil {
+		out := make([]string, 0, len(items))
+		seen := map[string]struct{}{}
+		for _, item := range items {
+			email, ok := normalizeRegistrationEmailAddress(item)
+			if !ok {
+				continue
+			}
+			if _, exists := seen[email]; exists {
+				continue
+			}
+			seen[email] = struct{}{}
+			out = append(out, email)
+		}
+		return out
+	}
+	return normalized
+}
+
+// IsRegistrationEmailAllowlisted 判断邮箱是否在开通名单中。名单为空时返回 false。
+func IsRegistrationEmailAllowlisted(email string, allowlist []string) bool {
+	normalized, ok := normalizeRegistrationEmailAddress(email)
+	if !ok || len(allowlist) == 0 {
+		return false
+	}
+	for _, allowed := range allowlist {
+		if allowed == normalized {
+			return true
+		}
+	}
+	return false
+}
+
+func normalizeRegistrationEmailAddress(raw string) (string, bool) {
+	email := strings.ToLower(strings.TrimSpace(raw))
+	local, domain, ok := splitEmailForPolicy(email)
+	if !ok || local == "" || !registrationEmailDomainPattern.MatchString(domain) {
+		return "", false
+	}
+	return local + "@" + domain, true
+}
+
 // NormalizeRegistrationEmailSuffixWhitelist normalizes and validates suffix whitelist items.
 func NormalizeRegistrationEmailSuffixWhitelist(raw []string) ([]string, error) {
 	return normalizeRegistrationEmailSuffixWhitelist(raw, true)
