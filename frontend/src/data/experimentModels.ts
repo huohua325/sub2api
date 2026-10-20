@@ -61,9 +61,6 @@ export const experimentModels: ExperimentModel[] = [
   lab('qwen3.8-max', 'qwen'),
   lab('qwen3.7-max', 'qwen'),
   lab('qwen3.7-plus', 'qwen'),
-  lab('qwen3.6-plus', 'qwen'),
-  lab('qwen3.7-flash', 'qwen'),
-  lab('qwen3.6-flash', 'qwen'),
 
   lab('kimi-k3', 'kimi'),
   lab('kimi-k2.6', 'kimi'),
