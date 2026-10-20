@@ -724,6 +724,17 @@ describe("admin SettingsView payment visible method controls", () => {
     adminSettingsFetch.mockResolvedValue(undefined);
   });
 
+  it("opens the email allowlist editor without crashing", async () => {
+    getSettings.mockResolvedValue({
+      ...baseSettingsResponse,
+      registration_email_allowlist_enabled: true,
+      registration_email_allowlist: ["student@school.edu"],
+    });
+    const wrapper = mountView();
+    await flushPromises();
+    expect(wrapper.text()).toContain("student@school.edu");
+  });
+
   it("loads and saves the open button visibility for each custom menu", async () => {
     const menuItems = [
       { id: "docs", label: "Docs", url: "https://example.com/docs", icon_svg: "", visibility: "user", sort_order: 0 },

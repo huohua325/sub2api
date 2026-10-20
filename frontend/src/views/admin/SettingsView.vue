@@ -1547,7 +1547,7 @@
                 <Toggle v-model="form.registration_email_allowlist_enabled" />
               </div>
 
-              <div v-if="form.registration_email_allowlist_enabled" class="border-t border-gray-100 pt-4 dark:border-dark-700">
+              <div v-show="form.registration_email_allowlist_enabled" class="border-t border-gray-100 pt-4 dark:border-dark-700">
                 <label class="font-medium text-gray-900 dark:text-white">{{
                   t("admin.settings.registration.emailAllowlist")
                 }}</label>
@@ -1559,7 +1559,7 @@
                 >
                   <div class="flex flex-wrap items-center gap-2">
                     <span
-                      v-for="email in registrationEmailAllowlistTags"
+                      v-for="email in registrationEmailAllowlistView"
                       :key="email"
                       class="inline-flex items-center gap-1 rounded bg-gray-100 px-2 py-1 font-mono text-xs text-gray-700 dark:bg-dark-600 dark:text-gray-200"
                     >
@@ -9241,6 +9241,9 @@ const registrationEmailSuffixWhitelistTags = ref<string[]>([]);
 const registrationEmailSuffixWhitelistDraft = ref("");
 const registrationEmailAllowlistTags = ref<string[]>([]);
 const registrationEmailAllowlistDraft = ref("");
+const registrationEmailAllowlistView = computed(() =>
+  Array.isArray(registrationEmailAllowlistTags.value) ? registrationEmailAllowlistTags.value : [],
+);
 const forwardedClientIpHeaderDraft = ref("");
 const tablePageSizeOptionsInput = ref("10, 20, 50, 100");
 
@@ -11246,8 +11249,9 @@ async function loadSettings() {
         settings.registration_email_suffix_whitelist,
       );
     form.registration_email_allowlist_enabled = settings.registration_email_allowlist_enabled === true;
-    registrationEmailAllowlistTags.value = (settings.registration_email_allowlist || [])
-      .map((email) => normalizeRegistrationEmailAddress(email))
+    const rawAllowlist = settings.registration_email_allowlist;
+    registrationEmailAllowlistTags.value = (Array.isArray(rawAllowlist) ? rawAllowlist : [])
+      .map((email) => normalizeRegistrationEmailAddress(String(email)))
       .filter((email) => isRegistrationEmailAddress(email));
     registrationEmailAllowlistDraft.value = "";
     form.forwarded_client_ip_headers = normalizeForwardedClientIpHeaders(

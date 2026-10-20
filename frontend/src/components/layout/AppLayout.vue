@@ -16,6 +16,10 @@
 
       <!-- Main Content -->
       <main class="p-4 md:p-6 lg:p-8">
+        <p
+          v-if="pageError"
+          class="mb-4 whitespace-pre-wrap rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200"
+        >{{ pageError }}</p>
         <slot />
       </main>
     </div>
@@ -24,13 +28,19 @@
 
 <script setup lang="ts">
 import '@/styles/onboarding.css'
-import { computed, onMounted } from 'vue'
+import { computed, onErrorCaptured, onMounted, ref } from 'vue'
 import { useAppStore } from '@/stores'
 import { useAuthStore } from '@/stores/auth'
 import { useOnboardingTour } from '@/composables/useOnboardingTour'
 import { useOnboardingStore } from '@/stores/onboarding'
 import AppSidebar from './AppSidebar.vue'
 import AppHeader from './AppHeader.vue'
+
+const pageError = ref('')
+onErrorCaptured((err) => {
+  pageError.value = err instanceof Error ? err.message : String(err)
+  return false
+})
 
 const appStore = useAppStore()
 const authStore = useAuthStore()
