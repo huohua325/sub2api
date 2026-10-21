@@ -1,6 +1,6 @@
 <template>
-  <!-- Row 1: Core Stats -->
-  <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+  <!-- Purpose wallets sit on their own row so the three uses stay together. -->
+  <div v-if="purposeMeters.length" class="grid grid-cols-1 gap-4 sm:grid-cols-3">
     <div
       v-for="meter in purposeMeters"
       :key="meter.id"
@@ -37,7 +37,10 @@
         </div>
       </div>
     </div>
+  </div>
 
+  <!-- Activity stats. Ordinary users do not see raw token totals here. -->
+  <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
     <div
       v-for="meter in usageMeters"
       v-show="hideMoney && purposeMeters.length === 0"
@@ -137,12 +140,9 @@
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- Row 2: Token Stats -->
-  <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
-    <!-- Today Tokens -->
-    <div class="card p-4">
+    <!-- Today Tokens: admins only. Students already have the three purpose cards. -->
+    <div v-if="!hideMoney" class="card p-4">
       <div class="flex items-center gap-3">
         <div class="rounded-lg bg-amber-100 p-2 dark:bg-amber-900/30">
           <Icon name="cube" size="md" class="text-amber-600 dark:text-amber-400" :stroke-width="2" />
@@ -156,7 +156,7 @@
     </div>
 
     <!-- Total Tokens -->
-    <div class="card p-4">
+    <div v-if="!hideMoney" class="card p-4">
       <div class="flex items-center gap-3">
         <div class="rounded-lg bg-indigo-100 p-2 dark:bg-indigo-900/30">
           <Icon name="database" size="md" class="text-indigo-600 dark:text-indigo-400" :stroke-width="2" />
@@ -253,7 +253,7 @@
         </div>
 
         <!-- Quota 区：仅当 quota 配置存在、非 __other__ 且至少有一个窗口配了 limit 时显示 -->
-        <div v-if="hasAnyLimit(item.quota) && !item.isOther" class="mt-3 space-y-1.5 border-t border-gray-200 pt-2 dark:border-dark-700">
+        <div v-if="showPlatformQuota(item)" class="mt-3 space-y-1.5 border-t border-gray-200 pt-2 dark:border-dark-700">
           <p class="text-[10px] uppercase tracking-wide text-gray-400">
             {{ t('dashboard.platformQuota.title') }}
           </p>
@@ -431,6 +431,13 @@ function quotaVal(q: PlatformQuotaItem | undefined, key: QuotaField): PlatformQu
 function hasAnyLimit(q: PlatformQuotaItem | undefined): boolean {
   if (!q) return false
   return q.daily_limit_usd != null || q.weekly_limit_usd != null || q.monthly_limit_usd != null
+}
+
+function showPlatformQuota(item: FusedPlatformCard): boolean {
+  if (item.isOther || !hasAnyLimit(item.quota)) return false
+  // The three purpose cards are the student quota. The older per-vendor bars use another ledger.
+  if (props.hideMoney && purposeMeters.value.length > 0) return false
+  return true
 }
 
 function platformQuota(platform: string) {

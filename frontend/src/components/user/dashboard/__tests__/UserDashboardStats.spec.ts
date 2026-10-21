@@ -15,6 +15,7 @@ vi.mock('vue-i18n', async () => {
 
 import UserDashboardStats from '../UserDashboardStats.vue'
 import type { UserDashboardStats as UserStatsType, PlatformDashboardStats } from '@/api/usage'
+import type { PurposeAllowanceItem } from '@/api/admin/users'
 import type { PlatformQuotaItem } from '@/types'
 
 function makeStats(over: Partial<UserStatsType> = {}): UserStatsType {
@@ -118,6 +119,37 @@ describe('UserDashboardStats usage meters', () => {
     })
     expect(w.get('[data-testid="codex-usage-card"]').text()).toContain('0%')
     expect(w.get('[data-testid="grok-usage-card"]').text()).toContain('0%')
+  })
+
+  it('shows the three purpose percents and hides token totals for ordinary users', () => {
+    const allowances: PurposeAllowanceItem[] = [
+      { purpose: 'openai', limit_amount: 100, used_amount: 0 },
+      { purpose: 'grok', limit_amount: 100, used_amount: 15.55 },
+      { purpose: 'experiment', limit_amount: 500, used_amount: 15 },
+    ]
+    const w = mount(UserDashboardStats, {
+      props: {
+        stats: makeStats({ today_tokens: 61300000, total_tokens: 73600000, today_requests: 323, total_requests: 410 }),
+        balance: 100,
+        isSimple: false,
+        hideMoney: true,
+        purposeAllowances: allowances,
+        platformQuotas: [
+          quota({ platform: 'openai', weekly_limit_usd: 100, weekly_usage_usd: 0 }),
+          quota({ platform: 'grok', weekly_limit_usd: 100, weekly_usage_usd: 15.55 }),
+        ],
+      },
+      global: { stubs: { Icon: true } },
+    })
+    expect(w.get('[data-testid="openai-purpose-card"]').text()).toContain('0%')
+    expect(w.get('[data-testid="grok-purpose-card"]').text()).toContain('16%')
+    expect(w.get('[data-testid="experiment-purpose-card"]').text()).toContain('3%')
+    expect(w.text()).toContain('dashboard.todayRequests')
+    expect(w.text()).toContain('dashboard.performance')
+    expect(w.text()).not.toContain('dashboard.todayTokens')
+    expect(w.text()).not.toContain('dashboard.totalTokens')
+    expect(w.text()).not.toContain('dashboard.platformQuota.title')
+    expect(w.text()).not.toContain('$100')
   })
 })
 
