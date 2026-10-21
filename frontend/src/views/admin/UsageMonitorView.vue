@@ -11,8 +11,9 @@
         </button>
       </div>
       <p v-if="errorText" class="text-sm text-red-600 dark:text-red-400" data-testid="usage-monitor-error">{{ errorText }}</p>
-      <UsageMonitorParents :parents="parents" :users="users" />
-      <PurposeWalletTable :users="users" :highlight-user-id="highlightUserId" @adjust="openAdjust" />
+      <p v-if="loading && !monitor" class="text-sm text-gray-500 dark:text-gray-400" data-testid="usage-monitor-loading">{{ t('admin.usageMonitor.loading') }}</p>
+      <UsageMonitorParents v-if="monitor" :parents="parents" :users="users" />
+      <PurposeWalletTable v-if="monitor" :users="users" :highlight-user-id="highlightUserId" @adjust="openAdjust" />
       <p v-if="auditError" class="text-sm text-red-600 dark:text-red-400">{{ auditError }}</p>
       <PurposeAdjustmentList
         :items="audits"
@@ -28,8 +29,8 @@
         :user="adjustUser"
         :purpose="adjustPurpose"
         :wallet="adjustWallet"
+        :refresh="refreshAfterAdjust"
         @close="closeAdjust"
-        @adjusted="onAdjusted"
       />
     </div>
   </AppLayout>
@@ -48,7 +49,6 @@ import {
   getUsageMonitor,
   listPurposeAdjustments,
   usageMonitorErrorText,
-  type PurposeAdjustResult,
   type PurposeAdjustmentAudit,
   type UsageMonitorUser,
   type UsageMonitorView,
@@ -59,7 +59,7 @@ const AUDIT_LIMIT = 50
 
 const { t } = useI18n()
 const route = useRoute()
-const loading = ref(false)
+const loading = ref(true)
 const errorText = ref('')
 const monitor = ref<UsageMonitorView | null>(null)
 const audits = ref<PurposeAdjustmentAudit[]>([])
@@ -132,6 +132,7 @@ async function loadMoreAudits() {
   if (!oldest) return
   const token = ++auditToken
   auditsLoading.value = true
+  auditError.value = ''
   try {
     const result = await listPurposeAdjustments({
       user_id: auditUserId.value || undefined,
@@ -170,18 +171,12 @@ function closeAdjust() {
   adjustUser.value = null
 }
 
-function onAdjusted(payload: { userId: number; result: PurposeAdjustResult }) {
-  const user = monitor.value?.users.find((item) => item.id === payload.userId)
-  if (user) {
-    const index = user.wallets.findIndex((item) => item.purpose === payload.result.wallet.purpose)
-    if (index >= 0) user.wallets.splice(index, 1, payload.result.wallet)
-    else user.wallets.push(payload.result.wallet)
-    if (adjustUser.value?.id === user.id) adjustUser.value = user
-  }
-  const audit = payload.result.audit
-  if (audit && (auditUserId.value === null || audit.target_user_id === auditUserId.value)) {
-    audits.value = [audit, ...audits.value.filter((item) => item.id !== audit.id)]
-  }
+async function refreshAfterAdjust() {
+  const userId = adjustUser.value?.id ?? null
+  await Promise.all([loadMonitor(), loadAudits()])
+  if (userId == null) return
+  const fresh = monitor.value?.users.find((item) => item.id === userId)
+  if (fresh) adjustUser.value = fresh
 }
 
 watch(() => route.query.user, async (value) => {

@@ -25,12 +25,12 @@
         </div>
         <div>
           <dt class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('admin.usageMonitor.resetAt') }}</dt>
-          <dd class="mt-1 text-sm text-gray-900 dark:text-white" :title="parent.official_reset_at || undefined">{{ showTime(parent.official_reset_at) }}</dd>
+          <dd class="mt-1 text-sm text-gray-900 dark:text-white" :title="parent.official_reset_at || undefined">{{ formatDateTime(parent.official_reset_at) || parent.official_reset_at || '' }}</dd>
         </div>
         <div>
           <dt class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('admin.usageMonitor.observedAt') }}</dt>
           <dd class="mt-1 text-sm" :class="isStale(parent.official_observed_at) ? 'text-amber-600 dark:text-amber-400' : 'text-gray-900 dark:text-white'" :title="parent.official_observed_at || undefined">
-            {{ showTime(parent.official_observed_at) }}
+            {{ formatDateTime(parent.official_observed_at) || parent.official_observed_at || '' }}
             <span v-if="ageMinutes(parent.official_observed_at) !== null">{{ t('admin.usageMonitor.observedAge', { minutes: ageMinutes(parent.official_observed_at) ?? 0 }) }}</span>
           </dd>
           <p v-if="isStale(parent.official_observed_at)" class="mt-1 text-sm text-amber-600 dark:text-amber-400" data-testid="stale-reading">
@@ -69,7 +69,7 @@
                 <span v-if="row.slope_share === '0.0000'">{{ row.gateway_actual_cost }}</span>
               </td>
             </tr>
-            <tr v-if="!isZeroText(parent.hidden_user_actual_cost)">
+            <tr v-if="parent.hidden_user_actual_cost && !/^0+(?:\.0+)?$/.test(parent.hidden_user_actual_cost.trim())">
               <td class="px-3 py-2 text-gray-500 dark:text-gray-400">{{ t('admin.usageMonitor.hiddenUsers') }}</td>
               <td class="px-3 py-2"></td>
               <td class="px-3 py-2 text-gray-900 dark:text-white" data-testid="hidden-cost">{{ parent.hidden_user_actual_cost }}</td>
@@ -96,7 +96,7 @@
       <p v-if="parent.oversubscribe?.numeric" class="text-sm text-amber-700 dark:text-amber-300" data-testid="oversubscribe-numbers">
         {{ t('admin.usageMonitor.oversubscribeNumbers', { points: parent.oversubscribe.wallet_points || '', remaining: parent.oversubscribe.remaining_official_percent || '' }) }}
       </p>
-      <p v-else-if="!isZeroText(parent.wallet_remaining_yuan)" class="text-sm text-amber-700 dark:text-amber-300" data-testid="oversubscribe-text">
+      <p v-else-if="parent.wallet_remaining_yuan && !/^0+(?:\.0+)?$/.test(parent.wallet_remaining_yuan.trim())" class="text-sm text-amber-700 dark:text-amber-300" data-testid="oversubscribe-text">
         {{ t('admin.usageMonitor.oversubscribeText') }}
       </p>
     </article>
@@ -130,11 +130,6 @@ function labelFor(userId: number): string {
   return user.username || user.email || `#${userId}`
 }
 
-function showTime(value: string | null): string {
-  if (!value) return ''
-  return formatDateTime(value) || value
-}
-
 function observedAgeMs(value: string | null): number | null {
   if (!value) return null
   const time = Date.parse(value)
@@ -151,9 +146,5 @@ function ageMinutes(value: string | null): number | null {
 function isStale(value: string | null): boolean {
   const age = observedAgeMs(value)
   return age !== null && age > TEN_MINUTES_MS
-}
-
-function isZeroText(value: string | null | undefined): boolean {
-  return !value || /^0+(?:\.0+)?$/.test(value.trim())
 }
 </script>

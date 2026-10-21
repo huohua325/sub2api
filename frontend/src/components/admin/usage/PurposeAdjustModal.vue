@@ -18,7 +18,7 @@
           <span class="input-label">{{ t('admin.usageMonitor.newLimit') }}</span>
           <input v-model="limitInput" type="text" class="input" data-testid="limit-input" autocomplete="off" />
         </label>
-        <button type="button" class="btn btn-primary" data-testid="set-limit" @click="ask('set_limit')">{{ t('admin.usageMonitor.setLimit') }}</button>
+        <button type="button" class="btn btn-primary" data-testid="set-limit" :disabled="submitting" @click="ask('set_limit')">{{ t('admin.usageMonitor.setLimit') }}</button>
       </section>
 
       <section class="space-y-3 border-t border-gray-200 pt-4 dark:border-dark-700">
@@ -31,9 +31,9 @@
           <span class="input-label">{{ t('admin.usageMonitor.newUsed') }}</span>
           <input v-model="usedInput" type="text" class="input" data-testid="used-input" autocomplete="off" />
         </label>
-        <button type="button" class="btn btn-secondary" data-testid="set-used" @click="ask('set_used')">{{ t('admin.usageMonitor.setUsed') }}</button>
+        <button type="button" class="btn btn-secondary" data-testid="set-used" :disabled="submitting" @click="ask('set_used')">{{ t('admin.usageMonitor.setUsed') }}</button>
         <p class="text-sm text-gray-500 dark:text-gray-400" data-testid="rebuild-copy">{{ t('admin.usageMonitor.rebuildCopy') }}</p>
-        <button type="button" class="btn btn-secondary" data-testid="rebuild-used" @click="ask('rebuild_used')">{{ t('admin.usageMonitor.rebuildUsed') }}</button>
+        <button type="button" class="btn btn-secondary" data-testid="rebuild-used" :disabled="submitting" @click="ask('rebuild_used')">{{ t('admin.usageMonitor.rebuildUsed') }}</button>
       </section>
 
       <section class="space-y-3 border-t border-gray-200 pt-4 dark:border-dark-700">
@@ -44,7 +44,7 @@
           <span class="input-label">{{ t('admin.usageMonitor.newWindow') }}</span>
           <input v-model="windowInput" type="text" class="input" data-testid="window-input" autocomplete="off" placeholder="2026-10-21T02:00:00Z" />
         </label>
-        <button type="button" class="btn btn-secondary" data-testid="align-window" @click="ask('align_window')">{{ t('admin.usageMonitor.alignWindow') }}</button>
+        <button type="button" class="btn btn-secondary" data-testid="align-window" :disabled="submitting" @click="ask('align_window')">{{ t('admin.usageMonitor.alignWindow') }}</button>
       </section>
 
       <p v-if="statusText" class="text-sm text-gray-700 dark:text-gray-300" data-testid="adjust-status">{{ statusText }}</p>
@@ -58,7 +58,7 @@
     :message="confirmMessage"
     :danger="pending === 'set_used' || pending === 'align_window'"
     @confirm="submitPending"
-    @cancel="pending = null"
+    @cancel="cancelPending"
   />
 </template>
 
@@ -72,7 +72,6 @@ import {
   usageMonitorErrorText,
   type PurposeAdjustAction,
   type PurposeAdjustRequest,
-  type PurposeAdjustResult,
   type UsageMonitorUser,
   type UsageMonitorWallet,
 } from '@/api/admin/usageMonitor'
@@ -82,11 +81,11 @@ const props = defineProps<{
   user: UsageMonitorUser | null
   purpose: string
   wallet: UsageMonitorWallet | null
+  refresh?: () => Promise<void>
 }>()
 
 const emit = defineEmits<{
   close: []
-  adjusted: [payload: { userId: number; result: PurposeAdjustResult }]
 }>()
 
 const { t } = useI18n()
@@ -151,11 +150,17 @@ function purposeLabel(purpose: string): string {
 }
 
 function ask(action: PurposeAdjustAction) {
+  if (submitting.value) return
   errorText.value = ''
   if (action === 'set_limit' && !limitInput.value.trim()) return
   if (action === 'set_used' && !usedInput.value.trim()) return
   if (action === 'align_window' && !windowInput.value.trim()) return
   pending.value = action
+}
+
+function cancelPending() {
+  if (submitting.value) return
+  pending.value = null
 }
 
 function payload(action: PurposeAdjustAction): PurposeAdjustRequest {
@@ -181,7 +186,7 @@ async function submitPending() {
   try {
     const result = await adjustPurposeWallet(payload(action))
     statusText.value = result.changed ? t('admin.usageMonitor.changed') : t('admin.usageMonitor.unchanged')
-    emit('adjusted', { userId: props.user.id, result })
+    await props.refresh?.()
     pending.value = null
   } catch (error) {
     errorText.value = usageMonitorErrorText(error) || t('admin.usageMonitor.adjustFailed')
@@ -211,13 +216,12 @@ function compareDecimal(left: string, right: string): number | null {
   return 0
 }
 
-function isZeroAmount(text: string): boolean {
-  return compareDecimal(text, '0') === 0
-}
-
 function clearsOrLowers(next: string, stored: string): boolean {
-  if (isZeroAmount(next)) return true
-  const compared = compareDecimal(next, stored)
+  const text = next.trim().replace(/^\+/, '')
+  const againstZero = compareDecimal(text, '0')
+  if (againstZero === null) return true
+  if (againstZero === 0) return true
+  const compared = compareDecimal(text, stored)
   return compared !== null && compared < 0
 }
 </script>

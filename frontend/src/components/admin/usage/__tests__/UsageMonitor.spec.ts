@@ -46,6 +46,7 @@ vi.mock('@/api/admin/usageMonitor', async () => {
 import UsageMonitorParents from '../UsageMonitorParents.vue'
 import PurposeWalletTable from '../PurposeWalletTable.vue'
 import PurposeAdjustModal from '../PurposeAdjustModal.vue'
+import PurposeAdjustmentList from '../PurposeAdjustmentList.vue'
 import UsageMonitorView from '@/views/admin/UsageMonitorView.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 
@@ -281,6 +282,19 @@ describe('purpose wallet adjustment confirms', () => {
     expect(dialogMessage(wrapper)).not.toContain(LOWER_USED)
   })
 
+  it('keeps the usage_logs sentence for a leading plus and for an unparsed amount', async () => {
+    const wrapper = mountWithI18n(PurposeAdjustModal, { show: true, user: student, purpose: 'openai', wallet: openai })
+    await wrapper.get('[data-testid="used-input"]').setValue('+5')
+    await wrapper.get('[data-testid="set-used"]').trigger('click')
+    expect(dialogMessage(wrapper)).toContain(LOWER_USED)
+    await wrapper.get('[data-testid="used-input"]').setValue('not-a-number')
+    await wrapper.get('[data-testid="set-used"]').trigger('click')
+    expect(dialogMessage(wrapper)).toContain(LOWER_USED)
+    await wrapper.get('[data-testid="used-input"]').setValue('+30')
+    await wrapper.get('[data-testid="set-used"]').trigger('click')
+    expect(dialogMessage(wrapper)).not.toContain(LOWER_USED)
+  })
+
   it('aligns the window in its own submit, then set_used is a second submit', async () => {
     const wrapper = mountWithI18n(PurposeAdjustModal, { show: true, user: student, purpose: 'openai', wallet: openai })
     await wrapper.get('[data-testid="window-input"]').setValue('2026-10-21T02:00:00Z')
@@ -334,6 +348,30 @@ describe('purpose wallet adjustment confirms', () => {
   })
 })
 
+describe('usage monitor audit list', () => {
+  it('keeps the current rows visible while an older page loads', () => {
+    const wrapper = mountWithI18n(PurposeAdjustmentList, {
+      loading: true,
+      hasMore: true,
+      items: [{
+        id: 3,
+        actor_user_id: 1,
+        target_user_id: 12,
+        purpose: 'openai',
+        field: 'used_amount',
+        origin: 'typed',
+        old_value: '20',
+        new_value: '0',
+        note: '',
+        created_at: '2026-10-21T02:00:00Z',
+      }],
+    })
+    expect(wrapper.get('[data-testid="audit-3"]').text()).toContain('20')
+    expect(wrapper.get('[data-testid="audit-3"]').text()).toContain('0')
+    expect(wrapper.find('[data-testid="no-audits"]').exists()).toBe(false)
+  })
+})
+
 describe('usage monitor page query', () => {
   beforeEach(() => {
     api.getUsageMonitor.mockReset()
@@ -359,30 +397,121 @@ describe('usage monitor page query', () => {
     api.listPurposeAdjustments.mockResolvedValue({ items: [] })
   })
 
-  it('highlights the queried user, filters the audit, and keeps parent cards class-wide', async () => {
+  async function mountPage() {
     const router = createRouter({
       history: createMemoryHistory(),
       routes: [{ path: '/admin/usage-monitor', component: { template: '<div />' } }],
     })
     await router.push('/admin/usage-monitor?user=12')
     await router.isReady()
-    const wrapper = mount(UsageMonitorView, {
+    return mount(UsageMonitorView, {
       global: {
         plugins: [router],
         stubs: {
           AppLayout: { template: '<div><slot /></div>' },
           Icon: true,
           Select: true,
-          BaseDialog: { props: ['show'], template: '<div v-if="show"><slot /></div>' },
+          BaseDialog: { props: ['show'], template: '<div v-if="show"><slot /><slot name="footer" /></div>' },
         },
       },
     })
+  }
+
+  it('does not show empty copy until the monitor read succeeds', async () => {
+    let release: (value: object) => void = () => {}
+    api.getUsageMonitor.mockReset()
+    api.getUsageMonitor.mockImplementation(() => new Promise((resolve) => { release = resolve }))
+    const wrapper = await mountPage()
+    expect(wrapper.find('[data-testid="no-users"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('还没有用户')
+    expect(wrapper.text()).not.toContain('没有 OpenAI 或 Grok 订阅母账号')
+    release({
+      generated_at: '2026-10-21T02:00:00Z',
+      disclaimer: 'gateway_observed_only',
+      parents: [],
+      users: [],
+    })
+    await flushPromises()
+    expect(wrapper.get('[data-testid="no-users"]').text()).toBe('还没有用户')
+    expect(wrapper.text()).toContain('没有 OpenAI 或 Grok 订阅母账号')
+  })
+
+  it('shows a failed read without the empty user copy', async () => {
+    api.getUsageMonitor.mockReset()
+    api.getUsageMonitor.mockRejectedValue({ reason: 'MONITOR_DOWN', message: 'monitor down' })
+    const wrapper = await mountPage()
+    await flushPromises()
+    expect(wrapper.get('[data-testid="usage-monitor-error"]').text()).toContain('MONITOR_DOWN')
+    expect(wrapper.find('[data-testid="no-users"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('还没有用户')
+  })
+
+  it('highlights the queried user, filters the audit, and keeps parent cards class-wide', async () => {
+    const wrapper = await mountPage()
     await flushPromises()
     expect(wrapper.get('[data-testid="usage-user-12"]').attributes('data-highlight')).toBe('true')
     expect(wrapper.get('[data-testid="usage-user-1"]').attributes('data-highlight')).toBe('false')
     expect(wrapper.get('[data-testid="observed-share-1"]').text()).toContain('40.0000')
     expect(wrapper.get('[data-testid="observed-cost-12"]').text()).toBe('0.0003905')
     expect(api.listPurposeAdjustments).toHaveBeenCalledWith(expect.objectContaining({ user_id: 12 }))
+  })
+
+  it('reloads the monitor before another confirm can use the adjusted wallet', async () => {
+    const updated = {
+      generated_at: '2026-10-21T02:05:00Z',
+      disclaimer: 'gateway_observed_only',
+      parents: [
+        parent({
+          official_used_percent: '41.2500',
+          gateway_actual_cost: '3.12500000',
+          wallet_remaining_yuan: '40',
+          users: [
+            { user_id: 12, gateway_actual_cost: '0.0003905', observed_share: '0.0000', slope_share: null },
+          ],
+        }),
+      ],
+      users: [
+        user({
+          wallets: [wallet({ stored_used_amount: '0', effective_used_amount: '0', student_percent: 0 })],
+        }),
+      ],
+    }
+    let release: (value: object) => void = () => {}
+    api.getUsageMonitor.mockReset()
+    api.getUsageMonitor
+      .mockResolvedValueOnce({
+        generated_at: '2026-10-21T02:00:00Z',
+        disclaimer: 'gateway_observed_only',
+        parents: [
+          parent({
+            official_used_percent: '41.2500',
+            gateway_actual_cost: '3.12500000',
+            users: [
+              { user_id: 12, gateway_actual_cost: '0.0003905', observed_share: '0.0000', slope_share: null },
+            ],
+          }),
+        ],
+        users: [user()],
+      })
+      .mockImplementationOnce(() => new Promise((resolve) => { release = resolve }))
+    api.adjustPurposeWallet.mockResolvedValue({ changed: true, wallet: wallet({ stored_used_amount: '0' }), audit: null })
+    const wrapper = await mountPage()
+    await flushPromises()
+    await wrapper.get('[data-testid="adjust-12-openai"]').trigger('click')
+    await wrapper.get('[data-testid="used-input"]').setValue('0')
+    await wrapper.get('[data-testid="set-used"]').trigger('click')
+    const confirmButton = wrapper.findAll('button').find((item) => item.text() === '确认')
+    expect(confirmButton).toBeTruthy()
+    await confirmButton!.trigger('click')
+    await flushPromises()
+    expect(wrapper.findComponent(ConfirmDialog).props('show')).toBe(true)
+    expect(api.getUsageMonitor).toHaveBeenCalledTimes(2)
+    expect(wrapper.get('[data-testid="set-limit"]').attributes('disabled')).toBeDefined()
+    release(updated)
+    await flushPromises()
+    expect(wrapper.findComponent(ConfirmDialog).props('show')).toBe(false)
+    expect(wrapper.text()).toContain('钱包剩余 40')
+    expect(wrapper.text()).toContain('账本已用 0')
   })
 })
 

@@ -44,8 +44,8 @@
                     <td class="px-3 py-2 text-gray-900 dark:text-white" :data-testid="`effective-used-${user.id}-${purpose}`">{{ walletOf(user, purpose)?.effective_used_amount }}</td>
                     <td class="px-3 py-2 text-gray-900 dark:text-white" :data-testid="`student-percent-${user.id}-${purpose}`">{{ walletOf(user, purpose)?.student_percent }}%</td>
                     <td class="px-3 py-2 text-gray-700 dark:text-gray-300">{{ walletOf(user, purpose)?.period }}</td>
-                    <td class="px-3 py-2 text-gray-700 dark:text-gray-300" :title="walletOf(user, purpose)?.window_start">{{ showTime(walletOf(user, purpose)?.window_start) }}</td>
-                    <td class="px-3 py-2 text-gray-700 dark:text-gray-300" :title="walletOf(user, purpose)?.resets_at">{{ showTime(walletOf(user, purpose)?.resets_at) }}</td>
+                    <td class="px-3 py-2 text-gray-700 dark:text-gray-300" :title="walletOf(user, purpose)?.window_start">{{ formatDateTime(walletOf(user, purpose)?.window_start) || walletOf(user, purpose)?.window_start || '' }}</td>
+                    <td class="px-3 py-2 text-gray-700 dark:text-gray-300" :title="walletOf(user, purpose)?.resets_at">{{ formatDateTime(walletOf(user, purpose)?.resets_at) || walletOf(user, purpose)?.resets_at || '' }}</td>
                   </template>
                   <template v-else>
                     <td class="px-3 py-2 text-gray-400" colspan="7">{{ t('admin.usageMonitor.noWallet') }}</td>
@@ -108,17 +108,9 @@ function walletOf(user: UsageMonitorUser, purpose: string): UsageMonitorWallet |
   return user.wallets.find((wallet) => wallet.purpose === purpose)
 }
 
-function showTime(value: string | null | undefined): string {
-  if (!value) return ''
-  return formatDateTime(value) || value
-}
-
-function isZeroText(value: string | null | undefined): boolean {
-  return !value || /^0+(?:\.0+)?$/.test(value.trim())
-}
-
 function tinyExperiment(wallet: UsageMonitorWallet | undefined): boolean {
   if (!wallet || wallet.purpose !== 'experiment' || wallet.student_percent !== 0) return false
-  return !isZeroText(wallet.effective_used_amount)
+  const spent = wallet.effective_used_amount.trim()
+  return spent !== '' && !/^0+(?:\.0+)?$/.test(spent)
 }
 </script>
