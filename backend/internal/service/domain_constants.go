@@ -747,6 +747,10 @@ const (
 // 值为 map[platform]{daily,weekly,monthly}，null/缺省 = 不限制；0 = 禁用；>0 = USD 上限。
 const SettingKeyDefaultPlatformQuotas = "default_platform_quotas"
 
+// SettingKeyPurposeAllowancePolicy is the Codex / Grok Build / API experiment
+// cap. It is not the per-platform daily, weekly, and monthly quota.
+const SettingKeyPurposeAllowancePolicy = "purpose_allowance_policy"
+
 // SettingKeyAccountSchedulingThresholds —— 系统全局：按平台自动停调阈值（JSON map）。
 // 值为 map[platform]percent，1..100；100 = 禁用该平台自动停调。
 const SettingKeyAccountSchedulingThresholds = "account_scheduling_thresholds"

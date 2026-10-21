@@ -547,6 +547,18 @@ func (s *SettingService) buildSystemSettingsUpdates(ctx context.Context, setting
 	updates[SettingKeyAccountQuotaNotifyEmails] = MarshalNotifyEmails(settings.AccountQuotaNotifyEmails)
 
 	// 系统全局 platform quota：整体替换语义（null/缺省 = 不限制）。
+	if settings.PurposeAllowancePolicy != nil {
+		normalized, err := NormalizePurposeAllowancePolicy(*settings.PurposeAllowancePolicy)
+		if err != nil {
+			return nil, err
+		}
+		blob, err := json.Marshal(normalized)
+		if err != nil {
+			return nil, fmt.Errorf("marshal purpose allowance policy: %w", err)
+		}
+		updates[SettingKeyPurposeAllowancePolicy] = string(blob)
+		settings.PurposeAllowancePolicy = &normalized
+	}
 	if settings.DefaultPlatformQuotas != nil {
 		if err := validateDefaultPlatformQuotaMap(settings.DefaultPlatformQuotas); err != nil {
 			return nil, err

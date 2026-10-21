@@ -379,7 +379,8 @@ type UpdateSettingsRequest struct {
 	OpenAIFastPolicySettings *dto.OpenAIFastPolicySettings `json:"openai_fast_policy_settings,omitempty"`
 
 	// 系统全局 platform quota 默认值（整体替换语义：nil = 不修改，non-nil = 整体覆盖）。
-	DefaultPlatformQuotas map[string]*service.DefaultPlatformQuotaSetting `json:"default_platform_quotas"`
+	DefaultPlatformQuotas  map[string]*service.DefaultPlatformQuotaSetting `json:"default_platform_quotas"`
+	PurposeAllowancePolicy *service.PurposeAllowancePolicy                 `json:"purpose_allowance_policy"`
 
 	// 各平台账号自动停调阈值（整体替换语义：nil = 不修改，non-nil = 整体覆盖）。
 	AccountSchedulingThresholds map[string]int `json:"account_scheduling_thresholds"`
@@ -1527,6 +1528,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 	settings := &service.SystemSettings{
 		// 系统全局 platform quota 默认值（整体替换语义）
 		DefaultPlatformQuotas:       req.DefaultPlatformQuotas,
+		PurposeAllowancePolicy:      req.PurposeAllowancePolicy,
 		AccountSchedulingThresholds: req.AccountSchedulingThresholds,
 
 		RegistrationEnabled:                 req.RegistrationEnabled,
@@ -2111,6 +2113,12 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		response.ErrorFrom(c, err)
 		return
 	}
+	if settings.PurposeAllowancePolicy != nil && h.purposeAllowances != nil {
+		if err := h.purposeAllowances.ApplyPolicy(c.Request.Context(), *settings.PurposeAllowancePolicy); err != nil {
+			response.ErrorFrom(c, err)
+			return
+		}
+	}
 	if h.opsService != nil {
 		h.opsService.SetMonitoringEnabled(settings.OpsMonitoringEnabled)
 	}
@@ -2478,6 +2486,11 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		slog.Error("default_platform_quotas_get_failed", "error", err)
 	} else {
 		payload.DefaultPlatformQuotas = platformQuotas
+	}
+	if policy, err := h.settingService.GetPurposeAllowancePolicy(c.Request.Context()); err != nil {
+		slog.Error("purpose_allowance_policy_get_failed", "error", err)
+	} else {
+		payload.PurposeAllowancePolicy = &policy
 	}
 	response.Success(c, systemSettingsResponseData(payload, updatedAuthSourceDefaults))
 }

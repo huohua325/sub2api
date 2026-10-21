@@ -34,6 +34,17 @@ export interface PlatformQuotaLimits {
 /** 全平台默认限额 map（key = PlatformType） */
 export type DefaultPlatformQuotasMap = Partial<Record<PlatformType, PlatformQuotaLimits>>
 
+export interface PurposeAllowanceRule {
+  limit: number
+  period: 'week' | 'month'
+}
+
+export interface PurposeAllowancePolicy {
+  openai: PurposeAllowanceRule
+  grok: PurposeAllowanceRule
+  experiment: PurposeAllowanceRule
+}
+
 
 export type SchedulingThresholdPlatformType =
   | "openai"
@@ -475,6 +486,7 @@ export interface SystemSettings {
   force_email_on_third_party_signup?: boolean;
   // ── 平台限额（嵌套 JSON，系统层 + 7 auth-source 层）────────────────────────────────
   default_platform_quotas?: DefaultPlatformQuotasMap;
+  purpose_allowance_policy?: PurposeAllowancePolicy;
   platform_quota_week_mode?: 'registration' | 'monday';
   auth_source_default_email_platform_quotas?: DefaultPlatformQuotasMap;
   auth_source_default_linuxdo_platform_quotas?: DefaultPlatformQuotasMap;
@@ -831,6 +843,7 @@ export interface UpdateSettingsRequest {
   force_email_on_third_party_signup?: boolean;
   // ── 平台限额（嵌套 JSON，系统层 + 7 auth-source 层）────────────────────────────────
   default_platform_quotas?: DefaultPlatformQuotasMap;
+  purpose_allowance_policy?: PurposeAllowancePolicy;
   platform_quota_week_mode?: 'registration' | 'monday';
   auth_source_default_email_platform_quotas?: DefaultPlatformQuotasMap;
   auth_source_default_linuxdo_platform_quotas?: DefaultPlatformQuotasMap;

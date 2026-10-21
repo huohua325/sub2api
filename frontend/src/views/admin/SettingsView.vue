@@ -4131,72 +4131,41 @@
                 </div>
               </div>
 
-              <!-- ★ 新增：系统全局默认平台限额矩阵 -->
-              <div class="border-t border-gray-100 pt-4 dark:border-dark-700">
-                <div class="mb-4 max-w-xl">
-                  <label class="input-label">{{ t("admin.settings.defaults.platformQuotaWeekMode") }}</label>
-                  <p class="mb-2 text-sm text-gray-500 dark:text-gray-400">
-                    {{ t("admin.settings.defaults.platformQuotaWeekModeHint") }}
-                  </p>
-                  <Select
-                    v-model="form.platform_quota_week_mode"
-                    :options="platformQuotaWeekModeOptions"
-                  />
-                </div>
-                <div class="mb-3">
-                  <label class="font-medium text-gray-900 dark:text-white">
-                    {{ t("admin.settings.defaults.defaultPlatformQuotas") }}
-                  </label>
-                  <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                    {{ t("admin.settings.defaults.defaultPlatformQuotasHint") }}
-                  </p>
-                  <p class="mt-0.5 text-xs text-amber-600 dark:text-amber-400">
-                    {{ t("admin.settings.defaults.platformQuotaNotice") }}
-                  </p>
-                </div>
-                <div class="overflow-x-auto">
+              <div class="rounded-xl border border-sky-200 bg-sky-50/60 p-4 dark:border-sky-900 dark:bg-sky-950/20">
+                <label class="font-medium text-gray-900 dark:text-white">
+                  {{ t("admin.settings.defaults.purposeAllowances") }}
+                </label>
+                <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
+                  {{ t("admin.settings.defaults.purposeAllowancesHint") }}
+                </p>
+                <p class="mt-1 text-sm text-sky-800 dark:text-sky-200">
+                  {{ t("admin.settings.defaults.purposeAllowancesDistinct") }}
+                </p>
+                <div class="mt-4 overflow-x-auto">
                   <table class="min-w-full text-sm">
                     <thead>
                       <tr class="text-left text-xs text-gray-500 dark:text-gray-400">
-                        <th class="pb-2 pr-4 font-medium">{{ t("admin.settings.platformQuota.platform") }}</th>
-                        <th class="pb-2 pr-4 font-medium">{{ t("admin.settings.platformQuota.daily") }}</th>
-                        <th class="pb-2 pr-4 font-medium">{{ t("admin.settings.platformQuota.weekly") }}</th>
-                        <th class="pb-2 font-medium">{{ t("admin.settings.platformQuota.monthly") }}</th>
+                        <th class="pb-2 pr-4 font-medium">{{ t("admin.groups.usageKind.label") }}</th>
+                        <th class="pb-2 pr-4 font-medium">{{ t("admin.settings.defaults.purposeAmount") }}</th>
+                        <th class="pb-2 font-medium">{{ t("admin.settings.defaults.purposeRefresh") }}</th>
                       </tr>
                     </thead>
-                    <tbody class="space-y-2">
-                      <tr v-for="p in platformQuotaRows(form.default_platform_quotas)" :key="p" class="align-top">
-                        <td class="pr-4 py-1">
-                          <span class="font-mono text-xs text-gray-700 dark:text-gray-300">{{ p }}</span>
-                        </td>
-                        <td class="pr-4 py-1">
+                    <tbody>
+                      <tr v-for="row in purposeAllowanceRows" :key="row.key">
+                        <td class="py-1 pr-4 text-gray-800 dark:text-gray-100">{{ row.label }}</td>
+                        <td class="py-1 pr-4">
                           <input
-                            v-model.number="form.default_platform_quotas[p]!.daily"
+                            v-model.number="form.purpose_allowance_policy[row.key].limit"
                             type="number"
-                            step="0.01"
                             min="0"
+                            step="1"
                             class="input h-8 w-28 text-sm"
-                            :placeholder="t('admin.settings.platformQuota.placeholder')"
-                          />
-                        </td>
-                        <td class="pr-4 py-1">
-                          <input
-                            v-model.number="form.default_platform_quotas[p]!.weekly"
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            class="input h-8 w-28 text-sm"
-                            :placeholder="t('admin.settings.platformQuota.placeholder')"
                           />
                         </td>
                         <td class="py-1">
-                          <input
-                            v-model.number="form.default_platform_quotas[p]!.monthly"
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            class="input h-8 w-28 text-sm"
-                            :placeholder="t('admin.settings.platformQuota.placeholder')"
+                          <Select
+                            v-model="form.purpose_allowance_policy[row.key].period"
+                            :options="purposeAllowancePeriodOptions"
                           />
                         </td>
                       </tr>
@@ -4204,7 +4173,8 @@
                   </table>
                 </div>
               </div>
-              <!-- /全局平台限额矩阵 -->
+
+
             </div>
           </div>
 
@@ -9118,6 +9088,7 @@ import type {
   UpdateSettingsRequest,
   DefaultSubscriptionSetting,
   DefaultPlatformQuotasMap,
+  PurposeAllowancePolicy,
   OpenAIFastPolicyRule,
   WeChatConnectMode,
   WebSearchEmulationConfig,
@@ -9900,6 +9871,7 @@ type SettingsForm = Omit<
   payment_recharge_bonus_notice: string;
   // 系统全局平台限额 map；form 内始终归一化为全部平台对象（模板非空绑定依赖此不变量）
   default_platform_quotas: DefaultPlatformQuotasMap;
+  purpose_allowance_policy: PurposeAllowancePolicy;
   platform_quota_week_mode: 'registration' | 'monday';
   account_scheduling_thresholds: ReturnType<typeof normalizeAccountSchedulingThresholdsMap>;
 };
@@ -9912,9 +9884,36 @@ function platformQuotaRows(map: DefaultPlatformQuotasMap | undefined): string[] 
   return listPlatformIds().filter((platform) => !!map?.[platform]);
 }
 
-const platformQuotaWeekModeOptions = computed<SelectOption[]>(() => [
-  { value: 'registration', label: t('admin.settings.defaults.platformQuotaWeekRegistration') },
-  { value: 'monday', label: t('admin.settings.defaults.platformQuotaWeekMonday') },
+function defaultPurposeAllowancePolicy(): PurposeAllowancePolicy {
+  return {
+    openai: { limit: 100, period: 'week' },
+    grok: { limit: 100, period: 'week' },
+    experiment: { limit: 500, period: 'month' },
+  }
+}
+
+function normalizePurposeAllowancePolicy(value: PurposeAllowancePolicy | undefined): PurposeAllowancePolicy {
+  const fallback = defaultPurposeAllowancePolicy()
+  const read = (rule: PurposeAllowancePolicy['openai'] | undefined, fallbackRule: PurposeAllowancePolicy['openai']) => ({
+    limit: typeof rule?.limit === 'number' && rule.limit >= 0 ? rule.limit : fallbackRule.limit,
+    period: rule?.period === 'month' || rule?.period === 'week' ? rule.period : fallbackRule.period,
+  })
+  return {
+    openai: read(value?.openai, fallback.openai),
+    grok: read(value?.grok, fallback.grok),
+    experiment: read(value?.experiment, fallback.experiment),
+  }
+}
+
+const purposeAllowanceRows = computed(() => [
+  { key: 'openai' as const, label: t('dashboard.purpose.openai') },
+  { key: 'grok' as const, label: t('dashboard.purpose.grok') },
+  { key: 'experiment' as const, label: t('dashboard.purpose.experiment') },
+])
+
+const purposeAllowancePeriodOptions = computed<SelectOption[]>(() => [
+  { value: 'week', label: t('admin.settings.defaults.purposeWeek') },
+  { value: 'month', label: t('admin.settings.defaults.purposeMonth') },
 ])
 
 const form = reactive<SettingsForm>({
@@ -9943,6 +9942,7 @@ const form = reactive<SettingsForm>({
   default_balance: 0,
   platform_quota_week_mode: 'registration',
   default_platform_quotas: normalizePlatformQuotasMap() as DefaultPlatformQuotasMap,
+  purpose_allowance_policy: defaultPurposeAllowancePolicy(),
   account_scheduling_thresholds: normalizeAccountSchedulingThresholdsMap(),
   affiliate_rebate_rate: 20,
   affiliate_rebate_freeze_hours: 0,
@@ -11328,6 +11328,7 @@ async function loadSettings() {
     );
     form.payment_recharge_bonus_notice = settings.payment_recharge_bonus_notice || "";
     form.default_platform_quotas = normalizePlatformQuotasMap(settings.default_platform_quotas);
+    form.purpose_allowance_policy = normalizePurposeAllowancePolicy(settings.purpose_allowance_policy);
     form.platform_quota_week_mode = settings.platform_quota_week_mode === 'monday' ? 'monday' : 'registration';
     form.account_scheduling_thresholds = normalizeAccountSchedulingThresholdsMap(
       settings.account_scheduling_thresholds,
@@ -12067,6 +12068,7 @@ async function saveSettings() {
     }
 
     payload.default_platform_quotas = sanitizePlatformQuotasMap(form.default_platform_quotas);
+    payload.purpose_allowance_policy = normalizePurposeAllowancePolicy(form.purpose_allowance_policy);
     payload.account_scheduling_thresholds = sanitizeAccountSchedulingThresholdsMap(
       form.account_scheduling_thresholds,
     );
@@ -12086,6 +12088,7 @@ async function saveSettings() {
     }
     Object.assign(authSourceDefaults, buildAuthSourceDefaultsState(updated));
     form.default_platform_quotas = normalizePlatformQuotasMap(updated.default_platform_quotas);
+    form.purpose_allowance_policy = normalizePurposeAllowancePolicy(updated.purpose_allowance_policy);
     form.account_scheduling_thresholds = normalizeAccountSchedulingThresholdsMap(
       updated.account_scheduling_thresholds,
     );

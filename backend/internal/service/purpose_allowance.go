@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"math"
 	"net/http"
 	"strings"
 	"time"
@@ -35,7 +36,66 @@ type PurposeAllowance struct {
 	Purpose     string
 	LimitAmount float64
 	UsedAmount  float64
+	Period      string
 	WindowStart time.Time
+}
+
+// PurposeAllowanceRule is one use's cap and refresh cycle.
+// week resets 7 days after the current window start. month resets at 00:00
+// Beijing time on the first day of each month.
+type PurposeAllowanceRule struct {
+	Limit  float64 `json:"limit"`
+	Period string  `json:"period"`
+}
+
+// PurposeAllowancePolicy is the lab control for Codex, Grok Build, and API experiments.
+// It is separate from per-platform daily/weekly/monthly quotas.
+type PurposeAllowancePolicy struct {
+	OpenAI     PurposeAllowanceRule `json:"openai"`
+	Grok       PurposeAllowanceRule `json:"grok"`
+	Experiment PurposeAllowanceRule `json:"experiment"`
+}
+
+func DefaultPurposeAllowancePolicy() PurposeAllowancePolicy {
+	return PurposeAllowancePolicy{
+		OpenAI:     PurposeAllowanceRule{Limit: PurposeOpenAILimit, Period: "week"},
+		Grok:       PurposeAllowanceRule{Limit: PurposeGrokLimit, Period: "week"},
+		Experiment: PurposeAllowanceRule{Limit: PurposeExperimentLimit, Period: "month"},
+	}
+}
+
+func (p PurposeAllowancePolicy) Rule(purpose string) (PurposeAllowanceRule, bool) {
+	switch purpose {
+	case PurposeOpenAI:
+		return p.OpenAI, true
+	case PurposeGrok:
+		return p.Grok, true
+	case PurposeExperiment:
+		return p.Experiment, true
+	default:
+		return PurposeAllowanceRule{}, false
+	}
+}
+
+// NormalizePurposeAllowancePolicy rejects unknown cycles and negative amounts.
+// A missing cycle keeps that use's built-in default.
+func NormalizePurposeAllowancePolicy(in PurposeAllowancePolicy) (PurposeAllowancePolicy, error) {
+	defaults := DefaultPurposeAllowancePolicy()
+	rules := []*PurposeAllowanceRule{&in.OpenAI, &in.Grok, &in.Experiment}
+	fallbacks := []PurposeAllowanceRule{defaults.OpenAI, defaults.Grok, defaults.Experiment}
+	for i, rule := range rules {
+		if rule.Period == "" && rule.Limit == 0 {
+			*rule = fallbacks[i]
+			continue
+		}
+		if math.IsNaN(rule.Limit) || math.IsInf(rule.Limit, 0) || rule.Limit < 0 {
+			return PurposeAllowancePolicy{}, infraerrors.New(http.StatusBadRequest, "INVALID_PURPOSE_ALLOWANCE", "purpose allowance amount must be zero or greater")
+		}
+		if rule.Period != "week" && rule.Period != "month" {
+			return PurposeAllowancePolicy{}, infraerrors.New(http.StatusBadRequest, "INVALID_PURPOSE_ALLOWANCE", "purpose allowance refresh must be week or month")
+		}
+	}
+	return in, nil
 }
 
 // NormalizeUsageKind checks the explicit group field. An empty value is the
@@ -113,12 +173,19 @@ func nextShanghaiMonthStart(now time.Time) time.Time {
 	return time.Date(start.Year(), start.Month()+1, 1, 0, 0, 0, 0, shanghai)
 }
 
+func allowancePeriod(purpose, period string) string {
+	if period == "week" || period == "month" {
+		return period
+	}
+	return PurposePeriod(purpose)
+}
+
 // PurposeWindowExpired reports whether used_amount belongs to a finished window.
-func PurposeWindowExpired(purpose string, windowStart, now time.Time) bool {
+func PurposeWindowExpired(period string, windowStart, now time.Time) bool {
 	if windowStart.IsZero() {
 		return true
 	}
-	switch PurposePeriod(purpose) {
+	switch period {
 	case "week":
 		return !now.Before(windowStart.Add(purposeWeek))
 	case "month":
@@ -129,14 +196,14 @@ func PurposeWindowExpired(purpose string, windowStart, now time.Time) bool {
 }
 
 // RenewedPurposeWindow is the start to store when the previous window has expired.
-func RenewedPurposeWindow(purpose string, windowStart, now time.Time) time.Time {
+func RenewedPurposeWindow(period string, windowStart, now time.Time) time.Time {
 	if windowStart.IsZero() {
-		if PurposePeriod(purpose) == "month" {
+		if period == "month" {
 			return shanghaiMonthStart(now)
 		}
 		return now
 	}
-	switch PurposePeriod(purpose) {
+	switch period {
 	case "week":
 		elapsed := now.Sub(windowStart)
 		weeks := int(elapsed / purposeWeek)
@@ -152,8 +219,8 @@ func RenewedPurposeWindow(purpose string, windowStart, now time.Time) time.Time 
 }
 
 // PurposeResetsAt is the instant the current window ends.
-func PurposeResetsAt(purpose string, windowStart time.Time) time.Time {
-	switch PurposePeriod(purpose) {
+func PurposeResetsAt(period string, windowStart time.Time) time.Time {
+	switch period {
 	case "week":
 		if windowStart.IsZero() {
 			return time.Time{}
@@ -172,12 +239,13 @@ func PurposeResetsAt(purpose string, windowStart time.Time) time.Time {
 
 // EffectivePurposeUsage treats an expired window as unused and returns when it resets.
 func EffectivePurposeUsage(row PurposeAllowance, now time.Time) (used float64, resetsAt time.Time) {
+	period := allowancePeriod(row.Purpose, row.Period)
 	start := row.WindowStart
-	if PurposeWindowExpired(row.Purpose, start, now) {
-		start = RenewedPurposeWindow(row.Purpose, start, now)
-		return 0, PurposeResetsAt(row.Purpose, start)
+	if PurposeWindowExpired(period, start, now) {
+		start = RenewedPurposeWindow(period, start, now)
+		return 0, PurposeResetsAt(period, start)
 	}
-	return row.UsedAmount, PurposeResetsAt(row.Purpose, start)
+	return row.UsedAmount, PurposeResetsAt(period, start)
 }
 
 // PurposeLimit is the starting amount for a wallet.
@@ -198,4 +266,5 @@ func PurposeLimit(purpose string) float64 {
 type PurposeAllowanceRepository interface {
 	List(ctx context.Context, userID int64) ([]PurposeAllowance, error)
 	EnsureDefaults(ctx context.Context, userID int64) error
+	ApplyPolicy(ctx context.Context, policy PurposeAllowancePolicy) error
 }

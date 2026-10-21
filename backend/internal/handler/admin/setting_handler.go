@@ -62,6 +62,14 @@ type SettingHandler struct {
 	notificationEmailService *service.NotificationEmailService
 	totpService              *service.TotpService
 	userService              *service.UserService
+	purposeAllowances        service.PurposeAllowanceRepository
+}
+
+func (h *SettingHandler) SetPurposeAllowances(repo service.PurposeAllowanceRepository) {
+	if h == nil {
+		return
+	}
+	h.purposeAllowances = repo
 }
 
 // NewSettingHandler 创建系统设置处理器
@@ -418,6 +426,11 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		slog.Error("default_platform_quotas_get_failed", "error", err)
 	} else {
 		payload.DefaultPlatformQuotas = platformQuotas
+	}
+	if policy, err := h.settingService.GetPurposeAllowancePolicy(c.Request.Context()); err != nil {
+		slog.Error("purpose_allowance_policy_get_failed", "error", err)
+	} else {
+		payload.PurposeAllowancePolicy = &policy
 	}
 
 	response.Success(c, systemSettingsResponseData(payload, authSourceDefaults))

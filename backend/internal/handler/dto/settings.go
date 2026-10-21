@@ -353,6 +353,8 @@ type SystemSettings struct {
 
 	// 系统全局默认平台配额（key = platform，nil/缺省 = 不限制）
 	DefaultPlatformQuotas map[string]*service.DefaultPlatformQuotaSetting `json:"default_platform_quotas,omitempty"`
+	// 用途额度：Codex、Grok Build、API 实验。不是平台日/周/月限额。
+	PurposeAllowancePolicy *service.PurposeAllowancePolicy `json:"purpose_allowance_policy,omitempty"`
 	// registration：从注册时刻起每 7 天。monday：每周一 0 点。
 	PlatformQuotaWeekMode string `json:"platform_quota_week_mode,omitempty"`
 
