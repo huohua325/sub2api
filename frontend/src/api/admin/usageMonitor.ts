@@ -1,0 +1,146 @@
+import { apiClient } from '../client'
+
+export interface UsageMonitorSlope {
+  delta_points: string
+  sample_ready: boolean
+  from_observed_at: string
+  to_observed_at: string
+  cost_between: string
+  yuan_per_point: string | null
+}
+
+export interface UsageMonitorOversubscribe {
+  numeric: boolean
+  wallet_points: string | null
+  remaining_official_percent: string | null
+}
+
+export interface UsageMonitorParentUser {
+  user_id: number
+  gateway_actual_cost: string
+  observed_share: string | null
+  slope_share: string | null
+}
+
+export interface UsageMonitorParent {
+  account_id: number
+  name: string
+  platform: string
+  purpose: string
+  official_used_percent: string | null
+  official_remaining_percent: string | null
+  official_reset_at: string | null
+  official_observed_at: string | null
+  official_source: string | null
+  percent_from: string | null
+  window_start: string | null
+  gateway_actual_cost: string
+  snapshot_note: string | null
+  slope: UsageMonitorSlope | null
+  users: UsageMonitorParentUser[]
+  hidden_user_actual_cost: string
+  wallet_remaining_yuan: string
+  oversubscribe: UsageMonitorOversubscribe
+}
+
+export interface UsageMonitorRequestCount {
+  platform: string
+  count: number
+}
+
+export interface UsageMonitorWallet {
+  purpose: string
+  limit_amount: string
+  stored_used_amount: string
+  effective_used_amount: string
+  student_percent: number
+  period: string
+  window_start: string
+  resets_at: string
+  official?: string | null
+  request_counts?: UsageMonitorRequestCount[] | null
+  ledger_unrolled?: boolean
+}
+
+export interface UsageMonitorUser {
+  id: number
+  email: string
+  username: string
+  role: string
+  wallets: UsageMonitorWallet[]
+}
+
+export interface UsageMonitorView {
+  generated_at: string
+  disclaimer: string
+  parents: UsageMonitorParent[]
+  users: UsageMonitorUser[]
+}
+
+export interface PurposeAdjustmentAudit {
+  id: number
+  actor_user_id: number
+  target_user_id: number
+  purpose: string
+  field: string
+  origin: string
+  old_value: string
+  new_value: string
+  note: string
+  created_at: string
+}
+
+export interface PurposeAdjustResult {
+  changed: boolean
+  wallet: UsageMonitorWallet
+  audit: PurposeAdjustmentAudit | null
+}
+
+export interface PurposeAdjustmentList {
+  items: PurposeAdjustmentAudit[]
+}
+
+export type PurposeAdjustAction = 'set_limit' | 'set_used' | 'rebuild_used' | 'align_window'
+
+export interface PurposeAdjustRequest {
+  user_id: number
+  purpose: string
+  action: PurposeAdjustAction
+  value?: string
+  note?: string
+  confirm: true
+}
+
+export interface PurposeAdjustmentQuery {
+  user_id?: number
+  before_id?: number
+  limit?: number
+}
+
+export function usageMonitorErrorText(error: unknown): string {
+  if (!error || typeof error !== 'object') return ''
+  const body = error as { reason?: unknown; message?: unknown }
+  const reason = typeof body.reason === 'string' ? body.reason.trim() : ''
+  const message = typeof body.message === 'string' ? body.message.trim() : ''
+  if (reason && message && reason !== message) return `${reason}: ${message}`
+  return reason || message
+}
+
+export async function getUsageMonitor(): Promise<UsageMonitorView> {
+  const { data } = await apiClient.get<UsageMonitorView>('/admin/usage-monitor')
+  return data
+}
+
+export async function adjustPurposeWallet(body: PurposeAdjustRequest): Promise<PurposeAdjustResult> {
+  const { data } = await apiClient.post<PurposeAdjustResult>('/admin/usage-monitor/adjustments', body)
+  return data
+}
+
+export async function listPurposeAdjustments(params: PurposeAdjustmentQuery = {}): Promise<PurposeAdjustmentList> {
+  const query: Record<string, number> = {}
+  if (params.user_id) query.user_id = params.user_id
+  if (params.before_id) query.before_id = params.before_id
+  if (params.limit) query.limit = params.limit
+  const { data } = await apiClient.get<PurposeAdjustmentList>('/admin/usage-monitor/adjustments', { params: query })
+  return data
+}

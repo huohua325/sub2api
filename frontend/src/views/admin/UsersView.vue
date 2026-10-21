@@ -303,8 +303,16 @@
             </div>
           </template>
 
-          <template #cell-username="{ value }">
-            <span class="text-sm text-gray-700 dark:text-gray-300">{{ value || '-' }}</span>
+          <template #cell-username="{ value, row }">
+            <span class="inline-flex flex-wrap items-center gap-2">
+              <span class="text-sm text-gray-700 dark:text-gray-300">{{ value || '-' }}</span>
+              <RouterLink
+                :to="{ path: '/admin/usage-monitor', query: { user: String(row.id) } }"
+                class="text-sm font-medium text-primary-600 hover:underline dark:text-primary-400"
+              >
+                {{ t('admin.usageMonitor.openUser') }}
+              </RouterLink>
+            </span>
           </template>
 
           <template #cell-notes="{ value }">
