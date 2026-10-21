@@ -1,78 +1,130 @@
-export type ModelFamily = 'gpt' | 'grok' | 'qwen' | 'kimi' | 'deepseek' | 'glm'
-export type ModelUse = 'chat' | 'coding' | 'image' | 'video'
-export type ModelSource = 'subscription' | 'experiment'
+export type ModelFamily = 'gpt' | 'grok' | 'claude' | 'gemini' | 'qwen' | 'kimi' | 'deepseek' | 'glm'
+export type ModelUse = 'chat' | 'coding'
+export type ModelNote = 'peak' | 'long2' | 'long3' | 'long5' | 'long55'
 
 export interface ExperimentModel {
   id: string
   family: ModelFamily
   use: ModelUse
-  source: ModelSource
+  input: number
+  output: number
+  cache: number
+  note?: ModelNote
 }
 
-export const modelFamilies: ModelFamily[] = ['gpt', 'grok', 'qwen', 'kimi', 'deepseek', 'glm']
-export const modelUses: ModelUse[] = ['chat', 'coding', 'image', 'video']
-
-function row(
-  id: string,
-  family: ModelFamily,
-  use: ModelUse,
-  source: ModelSource
-): ExperimentModel {
-  return { id, family, use, source }
-}
-
-const gpt = (id: string, use: ModelUse = 'chat') => row(id, 'gpt', use, 'subscription')
-const grok = (id: string, use: ModelUse = 'chat') => row(id, 'grok', use, 'subscription')
-const lab = (id: string, family: ModelFamily) => row(id, family, 'chat', 'experiment')
+export const modelFamilies: ModelFamily[] = ['gpt', 'grok', 'claude', 'gemini', 'qwen', 'kimi', 'deepseek', 'glm']
+export const modelUses: ModelUse[] = ['chat', 'coding']
 
 export const experimentModels: ExperimentModel[] = [
-  gpt('gpt-6.1-sol'),
-  gpt('gpt-6-sol'),
-  gpt('gpt-6-luna'),
-  gpt('gpt-6-astra'),
-  gpt('gpt-5.6-sol'),
-  gpt('gpt-5.6-terra'),
-  gpt('gpt-5.6-luna'),
-  gpt('gpt-5.4'),
-  gpt('gpt-5.4-mini'),
-  gpt('gpt-5.3-codex-spark', 'coding'),
-  gpt('gpt-5.2'),
-  gpt('gpt-image-2.5-flare', 'image'),
-  gpt('gpt-image-2.5-sunburst', 'image'),
-  gpt('gpt-image-2', 'image'),
-  gpt('gpt-image-1.5', 'image'),
-  gpt('gpt-image-1', 'image'),
-
-  grok('grok-4.7'),
-  grok('grok-4.6'),
-  grok('grok-4.5'),
-  grok('grok-4.3'),
-  grok('grok-build-0.1', 'coding'),
-  grok('grok-composer-2.5-fast', 'coding'),
-  grok('grok-4.20-0309-reasoning'),
-  grok('grok-4.20-0309-non-reasoning'),
-  grok('grok-4.20-multi-agent-0309'),
-  grok('grok-imagine-image-quality', 'image'),
-  grok('grok-imagine-image', 'image'),
-  grok('grok-imagine-image-2.0', 'image'),
-  grok('grok-imagine-video', 'video'),
-  grok('grok-imagine-video-1.5', 'video'),
-
-  lab('qwen3.8-max', 'qwen'),
-  lab('qwen3.7-max', 'qwen'),
-  lab('qwen3.7-plus', 'qwen'),
-
-  lab('kimi-k3', 'kimi'),
-  lab('kimi-k2.6', 'kimi'),
-  lab('kimi-k2.5', 'kimi'),
-
-  lab('deepseek-v4-pro', 'deepseek'),
-  lab('deepseek-v4-pro-0813', 'deepseek'),
-  lab('deepseek-v4.1-flash', 'deepseek'),
-  lab('deepseek-v4-flash', 'deepseek'),
-  lab('deepseek-v4-flash-0731', 'deepseek'),
-
-  lab('glm-5.3', 'glm'),
-  lab('glm-5.3-flash', 'glm'),
-  lab('glm-5.2', 'glm'),
+  { id: 'gpt-3.5-turbo', family: 'gpt', use: 'chat', input: 0.3, output: 0.6, cache: 0 },
+  { id: 'gpt-4.1', family: 'gpt', use: 'chat', input: 1.2, output: 4.8, cache: 0.3 },
+  { id: 'gpt-4.1-2025-04-14', family: 'gpt', use: 'chat', input: 1.2, output: 4.8, cache: 0.3 },
+  { id: 'gpt-4.1-mini', family: 'gpt', use: 'chat', input: 0.24, output: 0.96, cache: 0 },
+  { id: 'gpt-4.1-mini-2025-04-14', family: 'gpt', use: 'chat', input: 0.24, output: 0.96, cache: 0.06 },
+  { id: 'gpt-4.1-nano', family: 'gpt', use: 'chat', input: 0.06, output: 0.24, cache: 0 },
+  { id: 'gpt-4.1-nano-2025-04-14', family: 'gpt', use: 'chat', input: 0.06, output: 0.24, cache: 0 },
+  { id: 'gpt-4o', family: 'gpt', use: 'chat', input: 1.5, output: 6, cache: 0.75 },
+  { id: 'gpt-4o-2024-11-20', family: 'gpt', use: 'chat', input: 1.5, output: 6, cache: 0.75 },
+  { id: 'gpt-4o-mini', family: 'gpt', use: 'chat', input: 0.09, output: 0.36, cache: 0.045 },
+  { id: 'gpt-4o-mini-2024-07-18', family: 'gpt', use: 'chat', input: 0.09, output: 0.36, cache: 0.045 },
+  { id: 'gpt-5', family: 'gpt', use: 'chat', input: 0.75, output: 6, cache: 0.075 },
+  { id: 'gpt-5-2025-08-07', family: 'gpt', use: 'chat', input: 0.75, output: 6, cache: 0.075 },
+  { id: 'gpt-5-chat', family: 'gpt', use: 'chat', input: 0.75, output: 6, cache: 0 },
+  { id: 'gpt-5-chat-latest', family: 'gpt', use: 'chat', input: 0.75, output: 6, cache: 0.075 },
+  { id: 'gpt-5-mini', family: 'gpt', use: 'chat', input: 0.15, output: 1.2, cache: 0.018 },
+  { id: 'gpt-5-mini-2025-08-07', family: 'gpt', use: 'chat', input: 0.15, output: 1.2, cache: 0.018 },
+  { id: 'gpt-5-nano', family: 'gpt', use: 'chat', input: 0.03, output: 0.24, cache: 0.0036 },
+  { id: 'gpt-5-nano-2025-08-07', family: 'gpt', use: 'chat', input: 0.03, output: 0.24, cache: 0.0036 },
+  { id: 'gpt-5.1', family: 'gpt', use: 'chat', input: 0.75, output: 6, cache: 0.075 },
+  { id: 'gpt-5.1-2025-11-13', family: 'gpt', use: 'chat', input: 0.75, output: 6, cache: 0 },
+  { id: 'gpt-5.1-chat-2025-11-13', family: 'gpt', use: 'chat', input: 0.75, output: 6, cache: 0 },
+  { id: 'gpt-5.1-chat-latest', family: 'gpt', use: 'chat', input: 0.75, output: 6, cache: 0 },
+  { id: 'gpt-5.2', family: 'gpt', use: 'chat', input: 1.05, output: 8.4, cache: 0.105 },
+  { id: 'gpt-5.2-2025-12-11', family: 'gpt', use: 'chat', input: 1.05, output: 8.4, cache: 0.105 },
+  { id: 'gpt-5.2-chat-2025-12-11', family: 'gpt', use: 'chat', input: 1.05, output: 8.4, cache: 0 },
+  { id: 'gpt-5.2-chat-latest', family: 'gpt', use: 'chat', input: 1.05, output: 8.4, cache: 0 },
+  { id: 'gpt-5.3-codex', family: 'gpt', use: 'coding', input: 1.05, output: 8.4, cache: 0.105 },
+  { id: 'gpt-5.4-mini', family: 'gpt', use: 'chat', input: 0.45, output: 2.7, cache: 0 },
+  { id: 'gpt-5.4-mini-2026-03-17', family: 'gpt', use: 'chat', input: 0.12, output: 0.72, cache: 0 },
+  { id: 'gpt-5.4-nano', family: 'gpt', use: 'chat', input: 0.12, output: 0.75, cache: 0 },
+  { id: 'gpt-5.4-nano-2026-03-17', family: 'gpt', use: 'chat', input: 0.12, output: 0.75, cache: 0 },
+  { id: 'gpt-5.5', family: 'gpt', use: 'chat', input: 3, output: 18, cache: 0.3, note: 'long55' },
+  { id: 'gpt-oss-120b', family: 'gpt', use: 'chat', input: 0.18, output: 1.4994, cache: 0 },
+  { id: 'o1', family: 'gpt', use: 'chat', input: 9, output: 36, cache: 4.5 },
+  { id: 'o1-2024-12-17', family: 'gpt', use: 'chat', input: 9, output: 36, cache: 4.5 },
+  { id: 'o1-mini', family: 'gpt', use: 'chat', input: 0.66, output: 2.64, cache: 0.33 },
+  { id: 'o1-mini-2024-09-12', family: 'gpt', use: 'chat', input: 0.66, output: 2.64, cache: 0.33 },
+  { id: 'o1-preview', family: 'gpt', use: 'chat', input: 9, output: 36, cache: 4.5 },
+  { id: 'o1-preview-2024-09-12', family: 'gpt', use: 'chat', input: 9, output: 36, cache: 4.5 },
+  { id: 'o3', family: 'gpt', use: 'chat', input: 1.2, output: 4.8, cache: 0.3 },
+  { id: 'o3-mini', family: 'gpt', use: 'chat', input: 0.66, output: 2.64, cache: 0.33 },
+  { id: 'o3-mini-2025-01-31', family: 'gpt', use: 'chat', input: 0.66, output: 2.64, cache: 0.33 },
+  { id: 'o4-mini', family: 'gpt', use: 'chat', input: 0.66, output: 2.64, cache: 0.165 },
+  { id: 'o4-mini-2025-04-16', family: 'gpt', use: 'chat', input: 0.66, output: 2.64, cache: 0.165 },
+  { id: 'text-embedding-3-large', family: 'gpt', use: 'chat', input: 0.078, output: 0.078, cache: 0 },
+  { id: 'text-embedding-3-small', family: 'gpt', use: 'chat', input: 0.012, output: 0.012, cache: 0 },
+  { id: 'grok-4-20-non-reasoning', family: 'grok', use: 'chat', input: 0.6, output: 1.8, cache: 0.06 },
+  { id: 'grok-4-20-reasoning', family: 'grok', use: 'chat', input: 0.6, output: 1.8, cache: 0.06 },
+  { id: 'grok-4.3', family: 'grok', use: 'chat', input: 0.375, output: 0.75, cache: 0.06, note: 'long2' },
+  { id: 'grok-4.5', family: 'grok', use: 'chat', input: 0.6, output: 1.8, cache: 0.09, note: 'long2' },
+  { id: 'grok-4.6', family: 'grok', use: 'chat', input: 0.6, output: 1.8, cache: 0.15, note: 'long2' },
+  { id: 'grok-4.7', family: 'grok', use: 'chat', input: 0.6, output: 1.8, cache: 0.15, note: 'long2' },
+  { id: 'claude-fable-5', family: 'claude', use: 'chat', input: 16, output: 80, cache: 1.6 },
+  { id: 'claude-fable-5-1', family: 'claude', use: 'chat', input: 16, output: 80, cache: 0.4 },
+  { id: 'claude-haiku-4-5-20251001', family: 'claude', use: 'chat', input: 1.6, output: 8, cache: 0.16 },
+  { id: 'claude-haiku-5-5', family: 'claude', use: 'chat', input: 0.16, output: 0.8, cache: 0.016, note: 'long5' },
+  { id: 'claude-opus-4-5-20251101', family: 'claude', use: 'chat', input: 8, output: 40, cache: 0.8 },
+  { id: 'claude-opus-4-6', family: 'claude', use: 'chat', input: 8, output: 40, cache: 0.8 },
+  { id: 'claude-opus-4-6-thinking', family: 'claude', use: 'chat', input: 8, output: 40, cache: 0.8 },
+  { id: 'claude-opus-4-7', family: 'claude', use: 'chat', input: 8, output: 40, cache: 0.8 },
+  { id: 'claude-opus-4-8', family: 'claude', use: 'chat', input: 8, output: 40, cache: 0.8 },
+  { id: 'claude-opus-5', family: 'claude', use: 'chat', input: 8, output: 40, cache: 0.8 },
+  { id: 'claude-opus-5-5', family: 'claude', use: 'chat', input: 6.4, output: 32, cache: 0.32 },
+  { id: 'claude-sonnet-4-5-20250929', family: 'claude', use: 'chat', input: 4.8, output: 24, cache: 0.48 },
+  { id: 'claude-sonnet-4-6', family: 'claude', use: 'chat', input: 4.8, output: 24, cache: 0.48 },
+  { id: 'claude-sonnet-4-6-thinking', family: 'claude', use: 'chat', input: 4.8, output: 24, cache: 0.48 },
+  { id: 'claude-sonnet-5', family: 'claude', use: 'chat', input: 3.2, output: 16, cache: 0.32 },
+  { id: 'claude-sonnet-5-5', family: 'claude', use: 'chat', input: 3.2, output: 16, cache: 0.32 },
+  { id: 'gemini-2.5-flash', family: 'gemini', use: 'chat', input: 0.18, output: 1.5, cache: 0.018 },
+  { id: 'gemini-2.5-flash-lite', family: 'gemini', use: 'chat', input: 0.06, output: 0.24, cache: 0 },
+  { id: 'gemini-2.5-flash-nothinking', family: 'gemini', use: 'chat', input: 0.18, output: 1.5, cache: 0.018 },
+  { id: 'gemini-2.5-flash-thinking', family: 'gemini', use: 'chat', input: 0.18, output: 1.5, cache: 0.018 },
+  { id: 'gemini-2.5-pro', family: 'gemini', use: 'chat', input: 0.75, output: 6, cache: 0 },
+  { id: 'gemini-2.5-pro-c', family: 'gemini', use: 'chat', input: 0, output: 0, cache: 0 },
+  { id: 'gemini-2.5-pro-nothinking', family: 'gemini', use: 'chat', input: 0.75, output: 6, cache: 0 },
+  { id: 'gemini-2.5-pro-preview-tts', family: 'gemini', use: 'chat', input: 45, output: 360, cache: 0 },
+  { id: 'gemini-2.5-pro-thinking', family: 'gemini', use: 'chat', input: 0.7536, output: 6.0288, cache: 0 },
+  { id: 'gemini-3-flash-preview', family: 'gemini', use: 'chat', input: 0.3, output: 1.8, cache: 0.03 },
+  { id: 'gemini-3-flash-preview-c', family: 'gemini', use: 'chat', input: 0, output: 0, cache: 0 },
+  { id: 'gemini-3-flash-preview-thinking', family: 'gemini', use: 'chat', input: 0.3, output: 1.8, cache: 0.03 },
+  { id: 'gemini-3-pro-preview', family: 'gemini', use: 'chat', input: 1.2, output: 7.2, cache: 0.12 },
+  { id: 'gemini-3-pro-preview-thinking', family: 'gemini', use: 'chat', input: 1.2, output: 7.2, cache: 0.12 },
+  { id: 'gemini-3.1-flash-lite', family: 'gemini', use: 'chat', input: 0.15, output: 0.9, cache: 0 },
+  { id: 'gemini-3.1-flash-lite-preview', family: 'gemini', use: 'chat', input: 0.15, output: 0.9, cache: 0 },
+  { id: 'gemini-3.1-pro-preview', family: 'gemini', use: 'chat', input: 1.2, output: 7.2, cache: 0.12 },
+  { id: 'gemini-3.1-pro-preview-c', family: 'gemini', use: 'chat', input: 0, output: 0, cache: 0 },
+  { id: 'gemini-3.1-pro-preview-thinking', family: 'gemini', use: 'chat', input: 1.2, output: 7.2, cache: 0.12 },
+  { id: 'gemini-3.5-flash', family: 'gemini', use: 'chat', input: 0.9, output: 5.4, cache: 0.09 },
+  { id: 'gemini-3.5-flash-c', family: 'gemini', use: 'chat', input: 0, output: 0, cache: 0 },
+  { id: 'gemini-3.6-flash', family: 'gemini', use: 'chat', input: 0.9, output: 4.5, cache: 0.09 },
+  { id: 'gemini-3.6-flash-c', family: 'gemini', use: 'chat', input: 0, output: 0, cache: 0 },
+  { id: 'gemini-3.7-flash', family: 'gemini', use: 'chat', input: 0.45, output: 2.25, cache: 0.045 },
+  { id: 'gemini-3.7-flash-c', family: 'gemini', use: 'chat', input: 0, output: 0, cache: 0 },
+  { id: 'gemini-3.8-flash', family: 'gemini', use: 'chat', input: 0.45, output: 2.25, cache: 0.045 },
+  { id: 'gemini-3.8-flash-c', family: 'gemini', use: 'chat', input: 0, output: 0, cache: 0 },
+  { id: 'gemini-4-argon', family: 'gemini', use: 'chat', input: 1.2, output: 6, cache: 0.06 },
+  { id: 'qwen3.7-max', family: 'qwen', use: 'chat', input: 8.4, output: 25.2, cache: 1.68 },
+  { id: 'qwen3.7-plus', family: 'qwen', use: 'chat', input: 1.4, output: 5.6, cache: 0.28, note: 'long3' },
+  { id: 'qwen3.8-max', family: 'qwen', use: 'chat', input: 8.4, output: 25.2, cache: 1.05 },
+  { id: 'kimi-k2.5', family: 'kimi', use: 'chat', input: 2, output: 10.5, cache: 0.2 },
+  { id: 'kimi-k2.6', family: 'kimi', use: 'chat', input: 3.25, output: 13.5, cache: 0.55 },
+  { id: 'kimi-k3', family: 'kimi', use: 'chat', input: 10, output: 50, cache: 1 },
+  { id: 'deepseek-v4-flash', family: 'deepseek', use: 'chat', input: 0.75, output: 2.25, cache: 0.025, note: 'peak' },
+  { id: 'deepseek-v4-flash-0731', family: 'deepseek', use: 'chat', input: 0.75, output: 2.25, cache: 0.025, note: 'peak' },
+  { id: 'deepseek-v4-pro', family: 'deepseek', use: 'chat', input: 2.25, output: 6.75, cache: 0.075, note: 'peak' },
+  { id: 'deepseek-v4-pro-0813', family: 'deepseek', use: 'chat', input: 2.25, output: 6.75, cache: 0.075, note: 'peak' },
+  { id: 'deepseek-v4.1-flash', family: 'deepseek', use: 'chat', input: 0.5, output: 2, cache: 0.01, note: 'peak' },
+  { id: 'glm-5.2', family: 'glm', use: 'chat', input: 4, output: 14, cache: 1 },
+  { id: 'glm-5.3', family: 'glm', use: 'chat', input: 4, output: 14, cache: 1 },
+  { id: 'glm-5.3-flash', family: 'glm', use: 'chat', input: 0.4, output: 1.4, cache: 0.115 },
 ]
