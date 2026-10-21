@@ -72,19 +72,19 @@ func (r *UsageMonitorRepository) ListOfficialParents(ctx context.Context) ([]ser
 		); err != nil {
 			return nil, err
 		}
-		row.CodexUsedPercent = nullStringPtr(codexUsed)
-		row.CodexResetAt = nullStringPtr(codexReset)
-		row.CodexUsageUpdatedAt = nullStringPtr(codexUpdated)
-		row.CodexWindowMinutes = nullStringPtr(codexMinutes)
-		row.CodexResetAfterSeconds = nullStringPtr(codexAfter)
-		row.GrokUsagePercent = nullStringPtr(grokPercent)
-		row.GrokPeriodStart = nullStringPtr(grokStart)
-		row.GrokPeriodEnd = nullStringPtr(grokEnd)
-		row.GrokPeriodType = nullStringPtr(grokType)
-		row.GrokPlan = nullStringPtr(grokPlan)
-		row.GrokWeeklyUpdatedAt = nullStringPtr(grokWeekly)
-		row.GrokUpdatedAt = nullStringPtr(grokUpdated)
-		row.GrokFetchedAt = nullStringPtr(grokFetched)
+		row.CodexUsedPercent = nullStringFromSQL(codexUsed)
+		row.CodexResetAt = nullStringFromSQL(codexReset)
+		row.CodexUsageUpdatedAt = nullStringFromSQL(codexUpdated)
+		row.CodexWindowMinutes = nullStringFromSQL(codexMinutes)
+		row.CodexResetAfterSeconds = nullStringFromSQL(codexAfter)
+		row.GrokUsagePercent = nullStringFromSQL(grokPercent)
+		row.GrokPeriodStart = nullStringFromSQL(grokStart)
+		row.GrokPeriodEnd = nullStringFromSQL(grokEnd)
+		row.GrokPeriodType = nullStringFromSQL(grokType)
+		row.GrokPlan = nullStringFromSQL(grokPlan)
+		row.GrokWeeklyUpdatedAt = nullStringFromSQL(grokWeekly)
+		row.GrokUpdatedAt = nullStringFromSQL(grokUpdated)
+		row.GrokFetchedAt = nullStringFromSQL(grokFetched)
 		out = append(out, row)
 	}
 	return out, rows.Err()
@@ -150,8 +150,8 @@ func (r *UsageMonitorRepository) ListLatestStamps(ctx context.Context, accountID
 		if err := rows.Scan(&stamp.AccountID, &stamp.ResetAt, &stamp.UsedPercent, &remaining, &observed, &source); err != nil {
 			return nil, err
 		}
-		stamp.RemainingPercent = nullStringPtr(remaining)
-		stamp.ObservedAt = nullTimePtr(observed)
+		stamp.RemainingPercent = nullStringFromSQL(remaining)
+		stamp.ObservedAt = nullTimeFromSQL(observed)
 		if source.Valid {
 			stamp.Source = source.String
 		}
@@ -271,9 +271,9 @@ func (r *UsageMonitorRepository) ListWindowUsage(ctx context.Context, windows []
 		}
 		if usage.Slope == nil && p1.Valid && observed1.Valid {
 			slope := &service.UsageMonitorSlopeRow{P1: p1.String, Observed1: observed1.Time}
-			slope.P0 = nullStringPtr(p0)
-			slope.Observed0 = nullTimePtr(observed0)
-			slope.CostBetween = nullStringPtr(costBetween)
+			slope.P0 = nullStringFromSQL(p0)
+			slope.Observed0 = nullTimeFromSQL(observed0)
+			slope.CostBetween = nullStringFromSQL(costBetween)
 			usage.Slope = slope
 		}
 	}
@@ -409,19 +409,4 @@ func (r *UsageMonitorRepository) ListExperimentRequestCounts(ctx context.Context
 		out = append(out, count)
 	}
 	return out, rows.Err()
-}
-
-func nullStringPtr(value sql.NullString) *string {
-	if !value.Valid {
-		return nil
-	}
-	return &value.String
-}
-
-func nullTimePtr(value sql.NullTime) *time.Time {
-	if !value.Valid {
-		return nil
-	}
-	copied := value.Time
-	return &copied
 }
