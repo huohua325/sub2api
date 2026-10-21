@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"strings"
+	"time"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
@@ -178,6 +179,12 @@ func (r *usageBillingRepository) applyUsageBillingEffects(ctx context.Context, t
 		}
 	}
 
+	if cmd.PurposeCost > 0 && cmd.Purpose != "" {
+		if err := incrementUsageBillingPurpose(ctx, tx, cmd.UserID, cmd.Purpose, cmd.PurposeCost); err != nil {
+			return err
+		}
+	}
+
 	if cmd.BalanceCost > 0 {
 		newBalance, sufficient, err := deductUsageBillingBalance(ctx, tx, cmd.UserID, cmd.BalanceCost)
 		if err != nil {
@@ -239,6 +246,40 @@ func incrementUsageBillingSubscription(ctx context.Context, tx *sql.Tx, subscrip
 		return nil
 	}
 	return service.ErrSubscriptionNotFound
+}
+
+func incrementUsageBillingPurpose(ctx context.Context, tx *sql.Tx, userID int64, purpose string, amount float64) error {
+	limit := service.PurposeLimit(purpose)
+	if limit <= 0 {
+		return nil
+	}
+	period := service.PurposePeriod(purpose)
+	windowStart := time.Now()
+	if period == "month" {
+		windowStart = service.ShanghaiMonthStart(windowStart)
+	}
+	_, err := tx.ExecContext(ctx, `
+		INSERT INTO user_purpose_allowances (user_id, purpose, limit_amount, used_amount, window_start)
+		VALUES ($1, $2, $3, $4, $5)
+		ON CONFLICT (user_id, purpose) DO UPDATE
+		SET used_amount = CASE
+				WHEN $6 = 'week' AND user_purpose_allowances.window_start <= NOW() - INTERVAL '7 days'
+					THEN EXCLUDED.used_amount
+				WHEN $6 = 'month' AND user_purpose_allowances.window_start < $7
+					THEN EXCLUDED.used_amount
+				ELSE user_purpose_allowances.used_amount + EXCLUDED.used_amount
+			END,
+			window_start = CASE
+				WHEN $6 = 'week' AND user_purpose_allowances.window_start <= NOW() - INTERVAL '7 days'
+					THEN user_purpose_allowances.window_start
+						+ FLOOR(EXTRACT(EPOCH FROM (NOW() - user_purpose_allowances.window_start)) / 604800) * INTERVAL '7 days'
+				WHEN $6 = 'month' AND user_purpose_allowances.window_start < $7
+					THEN $7
+				ELSE user_purpose_allowances.window_start
+			END,
+			updated_at = NOW()
+	`, userID, purpose, limit, amount, windowStart, period, service.ShanghaiMonthStart(time.Now()))
+	return err
 }
 
 func deductUsageBillingBalance(ctx context.Context, tx *sql.Tx, userID int64, amount float64) (float64, bool, error) {

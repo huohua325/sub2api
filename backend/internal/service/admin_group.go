@@ -566,6 +566,11 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 		return nil, err
 	}
 
+	usageKind, err := NormalizeUsageKind(platform, input.UsageKind)
+	if err != nil {
+		return nil, err
+	}
+
 	group := &Group{
 		Name:                            input.Name,
 		Description:                     input.Description,
@@ -575,6 +580,7 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 		IsExclusive:                     input.IsExclusive,
 		Status:                          StatusActive,
 		SubscriptionType:                subscriptionType,
+		UsageKind:                       usageKind,
 		DailyLimitUSD:                   dailyLimit,
 		WeeklyLimitUSD:                  weeklyLimit,
 		MonthlyLimitUSD:                 monthlyLimit,
@@ -818,6 +824,14 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 	if input.SubscriptionType != "" {
 		group.SubscriptionType = input.SubscriptionType
 	}
+	if strings.TrimSpace(input.UsageKind) != "" {
+		group.UsageKind = input.UsageKind
+	}
+	usageKind, kindErr := NormalizeUsageKind(group.Platform, group.UsageKind)
+	if kindErr != nil {
+		return nil, kindErr
+	}
+	group.UsageKind = usageKind
 	// 限额字段：nil 表示不修改，负数表示"无限制"，0 表示"不允许用量"，正数表示具体限额。
 	if input.DailyLimitUSD != nil {
 		group.DailyLimitUSD = normalizeLimit(input.DailyLimitUSD)
@@ -1160,12 +1174,6 @@ func normalizeGroupModelPricing(platform string, pricing []ChannelModelPricing) 
 		out[i] = pricing[i].Clone()
 		out[i].ID = 0
 		out[i].ChannelID = 0
-		if out[i].TimePricing != nil && len(out[i].TimePricing.Periods) > 0 {
-			return nil, infraerrors.BadRequest(
-				"GROUP_MODEL_TIME_PRICING_UNSUPPORTED",
-				"group model pricing does not support time pricing",
-			)
-		}
 		if strings.TrimSpace(out[i].Platform) == "" {
 			out[i].Platform = platform
 		}
@@ -1175,6 +1183,9 @@ func normalizeGroupModelPricing(platform string, pricing []ChannelModelPricing) 
 		if len(out[i].Models) == 0 {
 			return nil, infraerrors.New(http.StatusBadRequest, "GROUP_MODEL_PRICING_MODELS_REQUIRED", "group model pricing entry requires at least one model")
 		}
+	}
+	if err := validatePricingTimePricing(out); err != nil {
+		return nil, err
 	}
 	if err := validatePricingEntries(out); err != nil {
 		return nil, err

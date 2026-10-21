@@ -254,7 +254,10 @@ func reasoningEffortBillingMultiplier(effort string, multipliers map[string]floa
 }
 
 func resolvedChannelTimeMultiplier(resolved *ResolvedPricing, at time.Time) float64 {
-	if resolved == nil || resolved.Source != PricingSourceChannel || resolved.channelPricing == nil {
+	if resolved == nil || resolved.channelPricing == nil {
+		return 1
+	}
+	if resolved.Source != PricingSourceChannel && resolved.Source != PricingSourceGroup {
 		return 1
 	}
 	return resolved.channelPricing.TimePricing.MultiplierAt(at)
@@ -1602,9 +1605,10 @@ func (s *BillingService) calculateTokenCost(resolved *ResolvedPricing, input Cos
 	}
 
 	pricingContext := totalContext
-	if !contextTierPricingEnabled {
-		// 渠道可能显式配置了第一档，也可能只配置高上下文档。用 1 token
-		// 选择最低档；未命中时自然回退到渠道基础价。
+	// 分组价卡上写明的区间是运营者的分档，不看长上下文开关。
+	// 渠道区间仍由开关控制：关闭时用 1 token 选择最低档。
+	groupIntervals := resolved.Source == PricingSourceGroup && len(resolved.Intervals) > 0
+	if !contextTierPricingEnabled && !groupIntervals {
 		pricingContext = 1
 	}
 	pricing := input.Resolver.GetIntervalPricing(resolved, pricingContext)

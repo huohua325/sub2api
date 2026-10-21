@@ -2,8 +2,45 @@
   <!-- Row 1: Core Stats -->
   <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
     <div
+      v-for="meter in purposeMeters"
+      :key="meter.id"
+      :data-testid="`${meter.id}-purpose-card`"
+      class="card p-4"
+    >
+      <div class="flex items-center gap-3">
+        <div class="rounded-lg p-2" :class="meter.iconWrap">
+          <Icon name="chart" size="md" :class="meter.icon" :stroke-width="2" />
+        </div>
+        <div class="min-w-0 flex-1">
+          <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ meter.title }}</p>
+          <p class="text-xl font-bold tabular-nums" :class="meter.value">
+            <template v-if="hideMoney">{{ meter.percent }}%</template>
+            <template v-else>{{ formatAmount(meter.used) }} / {{ formatAmount(meter.limit) }}</template>
+          </p>
+          <p class="text-xs text-gray-500 dark:text-gray-400">
+            {{ hideMoney ? (meter.percent >= 100 ? t('dashboard.codexQuota.exhausted') : t('dashboard.purpose.used')) : t('dashboard.purpose.yuan') }}
+          </p>
+          <div class="mt-2 h-1 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-dark-700">
+            <div
+              class="h-full rounded-full transition-all"
+              :class="quotaBarClass(meter.percent)"
+              :style="{ width: Math.min(100, meter.percent) + '%' }"
+            />
+          </div>
+          <p
+            v-if="meter.resetsAt"
+            class="mt-1 text-[10px] tabular-nums text-gray-400"
+            :title="formatResetTime(meter.resetsAt)"
+          >
+            {{ resetCountdownLabel(meter.resetsAt) }}
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div
       v-for="meter in usageMeters"
-      v-show="hideMoney"
+      v-show="hideMoney && purposeMeters.length === 0"
       :key="meter.id"
       :data-testid="`${meter.id}-usage-card`"
       class="card p-4"
@@ -37,7 +74,7 @@
     </div>
 
     <!-- Balance -->
-    <div v-if="!isSimple && !hideMoney" class="card p-4">
+    <div v-if="!isSimple && !hideMoney && purposeMeters.length === 0" class="card p-4">
       <div class="flex items-center gap-3">
         <div class="rounded-lg bg-emerald-100 p-2 dark:bg-emerald-900/30">
           <svg class="h-5 w-5 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -270,6 +307,7 @@ import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
 import type { PlatformDashboardStats, UserDashboardStats as UserStatsType } from '@/api/usage'
 import type { PlatformQuotaItem } from '@/types'
+import type { PurposeAllowanceItem } from '@/api/admin/users'
 import { codexQuotaPoints, formatCodexPoints } from '@/utils/codexQuota'
 
 interface FusedPlatformCard {
@@ -287,6 +325,7 @@ const props = withDefaults(defineProps<{
   balance: number
   isSimple: boolean
   platformQuotas?: PlatformQuotaItem[] | null
+  purposeAllowances?: PurposeAllowanceItem[] | null
   hideMoney?: boolean
 }>(), {
   hideMoney: false,
@@ -397,6 +436,29 @@ function hasAnyLimit(q: PlatformQuotaItem | undefined): boolean {
 function platformQuota(platform: string) {
   const row = (props.platformQuotas ?? []).find((item) => item.platform === platform)
   return codexQuotaPoints(row)
+}
+
+const purposeOrder = ['openai', 'grok', 'experiment'] as const
+
+const purposeMeters = computed(() => {
+  const rows = props.purposeAllowances ?? []
+  if (rows.length === 0) return []
+  const style = {
+    openai: { iconWrap: 'bg-emerald-100 dark:bg-emerald-900/30', icon: 'text-emerald-600 dark:text-emerald-400', value: 'text-emerald-600 dark:text-emerald-400' },
+    grok: { iconWrap: 'bg-amber-100 dark:bg-amber-900/30', icon: 'text-amber-600 dark:text-amber-400', value: 'text-amber-600 dark:text-amber-400' },
+    experiment: { iconWrap: 'bg-sky-100 dark:bg-sky-900/30', icon: 'text-sky-600 dark:text-sky-400', value: 'text-sky-600 dark:text-sky-400' },
+  }
+  return purposeOrder.map((id) => {
+    const row = rows.find((item) => item.purpose === id)
+    const limit = row?.limit_amount ?? 0
+    const used = row?.used_amount ?? 0
+    const percent = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0
+    return { id, title: t(`dashboard.purpose.${id}`), used, limit, percent, resetsAt: row?.resets_at, ...style[id] }
+  })
+})
+
+function formatAmount(value: number) {
+  return new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 }).format(value)
 }
 
 const usageMeters = computed(() => [

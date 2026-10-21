@@ -83,3 +83,33 @@ func TestBuildUsageBillingCommand_SubscriptionAppliesRateMultiplier(t *testing.T
 		})
 	}
 }
+
+func TestBuildUsageBillingCommand_PurposeWalletDoesNotSpendBalance(t *testing.T) {
+	t.Parallel()
+	groupID := int64(12)
+	subID := int64(9)
+
+	experiment := &postUsageBillingParams{
+		Cost:    &CostBreakdown{TotalCost: 1, ActualCost: 0.2},
+		User:    &User{ID: 1},
+		APIKey:  &APIKey{ID: 2, GroupID: &groupID, Group: &Group{Platform: PlatformOpenAI, UsageKind: UsageKindExperiment}},
+		Account: &Account{ID: 3},
+	}
+	cmd := buildUsageBillingCommand("req-experiment", nil, experiment)
+	if cmd.Purpose != PurposeExperiment || cmd.PurposeCost != 0.2 || cmd.BalanceCost != 0 || cmd.SubscriptionCost != 0 {
+		t.Fatalf("experiment cmd = purpose %s cost %v balance %v subscription %v", cmd.Purpose, cmd.PurposeCost, cmd.BalanceCost, cmd.SubscriptionCost)
+	}
+
+	coding := &postUsageBillingParams{
+		Cost:               &CostBreakdown{TotalCost: 1, ActualCost: 0.2},
+		User:               &User{ID: 1},
+		APIKey:             &APIKey{ID: 2, GroupID: &groupID, Group: &Group{Platform: PlatformGrok, UsageKind: UsageKindCoding}},
+		Account:            &Account{ID: 3},
+		Subscription:       &UserSubscription{ID: subID},
+		IsSubscriptionBill: true,
+	}
+	cmd = buildUsageBillingCommand("req-coding", nil, coding)
+	if cmd.Purpose != PurposeGrok || cmd.PurposeCost != 0.2 || cmd.BalanceCost != 0 || cmd.SubscriptionCost != 0.2 {
+		t.Fatalf("coding cmd = purpose %s cost %v balance %v subscription %v", cmd.Purpose, cmd.PurposeCost, cmd.BalanceCost, cmd.SubscriptionCost)
+	}
+}

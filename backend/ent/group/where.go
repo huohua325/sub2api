@@ -130,6 +130,11 @@ func SubscriptionType(v string) predicate.Group {
 	return predicate.Group(sql.FieldEQ(FieldSubscriptionType, v))
 }
 
+// UsageKind applies equality check predicate on the "usage_kind" field. It's identical to UsageKindEQ.
+func UsageKind(v string) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldUsageKind, v))
+}
+
 // DailyLimitUsd applies equality check predicate on the "daily_limit_usd" field. It's identical to DailyLimitUsdEQ.
 func DailyLimitUsd(v float64) predicate.Group {
 	return predicate.Group(sql.FieldEQ(FieldDailyLimitUsd, v))
@@ -1113,6 +1118,71 @@ func SubscriptionTypeEqualFold(v string) predicate.Group {
 // SubscriptionTypeContainsFold applies the ContainsFold predicate on the "subscription_type" field.
 func SubscriptionTypeContainsFold(v string) predicate.Group {
 	return predicate.Group(sql.FieldContainsFold(FieldSubscriptionType, v))
+}
+
+// UsageKindEQ applies the EQ predicate on the "usage_kind" field.
+func UsageKindEQ(v string) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldUsageKind, v))
+}
+
+// UsageKindNEQ applies the NEQ predicate on the "usage_kind" field.
+func UsageKindNEQ(v string) predicate.Group {
+	return predicate.Group(sql.FieldNEQ(FieldUsageKind, v))
+}
+
+// UsageKindIn applies the In predicate on the "usage_kind" field.
+func UsageKindIn(vs ...string) predicate.Group {
+	return predicate.Group(sql.FieldIn(FieldUsageKind, vs...))
+}
+
+// UsageKindNotIn applies the NotIn predicate on the "usage_kind" field.
+func UsageKindNotIn(vs ...string) predicate.Group {
+	return predicate.Group(sql.FieldNotIn(FieldUsageKind, vs...))
+}
+
+// UsageKindGT applies the GT predicate on the "usage_kind" field.
+func UsageKindGT(v string) predicate.Group {
+	return predicate.Group(sql.FieldGT(FieldUsageKind, v))
+}
+
+// UsageKindGTE applies the GTE predicate on the "usage_kind" field.
+func UsageKindGTE(v string) predicate.Group {
+	return predicate.Group(sql.FieldGTE(FieldUsageKind, v))
+}
+
+// UsageKindLT applies the LT predicate on the "usage_kind" field.
+func UsageKindLT(v string) predicate.Group {
+	return predicate.Group(sql.FieldLT(FieldUsageKind, v))
+}
+
+// UsageKindLTE applies the LTE predicate on the "usage_kind" field.
+func UsageKindLTE(v string) predicate.Group {
+	return predicate.Group(sql.FieldLTE(FieldUsageKind, v))
+}
+
+// UsageKindContains applies the Contains predicate on the "usage_kind" field.
+func UsageKindContains(v string) predicate.Group {
+	return predicate.Group(sql.FieldContains(FieldUsageKind, v))
+}
+
+// UsageKindHasPrefix applies the HasPrefix predicate on the "usage_kind" field.
+func UsageKindHasPrefix(v string) predicate.Group {
+	return predicate.Group(sql.FieldHasPrefix(FieldUsageKind, v))
+}
+
+// UsageKindHasSuffix applies the HasSuffix predicate on the "usage_kind" field.
+func UsageKindHasSuffix(v string) predicate.Group {
+	return predicate.Group(sql.FieldHasSuffix(FieldUsageKind, v))
+}
+
+// UsageKindEqualFold applies the EqualFold predicate on the "usage_kind" field.
+func UsageKindEqualFold(v string) predicate.Group {
+	return predicate.Group(sql.FieldEqualFold(FieldUsageKind, v))
+}
+
+// UsageKindContainsFold applies the ContainsFold predicate on the "usage_kind" field.
+func UsageKindContainsFold(v string) predicate.Group {
+	return predicate.Group(sql.FieldContainsFold(FieldUsageKind, v))
 }
 
 // DailyLimitUsdEQ applies the EQ predicate on the "daily_limit_usd" field.

@@ -238,6 +238,20 @@ func (_c *GroupCreate) SetNillableSubscriptionType(v *string) *GroupCreate {
 	return _c
 }
 
+// SetUsageKind sets the "usage_kind" field.
+func (_c *GroupCreate) SetUsageKind(v string) *GroupCreate {
+	_c.mutation.SetUsageKind(v)
+	return _c
+}
+
+// SetNillableUsageKind sets the "usage_kind" field if the given value is not nil.
+func (_c *GroupCreate) SetNillableUsageKind(v *string) *GroupCreate {
+	if v != nil {
+		_c.SetUsageKind(*v)
+	}
+	return _c
+}
+
 // SetDailyLimitUsd sets the "daily_limit_usd" field.
 func (_c *GroupCreate) SetDailyLimitUsd(v float64) *GroupCreate {
 	_c.mutation.SetDailyLimitUsd(v)
@@ -1093,6 +1107,10 @@ func (_c *GroupCreate) defaults() error {
 		v := group.DefaultSubscriptionType
 		_c.mutation.SetSubscriptionType(v)
 	}
+	if _, ok := _c.mutation.UsageKind(); !ok {
+		v := group.DefaultUsageKind
+		_c.mutation.SetUsageKind(v)
+	}
 	if _, ok := _c.mutation.DefaultValidityDays(); !ok {
 		v := group.DefaultDefaultValidityDays
 		_c.mutation.SetDefaultValidityDays(v)
@@ -1298,6 +1316,14 @@ func (_c *GroupCreate) check() error {
 	if v, ok := _c.mutation.SubscriptionType(); ok {
 		if err := group.SubscriptionTypeValidator(v); err != nil {
 			return &ValidationError{Name: "subscription_type", err: fmt.Errorf(`ent: validator failed for field "Group.subscription_type": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.UsageKind(); !ok {
+		return &ValidationError{Name: "usage_kind", err: errors.New(`ent: missing required field "Group.usage_kind"`)}
+	}
+	if v, ok := _c.mutation.UsageKind(); ok {
+		if err := group.UsageKindValidator(v); err != nil {
+			return &ValidationError{Name: "usage_kind", err: fmt.Errorf(`ent: validator failed for field "Group.usage_kind": %w`, err)}
 		}
 	}
 	if _, ok := _c.mutation.DefaultValidityDays(); !ok {
@@ -1521,6 +1547,10 @@ func (_c *GroupCreate) createSpec() (*Group, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.SubscriptionType(); ok {
 		_spec.SetField(group.FieldSubscriptionType, field.TypeString, value)
 		_node.SubscriptionType = value
+	}
+	if value, ok := _c.mutation.UsageKind(); ok {
+		_spec.SetField(group.FieldUsageKind, field.TypeString, value)
+		_node.UsageKind = value
 	}
 	if value, ok := _c.mutation.DailyLimitUsd(); ok {
 		_spec.SetField(group.FieldDailyLimitUsd, field.TypeFloat64, value)
@@ -2071,6 +2101,18 @@ func (u *GroupUpsert) SetSubscriptionType(v string) *GroupUpsert {
 // UpdateSubscriptionType sets the "subscription_type" field to the value that was provided on create.
 func (u *GroupUpsert) UpdateSubscriptionType() *GroupUpsert {
 	u.SetExcluded(group.FieldSubscriptionType)
+	return u
+}
+
+// SetUsageKind sets the "usage_kind" field.
+func (u *GroupUpsert) SetUsageKind(v string) *GroupUpsert {
+	u.Set(group.FieldUsageKind, v)
+	return u
+}
+
+// UpdateUsageKind sets the "usage_kind" field to the value that was provided on create.
+func (u *GroupUpsert) UpdateUsageKind() *GroupUpsert {
+	u.SetExcluded(group.FieldUsageKind)
 	return u
 }
 
@@ -3219,6 +3261,20 @@ func (u *GroupUpsertOne) SetSubscriptionType(v string) *GroupUpsertOne {
 func (u *GroupUpsertOne) UpdateSubscriptionType() *GroupUpsertOne {
 	return u.Update(func(s *GroupUpsert) {
 		s.UpdateSubscriptionType()
+	})
+}
+
+// SetUsageKind sets the "usage_kind" field.
+func (u *GroupUpsertOne) SetUsageKind(v string) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetUsageKind(v)
+	})
+}
+
+// UpdateUsageKind sets the "usage_kind" field to the value that was provided on create.
+func (u *GroupUpsertOne) UpdateUsageKind() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateUsageKind()
 	})
 }
 
@@ -4679,6 +4735,20 @@ func (u *GroupUpsertBulk) SetSubscriptionType(v string) *GroupUpsertBulk {
 func (u *GroupUpsertBulk) UpdateSubscriptionType() *GroupUpsertBulk {
 	return u.Update(func(s *GroupUpsert) {
 		s.UpdateSubscriptionType()
+	})
+}
+
+// SetUsageKind sets the "usage_kind" field.
+func (u *GroupUpsertBulk) SetUsageKind(v string) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetUsageKind(v)
+	})
+}
+
+// UpdateUsageKind sets the "usage_kind" field to the value that was provided on create.
+func (u *GroupUpsertBulk) UpdateUsageKind() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateUsageKind()
 	})
 }
 

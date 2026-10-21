@@ -135,8 +135,7 @@ func (s *BillingService) ResolveContextPricingSchedule(ctx context.Context, reso
 }
 
 // resolvedTimePricingSchedule 列出计费会生效的分时倍率时段。
-// 时段来自解析到的渠道定价配置，每个时段的倍率用计费自己的 resolvedChannelTimeMultiplier
-// 在时段内取值：定价来源不是渠道（分组价卡覆盖）、配置非法等情况下计费按 1 计，
+// 时段来自分组或渠道价卡。配置非法时 resolvedChannelTimeMultiplier 按 1 计，
 // 这里也就自然得到"无分时"。倍率为 1 的时段不列出。
 func resolvedTimePricingSchedule(resolved *ResolvedPricing) *TimePricingSchedule {
 	if resolved == nil || resolved.channelPricing == nil || resolved.channelPricing.TimePricing == nil {

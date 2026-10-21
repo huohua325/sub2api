@@ -41,6 +41,13 @@ export default {
       used: 'Used',
       exhausted: 'Used up',
     },
+    purpose: {
+      openai: 'Codex',
+      grok: 'Grok Build',
+      experiment: 'Experiment APIs',
+      used: 'Used',
+      yuan: 'yuan',
+    },
     tokenUsageTrend: 'Token Usage Trend',
     noDataAvailable: 'No data available',
     model: 'Model',

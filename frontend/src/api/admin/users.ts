@@ -361,8 +361,16 @@ export interface PlatformQuotaUpdateItem {
   monthly_limit_usd: number | null
 }
 
+export interface PurposeAllowanceItem {
+  purpose: 'openai' | 'grok' | 'experiment'
+  limit_amount: number
+  used_amount: number
+  resets_at?: string
+}
+
 export interface PlatformQuotasResponse {
   platform_quotas: PlatformQuotaItem[]
+  purpose_allowances?: PurposeAllowanceItem[]
 }
 
 /**

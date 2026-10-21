@@ -87,6 +87,13 @@ func (Group) Fields() []ent.Field {
 		field.String("subscription_type").
 			MaxLen(20).
 			Default(domain.SubscriptionTypeStandard),
+		// Lab quota use. coding is a programming-agent group (OpenAI = Codex,
+		// Grok = Grok Build). experiment is the shared monthly API pool.
+		// The group name is not used to decide this.
+		field.String("usage_kind").
+			MaxLen(20).
+			Default("experiment").
+			Comment("Lab quota use: coding or experiment. Not inferred from the group name."),
 		field.Float("daily_limit_usd").
 			Optional().
 			Nillable().

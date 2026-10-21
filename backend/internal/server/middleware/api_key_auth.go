@@ -258,12 +258,16 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 					AbortWithError(c, status, code, validateErr.Error())
 					return
 				}
-			} else {
-				// 非订阅模式 或 订阅模式但 subscriptionService 未注入：回退到余额检查
-				if apiKeyBalanceBelowAuthThreshold(apiKey.User.Balance, cfg) {
-					AbortWithError(c, 403, "INSUFFICIENT_BALANCE", "Insufficient account balance")
+				if abortIfPurposeQuotaExhausted(c, apiKey, apiKeyService) {
 					return
 				}
+			} else if blocked, message := purposeOrBalanceBlock(c, apiKey, apiKeyService, cfg); blocked {
+				code := "INSUFFICIENT_BALANCE"
+				if message != "Insufficient account balance" {
+					code = "PURPOSE_QUOTA_EXHAUSTED"
+				}
+				AbortWithError(c, 403, code, message)
+				return
 			}
 		}
 
@@ -389,6 +393,38 @@ func setGroupContext(c *gin.Context, group *service.Group) {
 	}
 	ctx := context.WithValue(c.Request.Context(), ctxkey.Group, group)
 	c.Request = c.Request.WithContext(ctx)
+}
+
+func abortIfPurposeQuotaExhausted(c *gin.Context, apiKey *service.APIKey, apiKeyService *service.APIKeyService) bool {
+	blocked, checked := purposeQuotaExhausted(c, apiKey, apiKeyService)
+	if !checked || !blocked {
+		return false
+	}
+	AbortWithError(c, 403, "PURPOSE_QUOTA_EXHAUSTED", "This use has no remaining quota")
+	return true
+}
+
+func purposeQuotaExhausted(c *gin.Context, apiKey *service.APIKey, apiKeyService *service.APIKeyService) (blocked bool, checked bool) {
+	if apiKey == nil || apiKey.User == nil || apiKey.Group == nil || apiKeyService == nil {
+		return false, false
+	}
+	return apiKeyService.PurposeBlocks(c.Request.Context(), apiKey.User.ID, apiKey.Group)
+}
+
+func purposeOrBalanceBlock(c *gin.Context, apiKey *service.APIKey, apiKeyService *service.APIKeyService, cfg *config.Config) (bool, string) {
+	if apiKey != nil && apiKey.User != nil && apiKey.Group != nil && apiKeyService != nil {
+		blocked, checked := apiKeyService.PurposeBlocks(c.Request.Context(), apiKey.User.ID, apiKey.Group)
+		if checked {
+			if blocked {
+				return true, "This use has no remaining quota"
+			}
+			return false, ""
+		}
+	}
+	if apiKey != nil && apiKey.User != nil && apiKeyBalanceBelowAuthThreshold(apiKey.User.Balance, cfg) {
+		return true, "Insufficient account balance"
+	}
+	return false, ""
 }
 
 // apiKeyBalanceBelowAuthThreshold 保持鉴权层的历史语义：仅在余额耗尽（<=0）时拒绝。

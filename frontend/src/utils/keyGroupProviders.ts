@@ -1,25 +1,16 @@
 import type { GroupPlatform } from '@/types'
 
 // Lab key picker. These are uses, not upstream vendors.
-// Codex and Grok Build are the subscription coding-agent groups.
-// GPT and Grok each also have an API-key group; those belong with the experiment models.
+// A group's usage_kind is chosen in the admin form. The name is not consulted.
+// Coding on OpenAI is Codex. Coding on Grok is Grok Build. Everything else is an experiment.
 export type KeyGroupProvider = 'codex' | 'grok_build' | 'experiment'
 
 export const KEY_GROUP_PROVIDERS = ['codex', 'grok_build', 'experiment'] as const
 
-export function getKeyGroupProvider(group: { platform: GroupPlatform; name?: string | null }): KeyGroupProvider {
-  const name = (group.name ?? '').trim().toLowerCase()
-  if (group.platform === 'openai' && isCodexGroupName(name)) return 'codex'
-  if (group.platform === 'grok' && isGrokBuildGroupName(name)) return 'grok_build'
+export function getKeyGroupProvider(group: { platform: GroupPlatform; usage_kind?: string | null }): KeyGroupProvider {
+  if (group.usage_kind === 'coding' && group.platform === 'openai') return 'codex'
+  if (group.usage_kind === 'coding' && group.platform === 'grok') return 'grok_build'
   return 'experiment'
-}
-
-function isCodexGroupName(name: string): boolean {
-  return name.includes('codex') || /pro\s*100/.test(name)
-}
-
-function isGrokBuildGroupName(name: string): boolean {
-  return name.includes('build') || name.includes('afk')
 }
 
 export const KEY_GROUP_PROVIDER_ICONS: Record<KeyGroupProvider, GroupPlatform[]> = {

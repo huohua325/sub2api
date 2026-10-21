@@ -991,6 +991,13 @@ export default {
       groupDeletedSuccess: 'Group deleted successfully',
       rateMultiplierHint: 'Cost multiplier for this group (e.g., 1.5 = 150% of base cost)',
       exclusiveHint: 'Exclusive group, manually assign to specific users',
+      usageKind: {
+        label: 'Quota use',
+        coding: 'Coding assistant',
+        experiment: 'API experiment',
+        hint: 'Coding assistants are billed by platform: OpenAI is Codex and Grok is Grok Build, each with 100 yuan every 7 days. API experiments share 500 yuan and reset at 00:00 on the first day of each Beijing month. The group name is not used.',
+        codingOnly: 'Coding assistant is only available for OpenAI and Grok platforms.'
+      },
       exclusiveTooltip: {
         title: 'What is an exclusive group?',
         description: 'When enabled, users cannot see this group when creating API Keys. Only after an admin manually assigns a user to this group can they use it.',

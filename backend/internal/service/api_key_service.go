@@ -314,6 +314,7 @@ type APIKeyService struct {
 	authInvalidationFailures  atomic.Uint64
 	lastUsedTouchL1           sync.Map // keyID -> nextAllowedAt(time.Time)
 	lastUsedTouchSF           singleflight.Group
+	purposeAllowances         PurposeAllowanceRepository
 }
 
 type APIKeyAuthLookupMetrics struct {
@@ -321,6 +322,38 @@ type APIKeyAuthLookupMetrics struct {
 	Rejected uint64 `json:"rejected"`
 	InFlight int64  `json:"in_flight"`
 	Capacity int    `json:"capacity"`
+}
+
+func (s *APIKeyService) SetPurposeAllowances(repo PurposeAllowanceRepository) {
+	if s == nil {
+		return
+	}
+	s.purposeAllowances = repo
+}
+
+// PurposeBlocks reports whether this group’s wallet is used up.
+// checked is false when the wallet system is not configured, so callers keep the shared-balance rule.
+func (s *APIKeyService) PurposeBlocks(ctx context.Context, userID int64, group *Group) (blocked bool, checked bool) {
+	if s == nil || s.purposeAllowances == nil || group == nil || userID <= 0 {
+		return false, false
+	}
+	purpose := PurposeOfGroup(group.Platform, group.UsageKind)
+	if purpose == "" {
+		return false, false
+	}
+	rows, err := s.purposeAllowances.List(ctx, userID)
+	if err != nil {
+		return false, true
+	}
+	now := time.Now()
+	for _, row := range rows {
+		if row.Purpose != purpose {
+			continue
+		}
+		used, _ := EffectivePurposeUsage(row, now)
+		return row.LimitAmount >= 0 && used >= row.LimitAmount, true
+	}
+	return false, true
 }
 
 func (s *APIKeyService) AuthLookupMetrics() APIKeyAuthLookupMetrics {

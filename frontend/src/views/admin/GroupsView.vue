@@ -183,6 +183,12 @@
                     : t("admin.groups.subscription.standard")
                 }}
               </span>
+              <span
+                class="ml-1 inline-block rounded-full px-2 py-0.5 text-xs font-medium"
+                :class="row.usage_kind === 'coding' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' : 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300'"
+              >
+                {{ row.usage_kind === 'coding' ? t('admin.groups.usageKind.coding') : t('admin.groups.usageKind.experiment') }}
+              </span>
               <!-- Subscription Limits - compact single line -->
               <div
                 v-if="row.subscription_type === 'subscription'"
@@ -517,9 +523,34 @@
             v-model="createForm.platform"
             :options="platformOptions"
             data-tour="group-form-platform"
-            @change="createForm.copy_accounts_from_group_ids = []"
+            @change="createForm.copy_accounts_from_group_ids = []; coerceCreateUsageKind()"
           />
           <p class="input-hint">{{ t("admin.groups.platformHint") }}</p>
+        </div>
+        <div>
+          <label class="input-label">{{ t("admin.groups.usageKind.label") }}</label>
+          <div class="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              class="rounded-xl border px-3 py-3 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+              :class="createForm.usage_kind === 'coding' ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-950/40 dark:text-primary-300' : 'border-gray-200 text-gray-700 dark:border-dark-600 dark:text-gray-200'"
+              :disabled="!codingUsageAllowed(createForm.platform)"
+              @click="createForm.usage_kind = 'coding'"
+            >
+              {{ t("admin.groups.usageKind.coding") }}
+            </button>
+            <button
+              type="button"
+              class="rounded-xl border px-3 py-3 text-sm font-medium transition-colors"
+              :class="createForm.usage_kind === 'experiment' ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-950/40 dark:text-primary-300' : 'border-gray-200 text-gray-700 dark:border-dark-600 dark:text-gray-200'"
+              @click="createForm.usage_kind = 'experiment'"
+            >
+              {{ t("admin.groups.usageKind.experiment") }}
+            </button>
+          </div>
+          <p class="input-hint">
+            {{ codingUsageAllowed(createForm.platform) ? t("admin.groups.usageKind.hint") : t("admin.groups.usageKind.codingOnly") }}
+          </p>
         </div>
         <!-- 从分组复制账号 -->
         <div v-if="!authStore.isSimpleMode && copyAccountsGroupOptions.length > 0">
@@ -1491,7 +1522,7 @@
             <span><span class="block text-sm text-gray-700 dark:text-gray-300">{{ t("admin.groups.modelPricing.longContext") }}</span><span class="block text-xs text-gray-500">{{ t("admin.groups.modelPricing.longContextHint") }}</span></span>
           </label>
           <div class="mt-3 space-y-2">
-            <PricingEntryCard v-for="(entry, index) in createForm.model_pricing" :key="index" :entry="entry" :platform="createForm.platform" hide-token-intervals @update="createForm.model_pricing[index] = $event" @remove="createForm.model_pricing.splice(index, 1)" />
+            <PricingEntryCard v-for="(entry, index) in createForm.model_pricing" :key="index" :entry="entry" :platform="createForm.platform" enable-time-pricing enable-tier-multipliers @update="createForm.model_pricing[index] = $event" @remove="createForm.model_pricing.splice(index, 1)" />
           </div>
         </div>
 
@@ -2157,6 +2188,29 @@
             data-tour="group-form-platform"
           />
           <p class="input-hint">{{ t("admin.groups.platformNotEditable") }}</p>
+        </div>
+        <div>
+          <label class="input-label">{{ t("admin.groups.usageKind.label") }}</label>
+          <div class="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              class="rounded-xl border px-3 py-3 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+              :class="editForm.usage_kind === 'coding' ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-950/40 dark:text-primary-300' : 'border-gray-200 text-gray-700 dark:border-dark-600 dark:text-gray-200'"
+              :disabled="!codingUsageAllowed(editForm.platform)"
+              @click="editForm.usage_kind = 'coding'"
+            >
+              {{ t("admin.groups.usageKind.coding") }}
+            </button>
+            <button
+              type="button"
+              class="rounded-xl border px-3 py-3 text-sm font-medium transition-colors"
+              :class="editForm.usage_kind === 'experiment' ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-950/40 dark:text-primary-300' : 'border-gray-200 text-gray-700 dark:border-dark-600 dark:text-gray-200'"
+              @click="editForm.usage_kind = 'experiment'"
+            >
+              {{ t("admin.groups.usageKind.experiment") }}
+            </button>
+          </div>
+          <p class="input-hint">{{ t("admin.groups.usageKind.hint") }}</p>
         </div>
         <template v-if="!authStore.isSimpleMode">
         <!-- 从分组复制账号（编辑时） -->
@@ -3141,7 +3195,7 @@
             <span><span class="block text-sm text-gray-700 dark:text-gray-300">{{ t("admin.groups.modelPricing.longContext") }}</span><span class="block text-xs text-gray-500">{{ t("admin.groups.modelPricing.longContextHint") }}</span></span>
           </label>
           <div class="mt-3 space-y-2">
-            <PricingEntryCard v-for="(entry, index) in editForm.model_pricing" :key="index" :entry="entry" :platform="editForm.platform" hide-token-intervals @update="editForm.model_pricing[index] = $event" @remove="editForm.model_pricing.splice(index, 1)" />
+            <PricingEntryCard v-for="(entry, index) in editForm.model_pricing" :key="index" :entry="entry" :platform="editForm.platform" enable-time-pricing enable-tier-multipliers @update="editForm.model_pricing[index] = $event" @remove="editForm.model_pricing.splice(index, 1)" />
           </div>
         </div>
 
@@ -4310,9 +4364,11 @@ import PricingEntryCard from "@/components/admin/channel/PricingEntryCard.vue";
 import type { PricingFormEntry } from "@/components/admin/channel/types";
 import {
   apiIntervalsToForm,
+  apiTimePricingToForm,
   createDefaultTimePricingForm,
   formIntervalsToAPI,
   formReasoningEffortMultipliersToAPI,
+  formTimePricingToAPI,
   mTokToPerToken,
   perTokenToMTok,
   toNullableNumber,
@@ -4420,7 +4476,7 @@ const groupPricingFromAPI = (
     image_output_price: perTokenToMTok(entry.image_output_price),
     per_request_price: entry.per_request_price,
     intervals: apiIntervalsToForm(entry.intervals || []),
-    time_pricing: createDefaultTimePricingForm(),
+    time_pricing: apiTimePricingToForm(entry.time_pricing),
   }));
 
 const groupPricingToAPI = (
@@ -4444,11 +4500,8 @@ const groupPricingToAPI = (
       image_input_price: mTokToPerToken(entry.image_input_price),
       image_output_price: mTokToPerToken(entry.image_output_price),
       per_request_price: toNullableNumber(entry.per_request_price),
-      intervals:
-        entry.billing_mode === "token"
-          ? []
-          : formIntervalsToAPI(entry.intervals || []),
-      time_pricing: null,
+      intervals: formIntervalsToAPI(entry.intervals || []),
+      time_pricing: formTimePricingToAPI(entry.time_pricing),
     }));
 
 const { t } = useI18n();
@@ -4948,6 +5001,7 @@ const createForm = reactive({
   rate_multiplier: 1.0,
   is_exclusive: false,
   subscription_type: "standard" as SubscriptionType,
+  usage_kind: "experiment" as "coding" | "experiment",
   daily_limit_usd: null as number | null,
   weekly_limit_usd: null as number | null,
   monthly_limit_usd: null as number | null,
@@ -5314,6 +5368,7 @@ const editForm = reactive({
   is_exclusive: false,
   status: "active" as "active" | "inactive",
   subscription_type: "standard" as SubscriptionType,
+  usage_kind: "experiment" as "coding" | "experiment",
   daily_limit_usd: null as number | null,
   weekly_limit_usd: null as number | null,
   monthly_limit_usd: null as number | null,
@@ -5764,6 +5819,14 @@ const openCreateModal = () => {
   loadModelAllowlistCandidates("create", 0, createForm.platform);
 };
 
+const codingUsageAllowed = (platform: string) => platform === "openai" || platform === "grok";
+
+const coerceCreateUsageKind = () => {
+  if (!codingUsageAllowed(createForm.platform)) {
+    createForm.usage_kind = "experiment";
+  }
+};
+
 const closeCreateModal = () => {
   showCreateModal.value = false;
   createModelRoutingRules.value.forEach((rule) => {
@@ -5777,6 +5840,7 @@ const closeCreateModal = () => {
   createForm.rate_multiplier = 1.0;
   createForm.is_exclusive = false;
   createForm.subscription_type = "standard";
+  createForm.usage_kind = "experiment";
   createForm.daily_limit_usd = null;
   createForm.weekly_limit_usd = null;
   createForm.monthly_limit_usd = null;
@@ -6030,6 +6094,7 @@ const handleCreateGroup = async () => {
           description: createForm.description,
           i18n: createForm.i18n,
           platform: createForm.platform,
+          usage_kind: createForm.usage_kind,
         }
       : requestData;
     await adminAPI.groups.create(payload);
@@ -6066,6 +6131,7 @@ const handleEdit = async (group: AdminGroup) => {
   editForm.is_exclusive = group.is_exclusive;
   editForm.status = group.status;
   editForm.subscription_type = group.subscription_type || "standard";
+  editForm.usage_kind = group.usage_kind === "coding" ? "coding" : "experiment";
   editForm.daily_limit_usd = group.daily_limit_usd;
   editForm.weekly_limit_usd = group.weekly_limit_usd;
   editForm.monthly_limit_usd = group.monthly_limit_usd;

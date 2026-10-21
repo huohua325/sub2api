@@ -251,7 +251,54 @@ func TestCalculateCostUnified_ChannelTimePricingScalesBaseOnUnmatchedInterval(t 
 	require.InDelta(t, 2.0, cost.TotalCost, 1e-12)
 }
 
-func TestCalculateCostUnified_ChannelTimePricingDoesNotApplyToGroupPricing(t *testing.T) {
+func TestCalculateCostUnified_GroupDeepSeekClockAndQwenLength(t *testing.T) {
+	bs := NewBillingService(&config.Config{}, nil)
+	resolver := NewModelPricingResolver(nil, bs)
+	input := 1e-6
+	triple := 3.0
+	deepseek := &Group{ModelPricing: []ChannelModelPricing{{
+		Models:      []string{"deepseek-v4-flash"},
+		BillingMode: BillingModeToken,
+		InputPrice:  &input,
+		TimePricing: &ChannelTimePricing{
+			Timezone:     "Asia/Shanghai",
+			WeekdaysOnly: true,
+			Periods: []ChannelTimePricingPeriod{
+				{StartTime: "09:00", EndTime: "12:00", Multiplier: 2},
+				{StartTime: "14:00", EndTime: "18:00", Multiplier: 2},
+			},
+		},
+	}}}
+	qwen := &Group{ModelPricing: []ChannelModelPricing{{
+		Models:      []string{"qwen3.7-plus"},
+		BillingMode: BillingModeToken,
+		InputPrice:  &input,
+		Intervals: []PricingInterval{{
+			MinTokens:       256000,
+			InputMultiplier: &triple,
+		}},
+	}}}
+	costAt := func(group *Group, model string, tokens int, at time.Time) float64 {
+		t.Helper()
+		cost, err := bs.CalculateCostUnified(CostInput{
+			Ctx: context.Background(), Model: model, Group: group,
+			Tokens: UsageTokens{InputTokens: tokens}, RateMultiplier: 1,
+			Resolver: resolver, PricingAt: at,
+		})
+		require.NoError(t, err)
+		return cost.TotalCost
+	}
+	mondayPeak := time.Date(2026, 8, 17, 2, 0, 0, 0, time.UTC)    // 10:00 Beijing
+	mondayLunch := time.Date(2026, 8, 17, 5, 0, 0, 0, time.UTC)   // 13:00 Beijing
+	sundayMorning := time.Date(2026, 8, 16, 2, 0, 0, 0, time.UTC) // 10:00 Beijing
+	require.InDelta(t, 0.002, costAt(deepseek, "deepseek-v4-flash", 1000, mondayPeak), 1e-12)
+	require.InDelta(t, 0.001, costAt(deepseek, "deepseek-v4-flash", 1000, mondayLunch), 1e-12)
+	require.InDelta(t, 0.001, costAt(deepseek, "deepseek-v4-flash", 1000, sundayMorning), 1e-12)
+	require.InDelta(t, 0.256, costAt(qwen, "qwen3.7-plus", 256000, mondayLunch), 1e-12)
+	require.InDelta(t, 0.768003, costAt(qwen, "qwen3.7-plus", 256001, mondayLunch), 1e-12)
+}
+
+func TestCalculateCostUnified_GroupTimePricingScalesCost(t *testing.T) {
 	resolved := channelTimeResolvedForTest(&ModelPricing{InputPricePerToken: 0.001}, nil)
 	resolved.Source = PricingSourceGroup
 	billing := NewBillingService(&config.Config{}, nil)
@@ -265,7 +312,7 @@ func TestCalculateCostUnified_ChannelTimePricingDoesNotApplyToGroupPricing(t *te
 		PricingAt: time.Date(2026, 8, 17, 1, 0, 0, 0, time.UTC),
 	})
 	require.NoError(t, err)
-	require.InDelta(t, 1.0, cost.TotalCost, 1e-12)
+	require.InDelta(t, 2.0, cost.TotalCost, 1e-12)
 }
 
 func TestCalculateCostUnified_ChannelTimePricingDoesNotApplyOutsideMatchingTime(t *testing.T) {

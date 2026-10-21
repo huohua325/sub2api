@@ -87,6 +87,7 @@ type AuthService struct {
 	affiliateService      *AffiliateService
 	defaultSubAssigner    DefaultSubscriptionAssigner
 	userPlatformQuotaRepo UserPlatformQuotaRepository
+	purposeAllowances     PurposeAllowanceRepository
 }
 
 type CaptchaProof struct {
@@ -1956,7 +1957,19 @@ func resolvedTokenVersion(user *User) int64 {
 
 // snapshotPlatformQuotaDefaults 把 plan.PlatformQuotas 中至少配置了一档限额的平台以
 // BulkInsertInitial 形式写入 user_platform_quotas 表。失败 fail-open（仅 warn log）。
+func (s *AuthService) SetPurposeAllowances(repo PurposeAllowanceRepository) {
+	if s == nil {
+		return
+	}
+	s.purposeAllowances = repo
+}
+
 func (s *AuthService) snapshotPlatformQuotaDefaults(ctx context.Context, userID int64, plan *signupGrantPlan) error {
+	if s != nil && s.purposeAllowances != nil && userID > 0 {
+		if err := s.purposeAllowances.EnsureDefaults(dbent.WithoutTx(ctx), userID); err != nil {
+			logger.LegacyPrintf("service.auth", "[Auth] Warning: purpose allowances failed user=%d: %v (fail-open)", userID, err)
+		}
+	}
 	if s.userPlatformQuotaRepo == nil || plan == nil || len(plan.PlatformQuotas) == 0 {
 		return nil
 	}

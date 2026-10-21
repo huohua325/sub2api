@@ -588,6 +588,7 @@ export interface Group {
   is_exclusive: boolean
   status: 'active' | 'inactive'
   subscription_type: SubscriptionType
+  usage_kind?: 'coding' | 'experiment'
   daily_limit_usd: number | null
   weekly_limit_usd: number | null
   monthly_limit_usd: number | null

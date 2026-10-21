@@ -762,14 +762,15 @@ func (s *BillingCacheService) CheckBillingEligibility(ctx context.Context, user 
 		if err := s.checkSubscriptionEligibility(ctx, user.ID, group, subscription); err != nil {
 			return err
 		}
-	} else {
+	} else if !groupHasPurposeWallet(group) {
 		if err := s.checkBalanceEligibility(ctx, user.ID); err != nil {
 			return err
 		}
 	}
 
-	// user × platform quota 仅在 standard（余额）模式生效；订阅模式豁免
-	if !isSubscriptionMode {
+	// user × platform quota 仅在 standard（余额）模式生效；订阅模式豁免。
+	// 已标明记账用途的分组走用途钱包，不再和同平台的另一个分组合用周限额。
+	if !isSubscriptionMode && !groupHasPurposeWallet(group) {
 		if err := s.checkUserPlatformQuotaEligibility(ctx, user.ID, platform); err != nil {
 			return err
 		}

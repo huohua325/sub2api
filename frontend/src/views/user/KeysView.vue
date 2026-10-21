@@ -1533,7 +1533,8 @@ const groupOptions = computed(() =>
     peakEnd: group.peak_end,
     peakRateMultiplier: group.peak_rate_multiplier,
     subscriptionType: group.subscription_type,
-    platform: group.platform
+    platform: group.platform,
+    usage_kind: group.usage_kind
   }))
 )
 
@@ -1546,7 +1547,7 @@ const createProviderOptions = computed(() => KEY_GROUP_PROVIDERS.map((value) => 
 
 const formGroupOptions = computed(() => showEditModal.value
   ? groupOptions.value
-  : groupOptions.value.filter((group) => getKeyGroupProvider({ platform: group.platform, name: group.label }) === createProvider.value)
+  : groupOptions.value.filter((group) => getKeyGroupProvider({ platform: group.platform, usage_kind: group.usage_kind }) === createProvider.value)
 )
 
 const selectCreateProvider = (provider: KeyGroupProvider) => {

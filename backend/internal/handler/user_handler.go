@@ -22,6 +22,7 @@ type UserHandler struct {
 	emailCache            service.EmailCache
 	affiliateService      *service.AffiliateService
 	userPlatformQuotaRepo service.UserPlatformQuotaRepository
+	purposeAllowances     service.PurposeAllowanceRepository
 }
 
 // NewUserHandler creates a new UserHandler
@@ -41,6 +42,13 @@ func NewUserHandler(
 		affiliateService:      affiliateService,
 		userPlatformQuotaRepo: userPlatformQuotaRepo,
 	}
+}
+
+func (h *UserHandler) SetPurposeAllowances(repo service.PurposeAllowanceRepository) {
+	if h == nil {
+		return
+	}
+	h.purposeAllowances = repo
 }
 
 // GetMyPlatformQuotas GET /user/platform-quotas
@@ -66,7 +74,30 @@ func (h *UserHandler) GetMyPlatformQuotas(c *gin.Context) {
 	for _, r := range records {
 		out = append(out, quotaview.LazyZeroQuotaForResponse(r, now, false))
 	}
-	response.Success(c, map[string]any{"platform_quotas": out})
+	payload := map[string]any{"platform_quotas": out}
+	if h.purposeAllowances != nil {
+		rows, err := h.purposeAllowances.List(c.Request.Context(), subject.UserID)
+		if err != nil {
+			response.ErrorFrom(c, err)
+			return
+		}
+		allowances := make([]map[string]any, 0, len(rows))
+		nowUsage := time.Now()
+		for _, row := range rows {
+			used, resetsAt := service.EffectivePurposeUsage(row, nowUsage)
+			item := map[string]any{
+				"purpose":      row.Purpose,
+				"limit_amount": row.LimitAmount,
+				"used_amount":  used,
+			}
+			if !resetsAt.IsZero() {
+				item["resets_at"] = resetsAt
+			}
+			allowances = append(allowances, item)
+		}
+		payload["purpose_allowances"] = allowances
+	}
+	response.Success(c, payload)
 }
 
 // ChangePasswordRequest represents the change password request payload

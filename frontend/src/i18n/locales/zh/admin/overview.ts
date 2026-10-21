@@ -957,6 +957,13 @@ export default {
       },
       exclusive: '专属',
       exclusiveHint: '专属分组，可以手动指定给特定用户',
+      usageKind: {
+        label: '记账用途',
+        coding: '编程助手',
+        experiment: 'API 实验',
+        hint: '编程助手按平台分开记账：OpenAI 是 Codex，Grok 是 Grok Build，各每周 100 元，每 7 天清零。API 实验共用每月 500 元，北京时间每月 1 日清零。分组名字不参与判断。',
+        codingOnly: '编程助手只用于 OpenAI 和 Grok 平台。'
+      },
       exclusiveTooltip: {
         title: '什么是专属分组？',
         description:

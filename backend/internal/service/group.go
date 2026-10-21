@@ -35,7 +35,10 @@ type Group struct {
 	// an already committed one-click copy. It must never be mapped to API DTOs.
 	DuplicateOperationID string
 
-	SubscriptionType    string
+	SubscriptionType string
+	// UsageKind is the lab quota use: coding or experiment. It is chosen when
+	// the group is created and is not derived from the group name.
+	UsageKind           string
 	DailyLimitUSD       *float64
 	WeeklyLimitUSD      *float64
 	MonthlyLimitUSD     *float64

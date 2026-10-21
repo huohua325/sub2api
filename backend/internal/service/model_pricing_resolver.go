@@ -72,13 +72,8 @@ type PricingInput struct {
 func (r *ModelPricingResolver) Resolve(ctx context.Context, input PricingInput) *ResolvedPricing {
 	longContextPricingEnabled := input.Group == nil || input.Group.LongContextPricingEnabled
 	if groupPricing := matchGroupModelPricing(input.Group, input.Model); groupPricing != nil {
-		// Group token cards only override the first-tier / flat rates.
-		// Long-context ladders come from official presets, gated by the checkbox.
-		if groupPricing.BillingMode == "" || groupPricing.BillingMode == BillingModeToken {
-			stripped := groupPricing.Clone()
-			stripped.Intervals = nil
-			groupPricing = &stripped
-		}
+		// A group card's own intervals are the operator's context ladder.
+		// Models without intervals keep the official preset, gated by the checkbox.
 		resolved := r.resolveConfiguredPricing(groupPricing, input.Model, PricingSourceGroup)
 		resolved.longContextPricingEnabled = longContextPricingEnabled
 		return resolved

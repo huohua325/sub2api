@@ -987,6 +987,7 @@ func groupEntityToService(g *dbent.Group) *service.Group {
 		Hydrated:                        true,
 		DuplicateOperationID:            derefString(g.DuplicateOperationID),
 		SubscriptionType:                g.SubscriptionType,
+		UsageKind:                       g.UsageKind,
 		DailyLimitUSD:                   g.DailyLimitUsd,
 		WeeklyLimitUSD:                  g.WeeklyLimitUsd,
 		MonthlyLimitUSD:                 g.MonthlyLimitUsd,

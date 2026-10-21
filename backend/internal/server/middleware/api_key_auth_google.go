@@ -197,13 +197,15 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 				abortWithGoogleError(c, status, err.Error())
 				return
 			}
-
-			c.Set(string(ContextKeySubscription), subscription)
-		} else {
-			if apiKeyBalanceBelowAuthThreshold(apiKey.User.Balance, cfg) {
-				abortWithGoogleError(c, 403, "Insufficient account balance")
+			if blocked, checked := purposeQuotaExhausted(c, apiKey, apiKeyService); checked && blocked {
+				abortWithGoogleError(c, 403, "This use has no remaining quota")
 				return
 			}
+
+			c.Set(string(ContextKeySubscription), subscription)
+		} else if blocked, message := purposeOrBalanceBlock(c, apiKey, apiKeyService, cfg); blocked {
+			abortWithGoogleError(c, 403, message)
+			return
 		}
 
 		c.Set(string(ContextKeyAPIKey), apiKey)
