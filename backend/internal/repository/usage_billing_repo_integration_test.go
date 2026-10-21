@@ -4,6 +4,8 @@ package repository
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -419,4 +421,69 @@ func TestUsageBillingRepositoryApply_DeduplicatesAgainstArchivedKey(t *testing.T
 	var balance float64
 	require.NoError(t, integrationDB.QueryRowContext(ctx, "SELECT balance FROM users WHERE id = $1", user.ID).Scan(&balance))
 	require.InDelta(t, 98.75, balance, 0.000001)
+}
+
+func TestUsageBillingRepositoryApply_KeepsCustomPurposeLimit(t *testing.T) {
+	ctx := context.Background()
+	client := testEntClient(t)
+	repo := NewUsageBillingRepository(client, integrationDB)
+
+	// Global policy differs from the row so a conflict update that copies
+	// EXCLUDED.limit_amount / EXCLUDED.period would fail this assertion.
+	const globalPolicy = `{"openai":{"limit":100,"period":"week"},"grok":{"limit":100,"period":"week"},"experiment":{"limit":500,"period":"month"}}`
+	var previous sql.NullString
+	err := integrationDB.QueryRowContext(ctx, `SELECT value FROM settings WHERE key = $1`, service.SettingKeyPurposeAllowancePolicy).Scan(&previous)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		require.NoError(t, err)
+	}
+	_, err = integrationDB.ExecContext(ctx, `
+		INSERT INTO settings (key, value)
+		VALUES ($1, $2)
+		ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
+	`, service.SettingKeyPurposeAllowancePolicy, globalPolicy)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		if previous.Valid {
+			_, _ = integrationDB.ExecContext(context.Background(), `UPDATE settings SET value = $2, updated_at = NOW() WHERE key = $1`, service.SettingKeyPurposeAllowancePolicy, previous.String)
+			return
+		}
+		_, _ = integrationDB.ExecContext(context.Background(), `DELETE FROM settings WHERE key = $1`, service.SettingKeyPurposeAllowancePolicy)
+	})
+
+	user := mustCreateUser(t, client, &service.User{
+		Email:        fmt.Sprintf("usage-billing-purpose-limit-%d@example.com", time.Now().UnixNano()),
+		PasswordHash: "hash",
+	})
+	apiKey := mustCreateApiKey(t, client, &service.APIKey{
+		UserID: user.ID,
+		Key:    "sk-usage-billing-purpose-limit-" + uuid.NewString(),
+		Name:   "billing-purpose-limit",
+	})
+	_, err = integrationDB.ExecContext(ctx, `
+		INSERT INTO user_purpose_allowances (user_id, purpose, limit_amount, used_amount, period, window_start)
+		VALUES ($1, $2, 80, 10, 'month', NOW())
+	`, user.ID, service.PurposeOpenAI)
+	require.NoError(t, err)
+
+	result, err := repo.Apply(ctx, &service.UsageBillingCommand{
+		RequestID:   uuid.NewString(),
+		APIKeyID:    apiKey.ID,
+		UserID:      user.ID,
+		Purpose:     service.PurposeOpenAI,
+		PurposeCost: 1.25,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.True(t, result.Applied)
+
+	var limitAmount, usedAmount float64
+	var period string
+	require.NoError(t, integrationDB.QueryRowContext(ctx, `
+		SELECT limit_amount, used_amount, period
+		FROM user_purpose_allowances
+		WHERE user_id = $1 AND purpose = $2
+	`, user.ID, service.PurposeOpenAI).Scan(&limitAmount, &usedAmount, &period))
+	require.InDelta(t, 80, limitAmount, 0.000001)
+	require.Equal(t, "month", period)
+	require.InDelta(t, 11.25, usedAmount, 0.000001)
 }

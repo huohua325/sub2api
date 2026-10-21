@@ -262,20 +262,23 @@ func incrementUsageBillingPurpose(ctx context.Context, tx *sql.Tx, userID int64,
 		INSERT INTO user_purpose_allowances (user_id, purpose, limit_amount, used_amount, period, window_start)
 		VALUES ($1, $2, $3, $4, $5, $6)
 		ON CONFLICT (user_id, purpose) DO UPDATE
-		SET limit_amount = EXCLUDED.limit_amount,
-			period = EXCLUDED.period,
-			used_amount = CASE
-				WHEN EXCLUDED.period = 'week' AND user_purpose_allowances.window_start <= NOW() - INTERVAL '7 days'
+		SET used_amount = CASE
+				WHEN user_purpose_allowances.period = 'week'
+					 AND user_purpose_allowances.window_start <= NOW() - INTERVAL '7 days'
 					THEN EXCLUDED.used_amount
-				WHEN EXCLUDED.period = 'month' AND user_purpose_allowances.window_start < $7
+				WHEN user_purpose_allowances.period = 'month'
+					 AND user_purpose_allowances.window_start < $7
 					THEN EXCLUDED.used_amount
 				ELSE user_purpose_allowances.used_amount + EXCLUDED.used_amount
 			END,
 			window_start = CASE
-				WHEN EXCLUDED.period = 'week' AND user_purpose_allowances.window_start <= NOW() - INTERVAL '7 days'
+				WHEN user_purpose_allowances.period = 'week'
+					 AND user_purpose_allowances.window_start <= NOW() - INTERVAL '7 days'
 					THEN user_purpose_allowances.window_start
-						+ FLOOR(EXTRACT(EPOCH FROM (NOW() - user_purpose_allowances.window_start)) / 604800) * INTERVAL '7 days'
-				WHEN EXCLUDED.period = 'month' AND user_purpose_allowances.window_start < $7
+						 + FLOOR(EXTRACT(EPOCH FROM (NOW() - user_purpose_allowances.window_start)) / 604800)
+						   * INTERVAL '7 days'
+				WHEN user_purpose_allowances.period = 'month'
+					 AND user_purpose_allowances.window_start < $7
 					THEN $7
 				ELSE user_purpose_allowances.window_start
 			END,
