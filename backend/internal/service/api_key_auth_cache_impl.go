@@ -14,7 +14,7 @@ import (
 	"github.com/dgraph-io/ristretto"
 )
 
-const apiKeyAuthSnapshotVersion = 25 // v25: group usage_kind selects the lab quota wallet
+const apiKeyAuthSnapshotVersion = 26 // v26: auth group load includes usage_kind
 
 type apiKeyAuthCacheConfig struct {
 	l1Size        int
