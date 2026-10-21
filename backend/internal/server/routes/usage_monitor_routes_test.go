@@ -25,6 +25,14 @@ func (usageMonitorStub) Read(context.Context) (*service.UsageMonitorView, error)
 	}, nil
 }
 
+func (usageMonitorStub) Adjust(context.Context, service.PurposeAdjustInput) (*service.PurposeAdjustResult, error) {
+	return &service.PurposeAdjustResult{}, nil
+}
+
+func (usageMonitorStub) ListAdjustments(context.Context, service.PurposeAdjustmentQuery) (*service.PurposeAdjustmentList, error) {
+	return &service.PurposeAdjustmentList{Items: []service.PurposeAdjustmentAudit{}}, nil
+}
+
 func TestUsageMonitorRouteRequiresAdmin(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
@@ -65,4 +73,14 @@ func TestUsageMonitorRouteRequiresAdmin(t *testing.T) {
 	require.NoError(t, json.Unmarshal(ok.Body.Bytes(), &success))
 	require.Equal(t, float64(0), success["code"])
 	require.Equal(t, "success", success["message"])
+
+	list := httptest.NewRecorder()
+	listRequest := httptest.NewRequest(http.MethodGet, "/api/v1/admin/usage-monitor/adjustments", nil)
+	listRequest.Header.Set("Authorization", "Bearer admin")
+	router.ServeHTTP(list, listRequest)
+	require.Equal(t, http.StatusOK, list.Code)
+
+	missingAdjust := httptest.NewRecorder()
+	router.ServeHTTP(missingAdjust, httptest.NewRequest(http.MethodPost, "/api/v1/admin/usage/adjustments", nil))
+	require.Equal(t, http.StatusNotFound, missingAdjust.Code)
 }

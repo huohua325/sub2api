@@ -324,6 +324,14 @@ func (f *fakeUsageMonitorStore) ListExperimentGroupIDs(context.Context) ([]int64
 	return []int64{8}, nil
 }
 
+func (f *fakeUsageMonitorStore) AdjustPurposeWallet(context.Context, PurposeWalletAdjust) (PurposeWalletAdjustResult, error) {
+	return PurposeWalletAdjustResult{}, nil
+}
+
+func (f *fakeUsageMonitorStore) ListPurposeAdjustments(context.Context, PurposeAdjustmentQuery) ([]PurposeAdjustmentAudit, error) {
+	return nil, nil
+}
+
 func (f *fakeUsageMonitorStore) ListExperimentRequestCounts(_ context.Context, groupIDs []int64, start, end time.Time) ([]UsageMonitorExperimentCount, error) {
 	f.monthStart = start
 	f.monthEnd = end

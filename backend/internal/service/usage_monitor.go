@@ -204,6 +204,8 @@ type UsageMonitorStore interface {
 	ListLiveUsers(ctx context.Context) ([]UsageMonitorUserRow, error)
 	ListExperimentGroupIDs(ctx context.Context) ([]int64, error)
 	ListExperimentRequestCounts(ctx context.Context, groupIDs []int64, start, end time.Time) ([]UsageMonitorExperimentCount, error)
+	AdjustPurposeWallet(ctx context.Context, cmd PurposeWalletAdjust) (PurposeWalletAdjustResult, error)
+	ListPurposeAdjustments(ctx context.Context, query PurposeAdjustmentQuery) ([]PurposeAdjustmentAudit, error)
 }
 
 // UsageMonitorService builds the admin read model from stamped usage and wallets.
