@@ -47,8 +47,6 @@ func TestPurposeAdjustSetLimitDoesNotChangeAnotherUserOrSettings(t *testing.T) {
 		UserID:      12,
 		Purpose:     "openai",
 		Action:      service.PurposeAdjustSetLimit,
-		Field:       service.PurposeAdjustFieldLimit,
-		Origin:      service.PurposeAdjustOriginTyped,
 		AmountText:  "80.00000000",
 		Note:        "less",
 		Now:         now,
@@ -96,8 +94,6 @@ func TestPurposeAdjustAlignWindowDoesNotChangeUsedAmount(t *testing.T) {
 		UserID:      12,
 		Purpose:     "openai",
 		Action:      service.PurposeAdjustAlignWindow,
-		Field:       service.PurposeAdjustFieldWindow,
-		Origin:      service.PurposeAdjustOriginAlign,
 		Window:      &next,
 		Now:         now,
 	})
@@ -144,8 +140,6 @@ func TestPurposeAdjustRebuildDoesNotDeleteUsageLogs(t *testing.T) {
 		UserID:      12,
 		Purpose:     "grok",
 		Action:      service.PurposeAdjustRebuildUsed,
-		Field:       service.PurposeAdjustFieldUsed,
-		Origin:      service.PurposeAdjustOriginRebuild,
 		Now:         now,
 	})
 	require.NoError(t, err)
@@ -266,8 +260,6 @@ func TestPurposeAdjustEnsuresWalletWithoutWritingSettings(t *testing.T) {
 		UserID:      12,
 		Purpose:     "openai",
 		Action:      service.PurposeAdjustSetLimit,
-		Field:       service.PurposeAdjustFieldLimit,
-		Origin:      service.PurposeAdjustOriginTyped,
 		AmountText:  "80.00000000",
 		Now:         now,
 	})

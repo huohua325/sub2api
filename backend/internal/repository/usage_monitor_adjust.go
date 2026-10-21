@@ -121,7 +121,7 @@ func (r *UsageMonitorRepository) AdjustPurposeWallet(ctx context.Context, cmd se
 	}
 	rebuilt := ""
 	if cmd.Action == service.PurposeAdjustRebuildUsed {
-		period := purposeAdjustPeriod(row.Purpose, row.Period)
+		period := service.AllowancePeriod(row.Purpose, row.Period)
 		end := service.PurposeResetsAt(period, row.WindowStart)
 		if err := tx.QueryRowContext(ctx, purposeAdjustSumSQL, cmd.UserID, row.WindowStart, end, cmd.Purpose).Scan(&rebuilt); err != nil {
 			return service.PurposeWalletAdjustResult{}, err
@@ -136,7 +136,7 @@ func (r *UsageMonitorRepository) AdjustPurposeWallet(ctx context.Context, cmd se
 			return service.PurposeWalletAdjustResult{}, err
 		}
 		committed = true
-		return service.PurposeWalletAdjustResult{Changed: false, Row: row}, nil
+		return service.PurposeWalletAdjustResult{Changed: false, Field: effect.Field, Origin: effect.Origin, Row: row}, nil
 	}
 
 	updated, err := updatePurposeWallet(ctx, tx, cmd, effect)
@@ -159,7 +159,7 @@ func (r *UsageMonitorRepository) AdjustPurposeWallet(ctx context.Context, cmd se
 		return service.PurposeWalletAdjustResult{}, err
 	}
 	committed = true
-	return service.PurposeWalletAdjustResult{Changed: true, Row: updated, Audit: audit}, nil
+	return service.PurposeWalletAdjustResult{Changed: true, Field: effect.Field, Origin: effect.Origin, Row: updated, Audit: audit}, nil
 }
 
 // ListPurposeAdjustments reads the audit table only. It does not insert wallets.
@@ -207,16 +207,14 @@ func lockPurposeWallet(ctx context.Context, tx *sql.Tx, userID int64, purpose st
 }
 
 func updatePurposeWallet(ctx context.Context, tx *sql.Tx, cmd service.PurposeWalletAdjust, effect service.PurposeWalletEffect) (service.UsageMonitorUserRow, error) {
-	var query scanner
-	switch cmd.Action {
-	case service.PurposeAdjustSetLimit:
+	var query *sql.Row
+	switch effect.Field {
+	case service.PurposeAdjustFieldLimit:
 		query = tx.QueryRowContext(ctx, purposeAdjustLimitSQL, cmd.UserID, cmd.Purpose, effect.Amount)
-	case service.PurposeAdjustSetUsed, service.PurposeAdjustRebuildUsed:
+	case service.PurposeAdjustFieldUsed:
 		query = tx.QueryRowContext(ctx, purposeAdjustUsedSQL, cmd.UserID, cmd.Purpose, effect.Amount)
-	case service.PurposeAdjustAlignWindow:
+	case service.PurposeAdjustFieldWindow:
 		query = tx.QueryRowContext(ctx, purposeAdjustWindowSQL, cmd.UserID, cmd.Purpose, effect.Window)
-	default:
-		return service.UsageMonitorUserRow{}, infraerrors.BadRequest("INVALID_ADJUSTMENT_ACTION", "action must be set_limit, set_used, rebuild_used, or align_window")
 	}
 	row, err := scanPurposeWallet(query)
 	if err != nil {
@@ -228,11 +226,7 @@ func updatePurposeWallet(ctx context.Context, tx *sql.Tx, cmd service.PurposeWal
 	return row, nil
 }
 
-type scanner interface {
-	Scan(dest ...any) error
-}
-
-func scanPurposeWallet(row scanner) (service.UsageMonitorUserRow, error) {
+func scanPurposeWallet(row *sql.Row) (service.UsageMonitorUserRow, error) {
 	var out service.UsageMonitorUserRow
 	var period sql.NullString
 	if err := row.Scan(&out.LimitAmount, &out.UsedAmount, &period, &out.WindowStart); err != nil {
@@ -283,13 +277,6 @@ func insertPurposeAdjustment(ctx context.Context, tx *sql.Tx, cmd service.Purpos
 }
 
 func purposeAdjustmentListSQL(query service.PurposeAdjustmentQuery) (string, []any) {
-	limit := query.Limit
-	if limit <= 0 {
-		limit = 50
-	}
-	if limit > 200 {
-		limit = 200
-	}
 	statement := `
 		SELECT id, actor_user_id, target_user_id, purpose, field, origin,
 		       old_value, new_value, note, created_at
@@ -304,14 +291,7 @@ func purposeAdjustmentListSQL(query service.PurposeAdjustmentQuery) (string, []a
 		args = append(args, *query.BeforeID)
 		statement += fmt.Sprintf(" AND id < $%d", len(args))
 	}
-	args = append(args, limit)
+	args = append(args, query.Limit)
 	statement += fmt.Sprintf(" ORDER BY id DESC LIMIT $%d", len(args))
 	return statement, args
-}
-
-func purposeAdjustPeriod(purpose, period string) string {
-	if period == "week" || period == "month" {
-		return period
-	}
-	return service.PurposePeriod(purpose)
 }

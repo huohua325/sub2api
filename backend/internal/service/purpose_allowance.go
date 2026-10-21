@@ -173,7 +173,8 @@ func nextShanghaiMonthStart(now time.Time) time.Time {
 	return time.Date(start.Year(), start.Month()+1, 1, 0, 0, 0, 0, shanghai)
 }
 
-func allowancePeriod(purpose, period string) string {
+// AllowancePeriod keeps a stored week or month cycle and otherwise uses the purpose default.
+func AllowancePeriod(purpose, period string) string {
 	if period == "week" || period == "month" {
 		return period
 	}
@@ -239,7 +240,7 @@ func PurposeResetsAt(period string, windowStart time.Time) time.Time {
 
 // EffectivePurposeUsage treats an expired window as unused and returns when it resets.
 func EffectivePurposeUsage(row PurposeAllowance, now time.Time) (used float64, resetsAt time.Time) {
-	period := allowancePeriod(row.Purpose, row.Period)
+	period := AllowancePeriod(row.Purpose, row.Period)
 	start := row.WindowStart
 	if PurposeWindowExpired(period, start, now) {
 		start = RenewedPurposeWindow(period, start, now)

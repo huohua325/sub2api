@@ -352,7 +352,7 @@ func (s *memoryAdjustStore) AdjustPurposeWallet(_ context.Context, cmd PurposeWa
 		return PurposeWalletAdjustResult{}, err
 	}
 	if !effect.Changed {
-		return PurposeWalletAdjustResult{Changed: false, Row: row}, nil
+		return PurposeWalletAdjustResult{Changed: false, Field: effect.Field, Origin: effect.Origin, Row: row}, nil
 	}
 	switch cmd.Action {
 	case PurposeAdjustSetLimit:
@@ -377,11 +377,11 @@ func (s *memoryAdjustStore) AdjustPurposeWallet(_ context.Context, cmd PurposeWa
 		CreatedAt:    cmd.Now,
 	}
 	s.audits = append(s.audits, audit)
-	return PurposeWalletAdjustResult{Changed: true, Row: row, Audit: &s.audits[len(s.audits)-1]}, nil
+	return PurposeWalletAdjustResult{Changed: true, Field: effect.Field, Origin: effect.Origin, Row: row, Audit: &s.audits[len(s.audits)-1]}, nil
 }
 
 func (s *memoryAdjustStore) sumCost(userID int64, purpose string, row UsageMonitorUserRow) string {
-	period := allowancePeriod(purpose, row.Period)
+	period := AllowancePeriod(purpose, row.Period)
 	end := PurposeResetsAt(period, row.WindowStart)
 	acc := mustRat("0")
 	for _, item := range s.logs {

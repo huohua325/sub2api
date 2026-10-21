@@ -502,7 +502,7 @@ func assembleMonitorUsers(rows []UsageMonitorUserRow, counts []UsageMonitorExper
 }
 
 func monitorWallet(row UsageMonitorUserRow, counts []UsageMonitorRequestCount, now time.Time) (UsageMonitorWallet, *big.Rat, error) {
-	period := allowancePeriod(row.Purpose, row.Period)
+	period := AllowancePeriod(row.Purpose, row.Period)
 	effective, resets, expired := effectivePurposeUsed(period, row.WindowStart, row.UsedAmount, now)
 	used, ok := parseDecimal(effective)
 	if !ok {

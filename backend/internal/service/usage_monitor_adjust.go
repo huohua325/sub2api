@@ -52,8 +52,6 @@ type PurposeWalletAdjust struct {
 	UserID      int64
 	Purpose     string
 	Action      string
-	Field       string
-	Origin      string
 	AmountText  string
 	Window      *time.Time
 	Note        string
@@ -84,6 +82,8 @@ type PurposeAdjustResult struct {
 // PurposeWalletAdjustResult is the locked wallet after the transaction.
 type PurposeWalletAdjustResult struct {
 	Changed bool
+	Field   string
+	Origin  string
 	Row     UsageMonitorUserRow
 	Audit   *PurposeAdjustmentAudit
 }
@@ -140,8 +140,8 @@ func (s *UsageMonitorService) Adjust(ctx context.Context, in PurposeAdjustInput)
 		"actor_user_id", cmd.ActorUserID,
 		"target_user_id", cmd.UserID,
 		"purpose", cmd.Purpose,
-		"field", cmd.Field,
-		"origin", cmd.Origin,
+		"field", stored.Field,
+		"origin", stored.Origin,
 		"changed", stored.Changed,
 	)
 	return &PurposeAdjustResult{
@@ -232,28 +232,14 @@ func validatePurposeAdjust(in PurposeAdjustInput, now time.Time) (PurposeWalletA
 		Now:         now.UTC(),
 	}
 	switch in.Action {
-	case PurposeAdjustSetLimit:
-		cmd.Field = PurposeAdjustFieldLimit
-		cmd.Origin = PurposeAdjustOriginTyped
-		text, err := submittedAmountText(in.Value)
-		if err != nil {
-			return PurposeWalletAdjust{}, err
-		}
-		cmd.AmountText = text
-	case PurposeAdjustSetUsed:
-		cmd.Field = PurposeAdjustFieldUsed
-		cmd.Origin = PurposeAdjustOriginTyped
+	case PurposeAdjustSetLimit, PurposeAdjustSetUsed:
 		text, err := submittedAmountText(in.Value)
 		if err != nil {
 			return PurposeWalletAdjust{}, err
 		}
 		cmd.AmountText = text
 	case PurposeAdjustRebuildUsed:
-		cmd.Field = PurposeAdjustFieldUsed
-		cmd.Origin = PurposeAdjustOriginRebuild
 	case PurposeAdjustAlignWindow:
-		cmd.Field = PurposeAdjustFieldWindow
-		cmd.Origin = PurposeAdjustOriginAlign
 		window, err := parseAdjustmentWindow(in.Value, now.UTC())
 		if err != nil {
 			return PurposeWalletAdjust{}, err
@@ -293,7 +279,7 @@ func PurposeAdjustExpired(action, purpose, period string, windowStart, now time.
 	if now.IsZero() {
 		now = time.Now()
 	}
-	if PurposeWindowExpired(allowancePeriod(purpose, period), windowStart, now) {
+	if PurposeWindowExpired(AllowancePeriod(purpose, period), windowStart, now) {
 		return infraerrors.Conflict("PURPOSE_WINDOW_EXPIRED", "purpose window expired")
 	}
 	return nil
