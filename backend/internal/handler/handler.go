@@ -29,6 +29,7 @@ type AdminHandlers struct {
 	Subscription           *admin.SubscriptionHandler
 	Usage                  *admin.UsageHandler
 	WeeklyExport           *admin.WeeklyUsageExportHandler
+	UsageMonitor           *admin.UsageMonitorHandler
 	UserAttribute          *admin.UserAttributeHandler
 	ErrorPassthrough       *admin.ErrorPassthroughHandler
 	TLSFingerprintProfile  *admin.TLSFingerprintProfileHandler
