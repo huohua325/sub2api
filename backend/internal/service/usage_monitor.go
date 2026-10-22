@@ -53,7 +53,10 @@ type UsageMonitorParent struct {
 	Users                    []UsageMonitorParentUser  `json:"users"`
 	HiddenUserActualCost     string                    `json:"hidden_user_actual_cost"`
 	WalletRemainingYuan      string                    `json:"wallet_remaining_yuan"`
+	PointBudget              *string                   `json:"point_budget,omitempty"`
 	Oversubscribe            UsageMonitorOversubscribe `json:"oversubscribe"`
+	// Inactive is a subscription parent that is no longer scheduled.
+	Inactive bool `json:"inactive,omitempty"`
 }
 
 // UsageMonitorParentUser is one live user's gateway cost inside a parent window.
@@ -99,7 +102,11 @@ type UsageMonitorWallet struct {
 	LimitAmount         string                      `json:"limit_amount"`
 	StoredUsedAmount    string                      `json:"stored_used_amount"`
 	EffectiveUsedAmount string                      `json:"effective_used_amount"`
-	StudentPercent      int                         `json:"student_percent"`
+	StudentPercent      *int                        `json:"student_percent"`
+	OfficialPoints      *string                     `json:"official_points,omitempty"`
+	PointBudget         *string                     `json:"point_budget,omitempty"`
+	ManualPoints        string                      `json:"manual_points,omitempty"`
+	PointsObservedAt    *time.Time                  `json:"points_observed_at,omitempty"`
 	Period              string                      `json:"period"`
 	WindowStart         time.Time                   `json:"window_start"`
 	ResetsAt            time.Time                   `json:"resets_at"`
@@ -133,6 +140,7 @@ type UsageMonitorParentRow struct {
 	GrokWeeklyUpdatedAt    *string
 	GrokUpdatedAt          *string
 	GrokFetchedAt          *string
+	Schedulable            bool
 }
 
 // UsageMonitorStamp is the latest stamped usage row for one parent.
@@ -150,6 +158,13 @@ type UsageMonitorWindowQuery struct {
 	ParentID int64
 	Reset    time.Time
 	Start    time.Time
+}
+
+// OfficialWindowCost is one parent's gateway total and one user's cost.
+type OfficialWindowCost struct {
+	ParentID  int64
+	TotalCost string
+	UserCost  string
 }
 
 // UsageMonitorWindowUserCost is one user's summed actual_cost inside a window.
@@ -210,8 +225,16 @@ type UsageMonitorStore interface {
 
 // UsageMonitorService builds the admin read model from stamped usage and wallets.
 type UsageMonitorService struct {
-	store UsageMonitorStore
-	now   func() time.Time
+	store  UsageMonitorStore
+	now    func() time.Time
+	points *OfficialPointService
+}
+
+func (s *UsageMonitorService) SetOfficialPoints(points *OfficialPointService) {
+	if s == nil {
+		return
+	}
+	s.points = points
 }
 
 // NewUsageMonitorService creates the read model. It does not call upstreams.
@@ -232,6 +255,10 @@ func (s *UsageMonitorService) Read(ctx context.Context) (*UsageMonitorView, erro
 	parents, err := s.store.ListOfficialParents(ctx)
 	if err != nil {
 		return nil, err
+	}
+	usePoints := s.points != nil
+	if usePoints {
+		parents = s.points.PrepareParents(ctx, parents)
 	}
 	since := now.Add(-usageMonitorDiscoverWindow)
 	stampedIDs, err := s.store.ListStampedParentIDs(ctx, since)
@@ -254,7 +281,7 @@ func (s *UsageMonitorService) Read(ctx context.Context) (*UsageMonitorView, erro
 	for _, row := range parents {
 		snap, periodStart, periodEnd := readParentSnapshot(row, now)
 		_, hasStamp := stamped[row.ID]
-		if snap == nil && !hasStamp {
+		if snap == nil && !hasStamp && (periodEnd == nil || !periodEnd.After(now)) {
 			continue
 		}
 		candidates = append(candidates, candidate{row: row, snap: snap, periodStart: periodStart, periodEnd: periodEnd})
@@ -297,9 +324,20 @@ func (s *UsageMonitorService) Read(ctx context.Context) (*UsageMonitorView, erro
 	windows := make([]UsageMonitorWindowQuery, 0, len(candidates))
 	for _, item := range candidates {
 		decision := decideOfficialWindow(now, stampByID[item.row.ID], item.snap)
-		built := decided{candidate: item, decision: decision}
-		if decision.HasWindow {
+		start := time.Time{}
+		if usePoints {
+			if snapDecision, snapStart, ok := snapshotWindow(item.row, now); ok {
+				decision = snapDecision
+				start = snapStart
+			} else {
+				decision = windowDecision{}
+			}
+		}
+		built := decided{candidate: item, decision: decision, start: start}
+		if decision.HasWindow && !usePoints {
 			built.start = officialWindowStart(item.row.Platform, decision.Point.Reset, item.periodStart, item.periodEnd)
+		}
+		if decision.HasWindow {
 			windows = append(windows, UsageMonitorWindowQuery{
 				ParentID: item.row.ID,
 				Reset:    decision.Point.Reset,
@@ -337,10 +375,17 @@ func (s *UsageMonitorService) Read(ctx context.Context) (*UsageMonitorView, erro
 		if err != nil {
 			return nil, err
 		}
+		if parent.OfficialResetAt == nil && item.periodEnd != nil && item.periodEnd.After(now) {
+			reset := item.periodEnd.UTC()
+			parent.OfficialResetAt = &reset
+		}
 		view.Parents = append(view.Parents, parent)
 	}
 	sort.Slice(view.Parents, func(i, j int) bool { return view.Parents[i].AccountID < view.Parents[j].AccountID })
 	sort.Slice(view.Users, func(i, j int) bool { return view.Users[i].ID < view.Users[j].ID })
+	if usePoints && s.points != nil {
+		s.points.ApplyMonitor(ctx, view)
+	}
 	return view, nil
 }
 
@@ -356,6 +401,7 @@ func assembleMonitorParent(row UsageMonitorParentRow, decision windowDecision, s
 		HiddenUserActualCost: "0",
 		WalletRemainingYuan:  formatTrimmed(walletRemain[purpose]),
 		Oversubscribe:        UsageMonitorOversubscribe{},
+		Inactive:             !row.Schedulable,
 	}
 	if !decision.HasWindow {
 		return parent, nil
@@ -512,12 +558,13 @@ func monitorWallet(row UsageMonitorUserRow, counts []UsageMonitorRequestCount, n
 	if !ok {
 		return UsageMonitorWallet{}, nil, fmt.Errorf("usage monitor limit amount %q", row.LimitAmount)
 	}
+	percent := StudentFacingPercent(used, limit)
 	wallet := UsageMonitorWallet{
 		Purpose:             row.Purpose,
 		LimitAmount:         row.LimitAmount,
 		StoredUsedAmount:    row.UsedAmount,
 		EffectiveUsedAmount: effective,
-		StudentPercent:      StudentFacingPercent(used, limit),
+		StudentPercent:      &percent,
 		Period:              period,
 		WindowStart:         row.WindowStart,
 		ResetsAt:            resets,

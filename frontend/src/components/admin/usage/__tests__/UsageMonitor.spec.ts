@@ -16,6 +16,18 @@ const api = vi.hoisted(() => ({
   adjustPurposeWallet: vi.fn(),
 }))
 
+const settingsApi = vi.hoisted(() => ({
+  getSettings: vi.fn(async () => ({
+    official_point_budget: { openai: '50', grok: '80' },
+    official_point_student_percent: true,
+  })),
+  updateSettings: vi.fn(async (body: object) => body),
+}))
+
+const usageApi = vi.hoisted(() => ({
+  list: vi.fn(async () => ({ items: [], total: 0, page: 1, page_size: 12, pages: 0 })),
+}))
+
 vi.mock('vue-i18n', async () => {
   const actual = await vi.importActual<typeof import('vue-i18n')>('vue-i18n')
   const common = (await import('@/i18n/locales/zh/common')).default
@@ -40,6 +52,32 @@ vi.mock('@/api/admin/usageMonitor', async () => {
     getUsageMonitor: api.getUsageMonitor,
     listPurposeAdjustments: api.listPurposeAdjustments,
     adjustPurposeWallet: api.adjustPurposeWallet,
+  }
+})
+
+vi.mock('@/api/admin/settings', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/api/admin/settings')>()
+  return {
+    ...actual,
+    getSettings: settingsApi.getSettings,
+    updateSettings: settingsApi.updateSettings,
+    default: {
+      ...actual.default,
+      getSettings: settingsApi.getSettings,
+      updateSettings: settingsApi.updateSettings,
+    },
+  }
+})
+
+vi.mock('@/api/admin/usage', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/api/admin/usage')>()
+  return {
+    ...actual,
+    list: usageApi.list,
+    default: {
+      ...actual.default,
+      list: usageApi.list,
+    },
   }
 })
 
@@ -162,21 +200,18 @@ describe('usage monitor display', () => {
     expect(missing.text()).toContain('暂无未过期的官方读数')
     expect(missing.text()).not.toContain('0%')
     expect(missing.get('[data-testid="observed-share-3"]').text()).toBe('')
-    expect(missing.text()).toContain('共享一个官方窗口，多个 100 元钱包可能加起来超过官方剩余')
+    expect(missing.text()).not.toContain('100 元钱包')
 
     const grok = wrapper.get('[data-testid="parent-1"]')
     expect(grok.get('[data-testid="official-used"]').text()).toBe('41.2500')
-    expect(grok.get('[data-testid="class-gateway-cost"]').text()).toBe('3.12500000')
+    expect(grok.get('[data-testid="class-gateway-cost"]').text()).toContain('3.12500000')
     expect(grok.get('[data-testid="observed-share-12"]').text()).toContain('0.0000')
     expect(grok.get('[data-testid="observed-cost-12"]').text()).toBe('0.0003905')
-    expect(grok.get('[data-testid="slope-delta"]').text()).toBe('4.5000')
-    expect(grok.get('[data-testid="yuan-per-point"]').text()).toBe('0.17777778')
-    expect(grok.get('[data-testid="slope-share-12"]').text()).toContain('0.0022')
-    expect(grok.text()).toContain('样本还不够，不要据此改倍率')
-    expect(grok.text()).toContain('读数已超过 10 分钟。刷新页面不会向上游探测')
+    expect(grok.text()).not.toContain('不要据此改倍率')
+    expect(grok.text()).toContain('读数时间')
+    expect(grok.text()).not.toContain('读数已超过 10 分钟')
     expect(grok.text()).not.toContain('999.0000')
-    expect(grok.text()).toContain('chatgpt.com / grok.com')
-    expect(grok.text()).toContain('网关观测份额')
+    expect(grok.text()).not.toContain('官网直接使用不在这里')
   })
 
   it('shows numeric oversubscribe points only when the API says the sample supports them', () => {
@@ -190,9 +225,8 @@ describe('usage monitor display', () => {
       ],
     })
     const card = wrapper.get('[data-testid="parent-5"]')
-    expect(card.get('[data-testid="oversubscribe-numbers"]').text()).toContain('70.0000')
-    expect(card.get('[data-testid="oversubscribe-numbers"]').text()).toContain('58.7500')
-    expect(card.text()).not.toContain('共享一个官方窗口，多个 100 元钱包可能加起来超过官方剩余')
+    expect(card.text()).not.toContain('70.0000')
+    expect(card.text()).not.toContain('100 元钱包')
   })
 
   it('shows an empty class, an admin with no students, and a tiny experiment spend', () => {
@@ -225,13 +259,12 @@ describe('usage monitor display', () => {
     expect(adminOnly.get('[data-testid="no-students"]').text()).toBe('还没有学生')
     expect(adminOnly.get('[data-testid="usage-user-1"]').attributes('data-highlight')).toBe('true')
     expect(adminOnly.text()).toContain('admin@example')
-    expect(adminOnly.get('[data-testid="stored-used-1-experiment"]').text()).toBe('0.0003905')
     expect(adminOnly.get('[data-testid="effective-used-1-experiment"]').text()).toBe('0.0003905')
     expect(adminOnly.get('[data-testid="limit-1-experiment"]').text()).toBe('500')
     expect(adminOnly.get('[data-testid="student-percent-1-experiment"]').text()).toBe('0%')
-    expect(adminOnly.get('[data-testid="official-none-1-experiment"]').text()).toBe('无官方额度')
-    expect(adminOnly.get('[data-testid="tiny-experiment-1-experiment"]').text()).toBe('学生卡片会显示 0%，这里不是未使用')
     expect(adminOnly.text()).toContain('deepseek 2')
+    expect(adminOnly.text()).not.toContain('学生卡片会显示 0%')
+    expect(adminOnly.text()).not.toContain('无官方额度')
   })
 })
 
@@ -257,69 +290,19 @@ describe('purpose wallet adjustment confirms', () => {
     await flushPromises()
   }
 
-  it('asks before lowering used and does not delete the usage log sentence', async () => {
-    const wrapper = mountWithI18n(PurposeAdjustModal, { show: true, user: student, purpose: 'openai', wallet: openai })
-    expect(wrapper.get('[data-testid="rebuild-copy"]').text()).toBe(REBUILD)
-    await wrapper.get('[data-testid="used-input"]').setValue('0')
-    await wrapper.get('[data-testid="set-used"]').trigger('click')
+  it('asks before changing the experiment cap', async () => {
+    const wrapper = mountWithI18n(PurposeAdjustModal, { show: true, user: student, purpose: 'experiment', wallet: openai })
+    expect(wrapper.find('[data-testid="used-input"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="align-window"]').exists()).toBe(false)
+    await wrapper.get('[data-testid="limit-input"]').setValue('400')
+    await wrapper.get('[data-testid="set-limit"]').trigger('click')
     expect(api.adjustPurposeWallet).not.toHaveBeenCalled()
-    expect(dialogMessage(wrapper)).toContain(LOWER_USED)
     await confirm(wrapper)
-    expect(api.adjustPurposeWallet).toHaveBeenCalledTimes(1)
     expect(api.adjustPurposeWallet).toHaveBeenCalledWith({
       user_id: 12,
-      purpose: 'openai',
-      action: 'set_used',
-      value: '0',
-      confirm: true,
-    })
-  })
-
-  it('does not use the lowering sentence when used goes up', async () => {
-    const wrapper = mountWithI18n(PurposeAdjustModal, { show: true, user: student, purpose: 'openai', wallet: openai })
-    await wrapper.get('[data-testid="used-input"]').setValue('30')
-    await wrapper.get('[data-testid="set-used"]').trigger('click')
-    expect(dialogMessage(wrapper)).not.toContain(LOWER_USED)
-  })
-
-  it('keeps the usage_logs sentence for a leading plus and for an unparsed amount', async () => {
-    const wrapper = mountWithI18n(PurposeAdjustModal, { show: true, user: student, purpose: 'openai', wallet: openai })
-    await wrapper.get('[data-testid="used-input"]').setValue('+5')
-    await wrapper.get('[data-testid="set-used"]').trigger('click')
-    expect(dialogMessage(wrapper)).toContain(LOWER_USED)
-    await wrapper.get('[data-testid="used-input"]').setValue('not-a-number')
-    await wrapper.get('[data-testid="set-used"]').trigger('click')
-    expect(dialogMessage(wrapper)).toContain(LOWER_USED)
-    await wrapper.get('[data-testid="used-input"]').setValue('+30')
-    await wrapper.get('[data-testid="set-used"]').trigger('click')
-    expect(dialogMessage(wrapper)).not.toContain(LOWER_USED)
-  })
-
-  it('aligns the window in its own submit, then set_used is a second submit', async () => {
-    const wrapper = mountWithI18n(PurposeAdjustModal, { show: true, user: student, purpose: 'openai', wallet: openai })
-    await wrapper.get('[data-testid="window-input"]').setValue('2026-10-21T02:00:00Z')
-    await wrapper.get('[data-testid="align-window"]').trigger('click')
-    expect(api.adjustPurposeWallet).not.toHaveBeenCalled()
-    const message = dialogMessage(wrapper)
-    expect(message).toContain(ALIGN_KEEP)
-    expect(message).toContain(ALIGN_BLOCK)
-    await confirm(wrapper)
-    expect(api.adjustPurposeWallet).toHaveBeenCalledTimes(1)
-    expect(api.adjustPurposeWallet.mock.calls[0][0]).toMatchObject({
-      action: 'align_window',
-      value: '2026-10-21T02:00:00Z',
-      confirm: true,
-    })
-    expect(api.adjustPurposeWallet.mock.calls[0][0].action).not.toBe('set_used')
-
-    await wrapper.get('[data-testid="used-input"]').setValue('1')
-    await wrapper.get('[data-testid="set-used"]').trigger('click')
-    expect(dialogMessage(wrapper)).toContain(LOWER_USED)
-    await confirm(wrapper)
-    expect(api.adjustPurposeWallet).toHaveBeenCalledTimes(2)
-    expect(api.adjustPurposeWallet.mock.calls[1][0]).toMatchObject({
-      action: 'set_used',
-      value: '1',
+      purpose: 'experiment',
+      action: 'set_limit',
+      value: '400',
       confirm: true,
     })
   })
@@ -330,9 +313,9 @@ describe('purpose wallet adjustment confirms', () => {
       reason: 'PURPOSE_WINDOW_EXPIRED',
       message: 'purpose window expired',
     })
-    const wrapper = mountWithI18n(PurposeAdjustModal, { show: true, user: student, purpose: 'openai', wallet: openai })
-    await wrapper.get('[data-testid="rebuild-used"]').trigger('click')
-    expect(dialogMessage(wrapper)).toContain(REBUILD)
+    const wrapper = mountWithI18n(PurposeAdjustModal, { show: true, user: student, purpose: 'experiment', wallet: openai })
+    await wrapper.get('[data-testid="limit-input"]').setValue('400')
+    await wrapper.get('[data-testid="set-limit"]').trigger('click')
     await confirm(wrapper)
     expect(wrapper.get('[data-testid="adjust-error"]').text()).toContain('PURPOSE_WINDOW_EXPIRED')
     expect(wrapper.get('[data-testid="adjust-error"]').text()).toContain('purpose window expired')
@@ -342,7 +325,7 @@ describe('purpose wallet adjustment confirms', () => {
       code: 'ADMIN_COMPLIANCE_ACK_REQUIRED',
       message: 'ack required',
     })
-    await wrapper.get('[data-testid="rebuild-used"]').trigger('click')
+    await wrapper.get('[data-testid="set-limit"]').trigger('click')
     await confirm(wrapper)
     expect(wrapper.get('[data-testid="adjust-error"]').text()).toContain('ack required')
   })
@@ -373,6 +356,13 @@ describe('usage monitor audit list', () => {
 })
 
 describe('usage monitor page query', () => {
+  let pageWrapper: { unmount: () => void } | null = null
+
+  afterEach(() => {
+    pageWrapper?.unmount()
+    pageWrapper = null
+  })
+
   beforeEach(() => {
     api.getUsageMonitor.mockReset()
     api.listPurposeAdjustments.mockReset()
@@ -400,11 +390,14 @@ describe('usage monitor page query', () => {
   async function mountPage() {
     const router = createRouter({
       history: createMemoryHistory(),
-      routes: [{ path: '/admin/usage-monitor', component: { template: '<div />' } }],
+      routes: [
+        { path: '/admin/usage-monitor', component: { template: '<div />' } },
+        { path: '/admin/usage', component: { template: '<div />' } },
+      ],
     })
     await router.push('/admin/usage-monitor?user=12')
     await router.isReady()
-    return mount(UsageMonitorView, {
+    const wrapper = mount(UsageMonitorView, {
       global: {
         plugins: [router],
         stubs: {
@@ -415,6 +408,8 @@ describe('usage monitor page query', () => {
         },
       },
     })
+    pageWrapper = wrapper
+    return wrapper
   }
 
   it('does not show empty copy until the monitor read succeeds', async () => {
@@ -462,7 +457,7 @@ describe('usage monitor page query', () => {
       disclaimer: 'gateway_observed_only',
       parents: [
         parent({
-          official_used_percent: '41.2500',
+          official_used_percent: '42.0000',
           gateway_actual_cost: '3.12500000',
           wallet_remaining_yuan: '40',
           users: [
@@ -497,21 +492,86 @@ describe('usage monitor page query', () => {
     api.adjustPurposeWallet.mockResolvedValue({ changed: true, wallet: wallet({ stored_used_amount: '0' }), audit: null })
     const wrapper = await mountPage()
     await flushPromises()
-    await wrapper.get('[data-testid="adjust-12-openai"]').trigger('click')
-    await wrapper.get('[data-testid="used-input"]').setValue('0')
-    await wrapper.get('[data-testid="set-used"]').trigger('click')
+    await wrapper.get('[data-testid="adjust-12-experiment"]').trigger('click')
+    await wrapper.get('[data-testid="limit-input"]').setValue('500')
+    await wrapper.get('[data-testid="set-limit"]').trigger('click')
     const confirmButton = wrapper.findAll('button').find((item) => item.text() === '确认')
     expect(confirmButton).toBeTruthy()
     await confirmButton!.trigger('click')
     await flushPromises()
-    expect(wrapper.findComponent(ConfirmDialog).props('show')).toBe(true)
+    expect(wrapper.findAllComponents(ConfirmDialog).some((dialog) => dialog.props('show'))).toBe(true)
     expect(api.getUsageMonitor).toHaveBeenCalledTimes(2)
     expect(wrapper.get('[data-testid="set-limit"]').attributes('disabled')).toBeDefined()
     release(updated)
     await flushPromises()
-    expect(wrapper.findComponent(ConfirmDialog).props('show')).toBe(false)
-    expect(wrapper.text()).toContain('钱包剩余 40')
-    expect(wrapper.text()).toContain('账本已用 0')
+    expect(wrapper.findAllComponents(ConfirmDialog).every((dialog) => dialog.props('show') === false)).toBe(true)
+    expect(wrapper.get('[data-testid="official-used"]').text()).toBe('42.0000')
+  })
+
+  it('puts a person at the cap in the decision list and keeps a 100% card under the cap', async () => {
+    api.getUsageMonitor.mockReset()
+    api.getUsageMonitor.mockResolvedValue({
+      generated_at: '2026-10-22T10:00:00Z',
+      disclaimer: 'gateway_observed_only',
+      parents: [
+        parent({
+          account_id: 14,
+          name: 'Grok Build milelab',
+          platform: 'grok',
+          purpose: 'grok',
+          official_used_percent: null,
+          official_reset_at: '2026-10-29T10:36:49Z',
+        }),
+      ],
+      users: [
+        user({
+          email: 'memslides@example.com',
+          wallets: [
+            wallet({
+              purpose: 'grok',
+              official_points: '34.4043',
+              point_budget: '30',
+              student_percent: 100,
+            }),
+            wallet({
+              purpose: 'openai',
+              official_points: '49.9999',
+              point_budget: '50',
+              student_percent: 100,
+            }),
+          ],
+        }),
+      ],
+    })
+    const wrapper = await mountPage()
+    await flushPromises()
+    const attention = wrapper.get('[data-testid="usage-monitor-attention"]')
+    expect(attention.text()).toContain('memslides@example.com 的 Grok 已到上限，34.4043 / 30 点')
+    expect(attention.text()).toContain('接近上限')
+    expect(attention.text()).not.toContain('Codex 已到上限')
+    expect(attention.text()).toContain('Grok Build milelab 没有官方读数')
+    expect(wrapper.get('[data-testid="status-12-grok"]').text()).toBe('已到上限')
+    expect(wrapper.get('[data-testid="status-12-openai"]').text()).toBe('接近上限')
+  })
+
+  it('saves only the point caps from this page', async () => {
+    const wrapper = await mountPage()
+    await flushPromises()
+    settingsApi.updateSettings.mockClear()
+    await wrapper.get('[data-testid="cap-grok"]').setValue('30')
+    await wrapper.get('[data-testid="cap-save"]').trigger('click')
+    const confirmButton = wrapper.findAll('button').find((item) => item.text() === '确认')
+    expect(confirmButton).toBeTruthy()
+    await confirmButton!.trigger('click')
+    await flushPromises()
+    expect(settingsApi.updateSettings).toHaveBeenCalledTimes(1)
+    const payload = settingsApi.updateSettings.mock.calls[0][0] as Record<string, unknown>
+    expect(payload).toEqual({
+      official_point_budget: { openai: '50', grok: '30' },
+      official_point_student_percent: true,
+    })
+    expect(payload).not.toHaveProperty('purpose_allowance_policy')
+    expect(wrapper.get('[data-testid="cap-status"]').text()).toContain('已保存')
   })
 })
 

@@ -14,13 +14,16 @@
         <div class="min-w-0 flex-1">
           <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ meter.title }}</p>
           <p class="text-xl font-bold tabular-nums" :class="meter.value">
-            <template v-if="hideMoney">{{ meter.percent }}%</template>
+            <template v-if="meter.asPoints || hideMoney">
+              <template v-if="meter.missing">{{ t('admin.usageMonitor.noReading') }}</template>
+              <template v-else>{{ meter.percent }}%</template>
+            </template>
             <template v-else>{{ formatAmount(meter.used) }} / {{ formatAmount(meter.limit) }}</template>
           </p>
           <p class="text-xs text-gray-500 dark:text-gray-400">
-            {{ hideMoney ? (meter.percent >= 100 ? t('dashboard.codexQuota.exhausted') : t('dashboard.purpose.used')) : t('dashboard.purpose.yuan') }}
+            {{ meter.asPoints || hideMoney ? (meter.percent >= 100 ? t('dashboard.codexQuota.exhausted') : t('dashboard.purpose.used')) : t('dashboard.purpose.yuan') }}
           </p>
-          <div class="mt-2 h-1 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-dark-700">
+          <div v-if="!meter.missing" class="mt-2 h-1 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-dark-700">
             <div
               class="h-full rounded-full transition-all"
               :class="quotaBarClass(meter.percent)"
@@ -28,7 +31,7 @@
             />
           </div>
           <p
-            v-if="meter.resetsAt"
+            v-if="meter.resetsAt && !meter.missing"
             class="mt-1 text-[10px] tabular-nums text-gray-400"
             :title="formatResetTime(meter.resetsAt)"
           >
@@ -459,8 +462,23 @@ const purposeMeters = computed(() => {
     const row = rows.find((item) => item.purpose === id)
     const limit = row?.limit_amount ?? 0
     const used = row?.used_amount ?? 0
-    const percent = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0
-    return { id, title: t(`dashboard.purpose.${id}`), used, limit, percent, resetsAt: row?.resets_at, ...style[id] }
+    const usesDisplay = row != null && Object.prototype.hasOwnProperty.call(row, 'display_percent')
+    const asPoints = usesDisplay && id !== 'experiment'
+    const missing = usesDisplay && row?.display_percent == null
+    const percent = usesDisplay
+      ? (row?.display_percent ?? 0)
+      : (limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0)
+    return {
+      id,
+      title: t(`dashboard.purpose.${id}`),
+      used,
+      limit,
+      percent,
+      asPoints,
+      missing,
+      resetsAt: missing ? undefined : row?.resets_at,
+      ...style[id],
+    }
   })
 })
 

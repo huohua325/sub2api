@@ -487,6 +487,8 @@ export interface SystemSettings {
   // ── 平台限额（嵌套 JSON，系统层 + 7 auth-source 层）────────────────────────────────
   default_platform_quotas?: DefaultPlatformQuotasMap;
   purpose_allowance_policy?: PurposeAllowancePolicy;
+  official_point_budget?: { openai: string; grok: string };
+  official_point_student_percent?: boolean;
   platform_quota_week_mode?: 'registration' | 'monday';
   auth_source_default_email_platform_quotas?: DefaultPlatformQuotasMap;
   auth_source_default_linuxdo_platform_quotas?: DefaultPlatformQuotasMap;
@@ -844,6 +846,8 @@ export interface UpdateSettingsRequest {
   // ── 平台限额（嵌套 JSON，系统层 + 7 auth-source 层）────────────────────────────────
   default_platform_quotas?: DefaultPlatformQuotasMap;
   purpose_allowance_policy?: PurposeAllowancePolicy;
+  official_point_budget?: { openai: string; grok: string };
+  official_point_student_percent?: boolean;
   platform_quota_week_mode?: 'registration' | 'monday';
   auth_source_default_email_platform_quotas?: DefaultPlatformQuotasMap;
   auth_source_default_linuxdo_platform_quotas?: DefaultPlatformQuotasMap;

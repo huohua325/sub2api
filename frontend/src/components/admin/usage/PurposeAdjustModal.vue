@@ -21,31 +21,7 @@
         <button type="button" class="btn btn-primary" data-testid="set-limit" :disabled="submitting" @click="ask('set_limit')">{{ t('admin.usageMonitor.setLimit') }}</button>
       </section>
 
-      <section class="space-y-3 border-t border-gray-200 pt-4 dark:border-dark-700">
-        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('admin.usageMonitor.setUsed') }}</h3>
-        <p class="text-sm text-gray-500 dark:text-gray-400">
-          {{ t('admin.usageMonitor.storedUsed') }} {{ wallet?.stored_used_amount || '' }}
-          · {{ t('admin.usageMonitor.effectiveUsed') }} {{ wallet?.effective_used_amount || '' }}
-        </p>
-        <label class="block">
-          <span class="input-label">{{ t('admin.usageMonitor.newUsed') }}</span>
-          <input v-model="usedInput" type="text" class="input" data-testid="used-input" autocomplete="off" />
-        </label>
-        <button type="button" class="btn btn-secondary" data-testid="set-used" :disabled="submitting" @click="ask('set_used')">{{ t('admin.usageMonitor.setUsed') }}</button>
-        <p class="text-sm text-gray-500 dark:text-gray-400" data-testid="rebuild-copy">{{ t('admin.usageMonitor.rebuildCopy') }}</p>
-        <button type="button" class="btn btn-secondary" data-testid="rebuild-used" :disabled="submitting" @click="ask('rebuild_used')">{{ t('admin.usageMonitor.rebuildUsed') }}</button>
-      </section>
 
-      <section class="space-y-3 border-t border-gray-200 pt-4 dark:border-dark-700">
-        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('admin.usageMonitor.alignWindow') }}</h3>
-        <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('admin.usageMonitor.current') }} {{ wallet?.window_start || '' }}</p>
-        <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('admin.usageMonitor.confirmAlign') }}</p>
-        <label class="block">
-          <span class="input-label">{{ t('admin.usageMonitor.newWindow') }}</span>
-          <input v-model="windowInput" type="text" class="input" data-testid="window-input" autocomplete="off" placeholder="2026-10-21T02:00:00Z" />
-        </label>
-        <button type="button" class="btn btn-secondary" data-testid="align-window" :disabled="submitting" @click="ask('align_window')">{{ t('admin.usageMonitor.alignWindow') }}</button>
-      </section>
 
       <p v-if="statusText" class="text-sm text-gray-700 dark:text-gray-300" data-testid="adjust-status">{{ statusText }}</p>
       <p v-if="errorText" class="text-sm text-red-600 dark:text-red-400" data-testid="adjust-error">{{ errorText }}</p>

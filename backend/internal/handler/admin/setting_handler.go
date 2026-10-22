@@ -432,6 +432,10 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 	} else {
 		payload.PurposeAllowancePolicy = &policy
 	}
+	budget := h.settingService.GetOfficialPointBudget(c.Request.Context())
+	payload.OfficialPointBudget = &budget
+	enabled := h.settingService.OfficialPointStudentPercentEnabled(c.Request.Context())
+	payload.OfficialPointStudentPercent = &enabled
 
 	response.Success(c, systemSettingsResponseData(payload, authSourceDefaults))
 }

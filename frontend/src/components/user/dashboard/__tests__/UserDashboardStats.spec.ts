@@ -151,6 +151,30 @@ describe('UserDashboardStats usage meters', () => {
     expect(w.text()).not.toContain('dashboard.platformQuota.title')
     expect(w.text()).not.toContain('$100')
   })
+
+  it('shows the official point percent on Codex and Grok even when the yuan wallet is still present', () => {
+    const allowances: PurposeAllowanceItem[] = [
+      { purpose: 'openai', limit_amount: 100, used_amount: 40, display_percent: 23 },
+      { purpose: 'grok', limit_amount: 100, used_amount: 15.55, display_percent: 13 },
+      { purpose: 'experiment', limit_amount: 500, used_amount: 15, display_percent: 3 },
+    ]
+    const w = mount(UserDashboardStats, {
+      props: {
+        stats: makeStats(),
+        balance: 100,
+        isSimple: false,
+        hideMoney: false,
+        purposeAllowances: allowances,
+      },
+      global: { stubs: { Icon: true } },
+    })
+    expect(w.get('[data-testid="openai-purpose-card"]').text()).toContain('23%')
+    expect(w.get('[data-testid="openai-purpose-card"]').text()).not.toContain('40')
+    expect(w.get('[data-testid="grok-purpose-card"]').text()).toContain('13%')
+    expect(w.get('[data-testid="grok-purpose-card"]').text()).not.toContain('15.55')
+    expect(w.get('[data-testid="experiment-purpose-card"]').text()).toContain('15')
+    expect(w.get('[data-testid="experiment-purpose-card"]').text()).toContain('500')
+  })
 })
 
 describe('UserDashboardStats 按平台拆分', () => {

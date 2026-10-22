@@ -215,10 +215,8 @@ func validatePurposeAdjust(in PurposeAdjustInput, now time.Time) (PurposeWalletA
 		return PurposeWalletAdjust{}, infraerrors.NotFound("USER_NOT_FOUND", "user not found")
 	}
 	purpose := strings.TrimSpace(in.Purpose)
-	switch purpose {
-	case PurposeOpenAI, PurposeGrok, PurposeExperiment:
-	default:
-		return PurposeWalletAdjust{}, infraerrors.BadRequest("INVALID_PURPOSE", "purpose must be openai, grok, or experiment")
+	if purpose != PurposeExperiment || in.Action != PurposeAdjustSetLimit {
+		return PurposeWalletAdjust{}, infraerrors.BadRequest("PURPOSE_YUAN_RETIRED", "only the experiment yuan cap can be changed")
 	}
 	if utf8.RuneCountInString(in.Note) > purposeAdjustNoteMax {
 		return PurposeWalletAdjust{}, infraerrors.BadRequest("INVALID_ADJUSTMENT_NOTE", "note is too long")

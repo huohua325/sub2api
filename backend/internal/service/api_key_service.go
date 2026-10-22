@@ -315,6 +315,7 @@ type APIKeyService struct {
 	lastUsedTouchL1           sync.Map // keyID -> nextAllowedAt(time.Time)
 	lastUsedTouchSF           singleflight.Group
 	purposeAllowances         PurposeAllowanceRepository
+	officialPoints            *OfficialPointService
 }
 
 type APIKeyAuthLookupMetrics struct {
@@ -331,14 +332,33 @@ func (s *APIKeyService) SetPurposeAllowances(repo PurposeAllowanceRepository) {
 	s.purposeAllowances = repo
 }
 
-// PurposeBlocks reports whether this group’s wallet is used up.
-// checked is false when the wallet system is not configured, so callers keep the shared-balance rule.
+func (s *APIKeyService) SetOfficialPoints(points *OfficialPointService) {
+	if s == nil {
+		return
+	}
+	s.officialPoints = points
+}
+
+// PurposeBlocks reports whether this group’s allowance is used up.
+// Codex and Grok use the per-person official-point cap when that switch is on.
+// Experiment keeps the yuan wallet. checked is false when no allowance applies,
+// so callers keep the shared-balance rule.
 func (s *APIKeyService) PurposeBlocks(ctx context.Context, userID int64, group *Group) (blocked bool, checked bool) {
-	if s == nil || s.purposeAllowances == nil || group == nil || userID <= 0 {
+	if s == nil || group == nil || userID <= 0 {
 		return false, false
 	}
 	purpose := PurposeOfGroup(group.Platform, group.UsageKind)
 	if purpose == "" {
+		return false, false
+	}
+	if purpose == PurposeOpenAI || purpose == PurposeGrok {
+		if s.officialPoints == nil {
+			return false, true
+		}
+		blocked, _ := s.officialPoints.Blocks(ctx, userID, purpose)
+		return blocked, true
+	}
+	if s.purposeAllowances == nil {
 		return false, false
 	}
 	rows, err := s.purposeAllowances.List(ctx, userID)

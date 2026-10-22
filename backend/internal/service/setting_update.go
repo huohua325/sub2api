@@ -559,6 +559,21 @@ func (s *SettingService) buildSystemSettingsUpdates(ctx context.Context, setting
 		updates[SettingKeyPurposeAllowancePolicy] = string(blob)
 		settings.PurposeAllowancePolicy = &normalized
 	}
+	if settings.OfficialPointBudget != nil {
+		normalized, err := NormalizeOfficialPointBudget(*settings.OfficialPointBudget)
+		if err != nil {
+			return nil, err
+		}
+		blob, err := json.Marshal(normalized)
+		if err != nil {
+			return nil, fmt.Errorf("marshal official point budget: %w", err)
+		}
+		updates[SettingKeyOfficialPointBudget] = string(blob)
+		settings.OfficialPointBudget = &normalized
+	}
+	if settings.OfficialPointStudentPercent != nil {
+		updates[SettingKeyOfficialPointStudentPercent] = strconv.FormatBool(*settings.OfficialPointStudentPercent)
+	}
 	if settings.DefaultPlatformQuotas != nil {
 		if err := validateDefaultPlatformQuotaMap(settings.DefaultPlatformQuotas); err != nil {
 			return nil, err

@@ -218,16 +218,16 @@ func TestUsageMonitorReadOpenLog(t *testing.T) {
 	require.Equal(t, int64(12), student.ID)
 	require.Equal(t, []string{PurposeOpenAI, PurposeGrok, PurposeExperiment}, walletPurposes(student.Wallets))
 	require.Equal(t, "0.5", student.Wallets[0].EffectiveUsedAmount)
-	require.Equal(t, 1, student.Wallets[0].StudentPercent)
+	require.Equal(t, 1, *student.Wallets[0].StudentPercent)
 	require.Nil(t, student.Wallets[0].Official)
 	require.Equal(t, "4.00", student.Wallets[1].StoredUsedAmount)
 	require.Equal(t, "0", student.Wallets[1].EffectiveUsedAmount)
-	require.Equal(t, 0, student.Wallets[1].StudentPercent)
+	require.Equal(t, 0, *student.Wallets[1].StudentPercent)
 	require.True(t, student.Wallets[1].LedgerUnrolled)
 	require.True(t, student.Wallets[1].ResetsAt.After(now))
 	require.Equal(t, "0.49", student.Wallets[2].StoredUsedAmount)
 	require.Equal(t, "0.49", student.Wallets[2].EffectiveUsedAmount)
-	require.Equal(t, 0, student.Wallets[2].StudentPercent)
+	require.Equal(t, 0, *student.Wallets[2].StudentPercent)
 	require.Equal(t, usageMonitorOfficialNone, *student.Wallets[2].Official)
 	require.Equal(t, []UsageMonitorRequestCount{{Platform: "deepseek", Count: 2}}, *student.Wallets[2].RequestCounts)
 
@@ -252,8 +252,8 @@ type fakeUsageMonitorStore struct {
 
 func (f *fakeUsageMonitorStore) ListOfficialParents(context.Context) ([]UsageMonitorParentRow, error) {
 	return []UsageMonitorParentRow{
-		{ID: 42, Name: "codex parent", Platform: PlatformOpenAI},
-		{ID: 43, Name: "grok parent", Platform: PlatformGrok},
+		{ID: 42, Name: "codex parent", Platform: PlatformOpenAI, Schedulable: true},
+		{ID: 43, Name: "grok parent", Platform: PlatformGrok, Schedulable: true},
 	}, nil
 }
 

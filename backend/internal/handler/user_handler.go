@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"math/big"
 	"strings"
 	"time"
 
@@ -23,6 +24,7 @@ type UserHandler struct {
 	affiliateService      *service.AffiliateService
 	userPlatformQuotaRepo service.UserPlatformQuotaRepository
 	purposeAllowances     service.PurposeAllowanceRepository
+	officialPoints        *service.OfficialPointService
 }
 
 // NewUserHandler creates a new UserHandler
@@ -49,6 +51,17 @@ func (h *UserHandler) SetPurposeAllowances(repo service.PurposeAllowanceReposito
 		return
 	}
 	h.purposeAllowances = repo
+}
+
+func floatRat(value float64) *big.Rat {
+	return new(big.Rat).SetFloat64(value)
+}
+
+func (h *UserHandler) SetOfficialPoints(points *service.OfficialPointService) {
+	if h == nil {
+		return
+	}
+	h.officialPoints = points
 }
 
 // GetMyPlatformQuotas GET /user/platform-quotas
@@ -83,15 +96,38 @@ func (h *UserHandler) GetMyPlatformQuotas(c *gin.Context) {
 		}
 		allowances := make([]map[string]any, 0, len(rows))
 		nowUsage := time.Now()
+		role, _ := middleware2.GetUserRoleFromContext(c)
+		showYuan := role == "admin"
+		// Codex and Grok cards follow the per-person point cap. The old yuan
+		// wallet stays in storage, but it is not the number students see.
+		var cards map[string]service.OfficialPointResult
+		if h.officialPoints != nil {
+			cards = h.officialPoints.CardsForUser(c.Request.Context(), subject.UserID)
+		}
 		for _, row := range rows {
 			used, resetsAt := service.EffectivePurposeUsage(row, nowUsage)
-			item := map[string]any{
-				"purpose":      row.Purpose,
-				"limit_amount": row.LimitAmount,
-				"used_amount":  used,
+			item := map[string]any{"purpose": row.Purpose}
+			if showYuan || cards == nil {
+				item["limit_amount"] = row.LimitAmount
+				item["used_amount"] = used
 			}
-			if !resetsAt.IsZero() {
-				item["resets_at"] = resetsAt
+			if cards == nil {
+				if !resetsAt.IsZero() {
+					item["resets_at"] = resetsAt
+				}
+			} else if row.Purpose == service.PurposeExperiment {
+				percent := service.StudentFacingPercent(floatRat(used), floatRat(row.LimitAmount))
+				item["display_percent"] = percent
+				if !resetsAt.IsZero() {
+					item["resets_at"] = resetsAt
+				}
+			} else if card, ok := cards[row.Purpose]; ok && card.Percent != nil {
+				item["display_percent"] = *card.Percent
+				if card.Reset != nil {
+					item["resets_at"] = *card.Reset
+				}
+			} else {
+				item["display_percent"] = nil
 			}
 			allowances = append(allowances, item)
 		}

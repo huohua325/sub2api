@@ -751,6 +751,14 @@ const SettingKeyDefaultPlatformQuotas = "default_platform_quotas"
 // cap. It is not the per-platform daily, weekly, and monthly quota.
 const SettingKeyPurposeAllowancePolicy = "purpose_allowance_policy"
 
+// SettingKeyOfficialPointBudget is the class official-point budget for Codex
+// and Grok. It does not rewrite user_purpose_allowances.
+const SettingKeyOfficialPointBudget = "official_point_budget"
+
+// SettingKeyOfficialPointStudentPercent switches the student Codex and Grok
+// percent from yuan to official points. Absent means off.
+const SettingKeyOfficialPointStudentPercent = "official_point_student_percent"
+
 // SettingKeyAccountSchedulingThresholds —— 系统全局：按平台自动停调阈值（JSON map）。
 // 值为 map[platform]percent，1..100；100 = 禁用该平台自动停调。
 const SettingKeyAccountSchedulingThresholds = "account_scheduling_thresholds"

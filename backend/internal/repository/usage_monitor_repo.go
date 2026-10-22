@@ -47,7 +47,8 @@ func (r *UsageMonitorRepository) ListOfficialParents(ctx context.Context) ([]ser
 		       a.extra#>>'{grok_billing_snapshot,plan}',
 		       a.extra#>>'{grok_billing_snapshot,weekly_updated_at}',
 		       a.extra#>>'{grok_billing_snapshot,updated_at}',
-		       a.extra#>>'{grok_billing_snapshot,fetched_at}'
+		       a.extra#>>'{grok_billing_snapshot,fetched_at}',
+		       a.schedulable
 		FROM accounts a
 		WHERE a.deleted_at IS NULL
 		  AND a.parent_account_id IS NULL
@@ -69,6 +70,7 @@ func (r *UsageMonitorRepository) ListOfficialParents(ctx context.Context) ([]ser
 			&codexUsed, &codexReset, &codexUpdated, &codexMinutes, &codexAfter,
 			&grokPercent, &grokStart, &grokEnd, &grokType, &grokPlan,
 			&grokWeekly, &grokUpdated, &grokFetched,
+			&row.Schedulable,
 		); err != nil {
 			return nil, err
 		}
@@ -160,15 +162,21 @@ func (r *UsageMonitorRepository) ListLatestStamps(ctx context.Context, accountID
 	return out, rows.Err()
 }
 
-// The 5-minute ball is inclusive and matches officialResetMoved: a reset flag
-// inside the ball still counts, and null stamps are not coalesced onto a parent.
+// The 5-minute ball is inclusive and matches officialResetMoved. A log already
+// tagged with this parent but missing official_reset_at still counts when its
+// time falls inside the official period. Those rows are this account's usage;
+// they are not borrowed from another parent.
 const usageMonitorWindowMatch = `
 ul.official_account_id = w.parent_id
-AND ul.official_reset_at IS NOT NULL
-AND ul.official_reset_at >= w.reset_at - ($4::bigint * INTERVAL '1 second')
-AND ul.official_reset_at <= w.reset_at + ($4::bigint * INTERVAL '1 second')
 AND ul.created_at >= w.window_start
-AND ul.created_at < w.reset_at`
+AND ul.created_at < w.reset_at
+AND (
+  ul.official_reset_at IS NULL
+  OR (
+    ul.official_reset_at >= w.reset_at - ($4::bigint * INTERVAL '1 second')
+    AND ul.official_reset_at <= w.reset_at + ($4::bigint * INTERVAL '1 second')
+  )
+)`
 
 var usageMonitorWindowSQL = `
 WITH windows AS (
@@ -285,6 +293,52 @@ func (r *UsageMonitorRepository) ListWindowUsage(ctx context.Context, windows []
 		out = append(out, *byParent[id])
 	}
 	return out, nil
+}
+
+const officialWindowCostSQL = `
+WITH windows AS (
+    SELECT *
+    FROM unnest($1::bigint[], $2::timestamptz[], $3::timestamptz[])
+        AS w(parent_id, reset_at, window_start)
+)
+SELECT w.parent_id,
+       COALESCE(SUM(ul.actual_cost), 0)::text AS total_cost,
+       COALESCE(SUM(ul.actual_cost) FILTER (WHERE ul.user_id = $5), 0)::text AS user_cost
+FROM windows w
+LEFT JOIN usage_logs ul ON ` + usageMonitorWindowMatch + `
+GROUP BY w.parent_id`
+
+// SumOfficialWindowCost is one indexed aggregate per parent. The user id is
+// only inside the aggregate, so the caller does not scan once per user.
+func (r *UsageMonitorRepository) SumOfficialWindowCost(ctx context.Context, userID int64, windows []service.UsageMonitorWindowQuery, resetGap time.Duration) ([]service.OfficialWindowCost, error) {
+	if err := r.ready(); err != nil {
+		return nil, err
+	}
+	if len(windows) == 0 {
+		return nil, nil
+	}
+	ids := make([]int64, len(windows))
+	resets := make([]time.Time, len(windows))
+	starts := make([]time.Time, len(windows))
+	for i, window := range windows {
+		ids[i] = window.ParentID
+		resets[i] = window.Reset
+		starts[i] = window.Start
+	}
+	rows, err := r.db.QueryContext(ctx, officialWindowCostSQL, pq.Array(ids), pq.Array(resets), pq.Array(starts), int64(resetGap/time.Second), userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]service.OfficialWindowCost, 0, len(windows))
+	for rows.Next() {
+		var row service.OfficialWindowCost
+		if err := rows.Scan(&row.ParentID, &row.TotalCost, &row.UserCost); err != nil {
+			return nil, err
+		}
+		out = append(out, row)
+	}
+	return out, rows.Err()
 }
 
 func (r *UsageMonitorRepository) ListLiveUsers(ctx context.Context) ([]service.UsageMonitorUserRow, error) {

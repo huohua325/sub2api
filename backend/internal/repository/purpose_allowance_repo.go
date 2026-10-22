@@ -76,8 +76,6 @@ func (r *purposeAllowanceRepository) ApplyPolicy(ctx context.Context, policy ser
 		purpose string
 		rule    service.PurposeAllowanceRule
 	}{
-		{service.PurposeOpenAI, normalized.OpenAI},
-		{service.PurposeGrok, normalized.Grok},
 		{service.PurposeExperiment, normalized.Experiment},
 	} {
 		if _, err := r.db.ExecContext(ctx, `

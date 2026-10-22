@@ -1,104 +1,85 @@
 <template>
   <section class="space-y-4">
     <h2 class="text-base font-semibold text-gray-900 dark:text-white">{{ t('admin.usageMonitor.parentsTitle') }}</h2>
-    <p v-if="parents.length === 0" class="text-sm text-gray-500 dark:text-gray-400">{{ t('admin.usageMonitor.noParents') }}</p>
+    <p v-if="parents.length === 0" class="card px-5 py-8 text-sm text-gray-500 dark:text-gray-400">{{ t('admin.usageMonitor.noParents') }}</p>
     <article
       v-for="parent in parents"
+      :id="`usage-monitor-parent-${parent.account_id}`"
       :key="parent.account_id"
-      class="card space-y-4 p-6"
+      class="card overflow-hidden"
       :data-testid="`parent-${parent.account_id}`"
     >
-      <div>
-        <h3 class="text-base font-semibold text-gray-900 dark:text-white">{{ parent.name }}</h3>
-        <p class="text-sm text-gray-500 dark:text-gray-400">{{ parent.platform }} · {{ purposeLabel(parent.purpose) }}</p>
-      </div>
-      <p class="max-w-4xl text-sm text-gray-500 dark:text-gray-400" data-testid="share-disclaimer">{{ t('admin.usageMonitor.disclaimer') }}</p>
-      <p class="max-w-4xl text-sm text-gray-500 dark:text-gray-400">{{ t('admin.usageMonitor.rateFootnote') }}</p>
-
-      <dl class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div>
-          <dt class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('admin.usageMonitor.officialUsed') }}</dt>
-          <dd class="mt-1 text-lg font-semibold text-gray-900 dark:text-white" data-testid="official-used">{{ parent.official_used_percent ?? '' }}</dd>
-          <p v-if="parent.official_used_percent == null" class="mt-1 text-sm text-gray-500 dark:text-gray-400" data-testid="no-official-reading">
+      <div class="flex items-start justify-between gap-4 border-b border-gray-100 px-5 py-4 dark:border-dark-700">
+        <div class="min-w-0">
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ parent.name }}</h3>
+          <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            {{ purposeLabel(parent.purpose) }}
+            <template v-if="parent.inactive"> · {{ t('admin.usageMonitor.stoppedScheduling') }}</template>
+          </p>
+          <p class="mt-3 text-sm text-gray-500 dark:text-gray-400">{{ t('admin.usageMonitor.rechargeTitle') }}</p>
+          <p class="mt-1 text-2xl font-semibold tabular-nums text-gray-900 dark:text-white" :data-testid="`recharge-card-${parent.account_id}`">
+            {{ countdownText(parent.official_reset_at) }}
+          </p>
+          <p v-if="parent.official_reset_at" class="mt-1 text-sm tabular-nums text-gray-500 dark:text-gray-400">
+            {{ formatDateTime(parent.official_reset_at) }}
+          </p>
+        </div>
+        <div class="text-right">
+          <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('admin.usageMonitor.officialUsed') }}</p>
+          <p class="text-4xl font-semibold tabular-nums leading-none text-gray-900 dark:text-white" :class="isChanged(parent.account_id) ? 'text-amber-700 dark:text-amber-300' : ''">
+            <span data-testid="official-used">{{ parent.official_used_percent ?? '' }}</span><span v-if="parent.official_used_percent != null">%</span>
+          </p>
+          <p v-if="parent.official_remaining_percent != null" class="mt-2 text-sm tabular-nums text-gray-500 dark:text-gray-400">
+            {{ t('admin.usageMonitor.officialRemaining') }} {{ parent.official_remaining_percent }}%
+          </p>
+          <p v-if="parent.official_used_percent == null" class="mt-2 text-sm text-gray-500 dark:text-gray-400" data-testid="no-official-reading">
             {{ t('admin.usageMonitor.noReading') }}
           </p>
         </div>
-        <div>
-          <dt class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('admin.usageMonitor.resetAt') }}</dt>
-          <dd class="mt-1 text-sm text-gray-900 dark:text-white" :title="parent.official_reset_at || undefined">{{ formatDateTime(parent.official_reset_at) || parent.official_reset_at || '' }}</dd>
+      </div>
+
+      <div class="space-y-4 px-5 py-4">
+        <div v-if="parent.official_used_percent != null" class="h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-dark-700">
+          <div class="h-full rounded-full bg-primary-500" :style="{ width: barWidth(parent.official_used_percent) }"></div>
         </div>
-        <div>
-          <dt class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('admin.usageMonitor.observedAt') }}</dt>
-          <dd class="mt-1 text-sm" :class="isStale(parent.official_observed_at) ? 'text-amber-600 dark:text-amber-400' : 'text-gray-900 dark:text-white'" :title="parent.official_observed_at || undefined">
-            {{ formatDateTime(parent.official_observed_at) || parent.official_observed_at || '' }}
-            <span v-if="ageMinutes(parent.official_observed_at) !== null">{{ t('admin.usageMonitor.observedAge', { minutes: ageMinutes(parent.official_observed_at) ?? 0 }) }}</span>
-          </dd>
-          <p v-if="isStale(parent.official_observed_at)" class="mt-1 text-sm text-amber-600 dark:text-amber-400" data-testid="stale-reading">
-            {{ t('admin.usageMonitor.staleReading') }}
+
+        <div class="space-y-1 text-sm text-gray-600 dark:text-gray-300">
+          <p class="flex flex-wrap gap-x-6 gap-y-1">
+            <span><span data-testid="class-gateway-cost">{{ t('admin.usageMonitor.classGatewayYuan') }} {{ parent.gateway_actual_cost }}</span> {{ t('admin.usageMonitor.yuanUnit') }}</span>
+            <span v-if="parent.point_budget">{{ t('admin.usageMonitor.personCap') }} {{ parent.point_budget }} {{ t('admin.usageMonitor.pointUnit') }}</span>
+          </p>
+          <p v-if="parent.official_observed_at" class="text-gray-600 dark:text-gray-300">
+            {{ t('admin.usageMonitor.observedAt') }} {{ formatDateTime(parent.official_observed_at) }}
           </p>
         </div>
-        <div>
-          <dt class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('admin.usageMonitor.classGatewayYuan') }}</dt>
-          <dd class="mt-1 text-sm text-gray-900 dark:text-white" data-testid="class-gateway-cost">{{ parent.gateway_actual_cost }}</dd>
-          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('admin.usageMonitor.walletRemaining') }} {{ parent.wallet_remaining_yuan }}</p>
+
+        <div class="divide-y divide-gray-100 dark:divide-dark-700">
+          <div v-for="row in parent.users" :key="row.user_id" class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 py-3">
+            <div class="min-w-0">
+              <p class="break-all text-sm font-medium text-gray-900 dark:text-white">{{ emailFor(row.user_id) }}</p>
+              <p v-if="nameFor(row.user_id)" class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">{{ nameFor(row.user_id) }}</p>
+              <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-100 dark:bg-dark-700">
+                <div class="h-full rounded-full bg-primary-400" :style="{ width: shareWidth(parent.official_used_percent, row.observed_share) }"></div>
+              </div>
+            </div>
+            <div class="text-right">
+              <p class="text-lg font-semibold tabular-nums text-gray-900 dark:text-white">
+                <span :data-testid="`observed-share-${row.user_id}`">{{ row.observed_share ?? '' }}</span><span v-if="row.observed_share">%</span>
+              </p>
+              <p class="text-sm tabular-nums text-gray-500 dark:text-gray-400">
+                <span v-if="isZeroShare(row.observed_share)" :data-testid="`observed-cost-${row.user_id}`">{{ row.gateway_actual_cost }}</span>
+                <span v-else>{{ row.gateway_actual_cost }}</span>
+                <span v-if="row.gateway_actual_cost"> {{ t('admin.usageMonitor.yuanUnit') }}</span>
+              </p>
+            </div>
+          </div>
+          <div v-if="parent.hidden_user_actual_cost && !/^0+(?:\.0+)?$/.test(parent.hidden_user_actual_cost.trim())" class="flex items-center justify-between gap-4 py-3 text-sm">
+            <span class="text-gray-500 dark:text-gray-400">{{ t('admin.usageMonitor.hiddenUsers') }}</span>
+            <span class="tabular-nums text-gray-900 dark:text-white" data-testid="hidden-cost">{{ parent.hidden_user_actual_cost }}</span>
+          </div>
         </div>
-      </dl>
 
-      <p v-if="parent.snapshot_note" class="text-sm text-gray-500 dark:text-gray-400">{{ parent.snapshot_note }}</p>
-
-      <div class="overflow-x-auto">
-        <table class="min-w-full text-sm">
-          <thead>
-            <tr class="border-b border-gray-200 text-left text-xs font-medium text-gray-500 dark:border-dark-700 dark:text-gray-400">
-              <th class="px-3 py-2">{{ t('admin.usageMonitor.user') }}</th>
-              <th class="px-3 py-2">{{ t('admin.usageMonitor.observedShare') }}</th>
-              <th class="px-3 py-2">{{ t('admin.usageMonitor.gatewayCost') }}</th>
-              <th v-if="parent.slope" class="px-3 py-2">{{ t('admin.usageMonitor.slopeShare') }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="row in parent.users" :key="row.user_id" class="border-b border-gray-100 dark:border-dark-700">
-              <td class="px-3 py-2 text-gray-900 dark:text-white">{{ labelFor(row.user_id) }}</td>
-              <td class="px-3 py-2 text-gray-900 dark:text-white" :data-testid="`observed-share-${row.user_id}`">
-                {{ row.observed_share ?? '' }}
-                <span v-if="row.observed_share === '0.0000'" :data-testid="`observed-cost-${row.user_id}`">{{ row.gateway_actual_cost }}</span>
-              </td>
-              <td class="px-3 py-2 text-gray-900 dark:text-white">{{ row.gateway_actual_cost }}</td>
-              <td v-if="parent.slope" class="px-3 py-2 text-gray-900 dark:text-white" :data-testid="`slope-share-${row.user_id}`">
-                {{ row.slope_share ?? '' }}
-                <span v-if="row.slope_share === '0.0000'">{{ row.gateway_actual_cost }}</span>
-              </td>
-            </tr>
-            <tr v-if="parent.hidden_user_actual_cost && !/^0+(?:\.0+)?$/.test(parent.hidden_user_actual_cost.trim())">
-              <td class="px-3 py-2 text-gray-500 dark:text-gray-400">{{ t('admin.usageMonitor.hiddenUsers') }}</td>
-              <td class="px-3 py-2"></td>
-              <td class="px-3 py-2 text-gray-900 dark:text-white" data-testid="hidden-cost">{{ parent.hidden_user_actual_cost }}</td>
-              <td v-if="parent.slope"></td>
-            </tr>
-          </tbody>
-        </table>
       </div>
-
-      <div v-if="parent.slope" class="space-y-1 text-sm text-gray-700 dark:text-gray-300" data-testid="slope">
-        <p>
-          <span>{{ t('admin.usageMonitor.delta') }} </span>
-          <span data-testid="slope-delta">{{ parent.slope.delta_points }}</span>
-        </p>
-        <p>
-          <span>{{ t('admin.usageMonitor.yuanPerPoint') }} </span>
-          <span data-testid="yuan-per-point">{{ parent.slope.yuan_per_point || t('admin.usageMonitor.noCostBetween') }}</span>
-        </p>
-        <p v-if="!parent.slope.sample_ready" class="text-amber-600 dark:text-amber-400" data-testid="sample-not-ready">
-          {{ t('admin.usageMonitor.sampleNotReady') }}
-        </p>
-      </div>
-
-      <p v-if="parent.oversubscribe?.numeric" class="text-sm text-amber-700 dark:text-amber-300" data-testid="oversubscribe-numbers">
-        {{ t('admin.usageMonitor.oversubscribeNumbers', { points: parent.oversubscribe.wallet_points || '', remaining: parent.oversubscribe.remaining_official_percent || '' }) }}
-      </p>
-      <p v-else-if="parent.wallet_remaining_yuan && !/^0+(?:\.0+)?$/.test(parent.wallet_remaining_yuan.trim())" class="text-sm text-amber-700 dark:text-amber-300" data-testid="oversubscribe-text">
-        {{ t('admin.usageMonitor.oversubscribeText') }}
-      </p>
     </article>
   </section>
 </template>
@@ -107,16 +88,20 @@
 import { useI18n } from 'vue-i18n'
 import { formatDateTime } from '@/utils/format'
 import type { UsageMonitorParent, UsageMonitorUser } from '@/api/admin/usageMonitor'
+import { rechargeCountdownText } from './rechargeCountdownText'
 
 const props = withDefaults(defineProps<{
   parents: UsageMonitorParent[]
   users?: UsageMonitorUser[]
+  changedKeys?: string[]
+  now?: number
 }>(), {
   users: () => [],
+  changedKeys: () => [],
+  now: undefined,
 })
 
 const { t } = useI18n()
-const TEN_MINUTES_MS = 10 * 60 * 1000
 
 function purposeLabel(purpose: string): string {
   const key = `admin.usageMonitor.purposes.${purpose}`
@@ -124,27 +109,44 @@ function purposeLabel(purpose: string): string {
   return text === key ? purpose : text
 }
 
-function labelFor(userId: number): string {
-  const user = props.users.find((item) => item.id === userId)
-  if (!user) return `#${userId}`
-  return user.username || user.email || `#${userId}`
+function userFor(userId: number): UsageMonitorUser | undefined {
+  return props.users.find((item) => item.id === userId)
 }
 
-function observedAgeMs(value: string | null): number | null {
-  if (!value) return null
-  const time = Date.parse(value)
-  if (Number.isNaN(time)) return null
-  return Date.now() - time
+function emailFor(userId: number): string {
+  return userFor(userId)?.email || `#${userId}`
 }
 
-function ageMinutes(value: string | null): number | null {
-  const age = observedAgeMs(value)
-  if (age === null) return null
-  return Math.max(0, Math.floor(age / 60000))
+function nameFor(userId: number): string {
+  const user = userFor(userId)
+  if (!user?.username || user.username === user.email) return ''
+  return user.username
 }
 
-function isStale(value: string | null): boolean {
-  const age = observedAgeMs(value)
-  return age !== null && age > TEN_MINUTES_MS
+function isZeroShare(share: string | null): boolean {
+  return share === '0' || share === '0.0000'
+}
+
+function isChanged(accountId: number): boolean {
+  return props.changedKeys.includes(`parent:${accountId}`)
+}
+
+function countdownText(value: string | null): string {
+  return rechargeCountdownText(value, props.now ?? Date.now(), t)
+}
+
+function barWidth(value: string | null): string {
+  if (!value) return '0%'
+  const number = Number(value)
+  if (!Number.isFinite(number) || number <= 0) return '0%'
+  return `${Math.min(100, number)}%`
+}
+
+function shareWidth(total: string | null, share: string | null): string {
+  if (!total || !share) return '0%'
+  const whole = Number(total)
+  const part = Number(share)
+  if (!Number.isFinite(whole) || whole <= 0 || !Number.isFinite(part) || part <= 0) return '0%'
+  return `${Math.min(100, (part / whole) * 100)}%`
 }
 </script>

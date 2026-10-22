@@ -355,6 +355,8 @@ type SystemSettings struct {
 	DefaultPlatformQuotas map[string]*service.DefaultPlatformQuotaSetting `json:"default_platform_quotas,omitempty"`
 	// 用途额度：Codex、Grok Build、API 实验。不是平台日/周/月限额。
 	PurposeAllowancePolicy *service.PurposeAllowancePolicy `json:"purpose_allowance_policy,omitempty"`
+	OfficialPointBudget *service.OfficialPointBudget `json:"official_point_budget,omitempty"`
+	OfficialPointStudentPercent *bool `json:"official_point_student_percent,omitempty"`
 	// registration：从注册时刻起每 7 天。monday：每周一 0 点。
 	PlatformQuotaWeekMode string `json:"platform_quota_week_mode,omitempty"`
 

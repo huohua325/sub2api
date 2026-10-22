@@ -670,8 +670,7 @@ const routes: RouteRecordRaw[] = [
       requiresAuth: true,
       requiresAdmin: true,
       title: 'Usage monitor',
-      titleKey: 'admin.usageMonitor.title',
-      descriptionKey: 'admin.usageMonitor.description'
+      titleKey: 'admin.usageMonitor.title'
     }
   },
   {

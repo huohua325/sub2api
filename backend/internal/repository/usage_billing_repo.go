@@ -179,7 +179,7 @@ func (r *usageBillingRepository) applyUsageBillingEffects(ctx context.Context, t
 		}
 	}
 
-	if cmd.PurposeCost > 0 && cmd.Purpose != "" {
+	if cmd.PurposeCost > 0 && cmd.Purpose == service.PurposeExperiment {
 		if err := incrementUsageBillingPurpose(ctx, tx, cmd.UserID, cmd.Purpose, cmd.PurposeCost); err != nil {
 			return err
 		}

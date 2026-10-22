@@ -35,12 +35,14 @@ export interface UsageMonitorParent {
   percent_from: string | null
   window_start: string | null
   gateway_actual_cost: string
+  point_budget?: string | null
   snapshot_note: string | null
   slope: UsageMonitorSlope | null
   users: UsageMonitorParentUser[]
   hidden_user_actual_cost: string
   wallet_remaining_yuan: string
   oversubscribe: UsageMonitorOversubscribe
+  inactive?: boolean
 }
 
 export interface UsageMonitorRequestCount {
@@ -53,7 +55,10 @@ export interface UsageMonitorWallet {
   limit_amount: string
   stored_used_amount: string
   effective_used_amount: string
-  student_percent: number
+  student_percent: number | null
+  official_points?: string | null
+  point_budget?: string | null
+  manual_points?: string
   period: string
   window_start: string
   resets_at: string

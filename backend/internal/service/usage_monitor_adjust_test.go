@@ -18,14 +18,14 @@ func TestPurposeAdjustSetLimitDoesNotChangeAnotherUserOrSettings(t *testing.T) {
 	store := newMemoryAdjustStore()
 	store.users[12] = true
 	store.users[13] = true
-	store.wallets[walletKey(12, PurposeOpenAI)] = walletRow(12, PurposeOpenAI, "100.00000000", "1.25000000", "week", window)
-	store.wallets[walletKey(13, PurposeOpenAI)] = walletRow(13, PurposeOpenAI, "90.00000000", "2.00000000", "week", window)
-	store.settings = `{"openai":{"limit":100,"period":"week"}}`
+	store.wallets[walletKey(12, PurposeExperiment)] = walletRow(12, PurposeExperiment, "500.00000000", "1.25000000", "month", window)
+	store.wallets[walletKey(13, PurposeExperiment)] = walletRow(13, PurposeExperiment, "90.00000000", "2.00000000", "month", window)
+	store.settings = `{"experiment":{"limit":500,"period":"month"}}`
 
 	out, err := newAdjustService(store, now).Adjust(context.Background(), PurposeAdjustInput{
 		ActorUserID: 7,
 		UserID:      12,
-		Purpose:     PurposeOpenAI,
+		Purpose:     PurposeExperiment,
 		Action:      PurposeAdjustSetLimit,
 		Value:       "80",
 		Note:        "less",
@@ -36,51 +36,41 @@ func TestPurposeAdjustSetLimitDoesNotChangeAnotherUserOrSettings(t *testing.T) {
 	require.Equal(t, "80.00000000", out.Wallet.LimitAmount)
 	require.Equal(t, "1.25000000", out.Wallet.StoredUsedAmount)
 	require.Equal(t, "1.25000000", out.Wallet.EffectiveUsedAmount)
-	require.Equal(t, "week", out.Wallet.Period)
+	require.Equal(t, "month", out.Wallet.Period)
 	require.True(t, out.Wallet.WindowStart.Equal(window))
 	require.Nil(t, out.Wallet.Official)
 	require.Equal(t, PurposeAdjustOriginTyped, out.Audit.Origin)
 	require.Equal(t, PurposeAdjustFieldLimit, out.Audit.Field)
 	require.Equal(t, int64(7), out.Audit.ActorUserID)
 	require.Equal(t, int64(12), out.Audit.TargetUserID)
-	require.Equal(t, "100.00000000", out.Audit.OldValue)
+	require.Equal(t, "500.00000000", out.Audit.OldValue)
 	require.Equal(t, "80.00000000", out.Audit.NewValue)
 
-	other := store.wallets[walletKey(13, PurposeOpenAI)]
+	other := store.wallets[walletKey(13, PurposeExperiment)]
 	require.Equal(t, "90.00000000", other.LimitAmount)
 	require.Equal(t, "2.00000000", other.UsedAmount)
 	require.True(t, other.WindowStart.Equal(window))
 	require.Equal(t, 0, store.settingsWrites)
-	require.Equal(t, `{"openai":{"limit":100,"period":"week"}}`, store.settings)
+	require.Equal(t, `{"experiment":{"limit":500,"period":"month"}}`, store.settings)
 	require.NotContains(t, store.touchedTables, "settings")
 }
 
 func TestPurposeAdjustAlignWindowKeepsUsedAmount(t *testing.T) {
 	now := time.Date(2026, 10, 21, 2, 0, 0, 0, time.UTC)
 	window := now.Add(-8 * 24 * time.Hour)
-	next := time.Date(2026, 10, 20, 0, 0, 0, 0, time.UTC)
 	store := newMemoryAdjustStore()
 	store.users[12] = true
 	store.wallets[walletKey(12, PurposeOpenAI)] = walletRow(12, PurposeOpenAI, "100.00000000", "4.25000000", "week", window)
 
-	out, err := newAdjustService(store, now).Adjust(context.Background(), PurposeAdjustInput{
+	_, err := newAdjustService(store, now).Adjust(context.Background(), PurposeAdjustInput{
 		ActorUserID: 7,
 		UserID:      12,
 		Purpose:     PurposeOpenAI,
 		Action:      PurposeAdjustAlignWindow,
-		Value:       next.Format(time.RFC3339),
+		Value:       now.Format(time.RFC3339),
 		Confirm:     true,
 	})
-	require.NoError(t, err)
-	require.True(t, out.Changed)
-	require.Equal(t, "4.25000000", out.Wallet.StoredUsedAmount)
-	require.NotEqual(t, "0", out.Wallet.StoredUsedAmount)
-	require.Equal(t, "100.00000000", out.Wallet.LimitAmount)
-	require.True(t, out.Wallet.WindowStart.Equal(next))
-	require.Equal(t, PurposeAdjustOriginAlign, out.Audit.Origin)
-	require.Equal(t, PurposeAdjustFieldWindow, out.Audit.Field)
-	require.Equal(t, formatAdjustmentWindow(window), out.Audit.OldValue)
-	require.Equal(t, formatAdjustmentWindow(next), out.Audit.NewValue)
+	require.Equal(t, "PURPOSE_YUAN_RETIRED", infraerrors.Reason(err))
 	require.Equal(t, "4.25000000", store.wallets[walletKey(12, PurposeOpenAI)].UsedAmount)
 }
 
@@ -99,6 +89,16 @@ func TestPurposeAdjustRebuildDoesNotDeleteUsageLogs(t *testing.T) {
 	}
 	before := append([]memoryUsageLog(nil), store.logs...)
 
+	_, err := newAdjustService(store, now).Adjust(context.Background(), PurposeAdjustInput{
+		ActorUserID: 7,
+		UserID:      12,
+		Purpose:     PurposeGrok,
+		Action:      PurposeAdjustRebuildUsed,
+		Confirm:     true,
+	})
+	require.Equal(t, "PURPOSE_YUAN_RETIRED", infraerrors.Reason(err))
+	require.Equal(t, before, store.logs)
+	return
 	out, err := newAdjustService(store, now).Adjust(context.Background(), PurposeAdjustInput{
 		ActorUserID: 7,
 		UserID:      12,
@@ -147,6 +147,16 @@ func TestPurposeAdjustExpiredSetUsed(t *testing.T) {
 		Value:       "1",
 		Confirm:     true,
 	})
+	require.Equal(t, "PURPOSE_YUAN_RETIRED", infraerrors.Reason(err))
+	return
+	_, err = newAdjustService(store, now).Adjust(context.Background(), PurposeAdjustInput{
+		ActorUserID: 7,
+		UserID:      12,
+		Purpose:     PurposeOpenAI,
+		Action:      PurposeAdjustSetUsed,
+		Value:       "1",
+		Confirm:     true,
+	})
 	require.Equal(t, "PURPOSE_WINDOW_EXPIRED", infraerrors.Reason(err))
 	require.Equal(t, 409, infraerrors.Code(err))
 	require.Equal(t, "3.00000000", store.wallets[walletKey(12, PurposeOpenAI)].UsedAmount)
@@ -167,7 +177,7 @@ func TestPurposeAdjustValueRange(t *testing.T) {
 	now := time.Date(2026, 10, 21, 2, 0, 0, 0, time.UTC)
 	store := newMemoryAdjustStore()
 	svc := newAdjustService(store, now)
-	base := PurposeAdjustInput{ActorUserID: 7, UserID: 12, Purpose: PurposeOpenAI, Confirm: true}
+	base := PurposeAdjustInput{ActorUserID: 7, UserID: 12, Purpose: PurposeExperiment, Confirm: true}
 
 	_, err := parseAdjustmentAmount("999999999999.99999999")
 	require.NoError(t, err)
@@ -187,7 +197,7 @@ func TestPurposeAdjustValueRange(t *testing.T) {
 	require.Equal(t, "INVALID_ADJUSTMENT_VALUE", infraerrors.Reason(err))
 
 	note := base
-	note.Action = PurposeAdjustSetUsed
+	note.Action = PurposeAdjustSetLimit
 	note.Value = "1"
 	note.Note = strings.Repeat("注", 501)
 	_, err = svc.Adjust(context.Background(), note)
@@ -197,23 +207,16 @@ func TestPurposeAdjustValueRange(t *testing.T) {
 	early.Action = PurposeAdjustAlignWindow
 	early.Value = "2019-12-31T23:59:59Z"
 	_, err = svc.Adjust(context.Background(), early)
-	require.Equal(t, "INVALID_ADJUSTMENT_VALUE", infraerrors.Reason(err))
+	require.Equal(t, "PURPOSE_YUAN_RETIRED", infraerrors.Reason(err))
 
 	late := base
-	late.Action = PurposeAdjustAlignWindow
-	late.Value = now.Add(purposeAdjustWindowDays*24*time.Hour + time.Second).Format(time.RFC3339)
+	late.Action = PurposeAdjustSetUsed
+	late.Value = "1"
 	_, err = svc.Adjust(context.Background(), late)
-	require.Equal(t, "INVALID_ADJUSTMENT_VALUE", infraerrors.Reason(err))
+	require.Equal(t, "PURPOSE_YUAN_RETIRED", infraerrors.Reason(err))
 
-	store.users[12] = true
-	store.wallets[walletKey(12, PurposeOpenAI)] = walletRow(12, PurposeOpenAI, "100.00000000", "1.00000000", "week", now.Add(-time.Hour))
-	edge := base
-	edge.Action = PurposeAdjustAlignWindow
-	edge.Value = purposeAdjustWindowMin.Format(time.RFC3339)
-	out, err := svc.Adjust(context.Background(), edge)
-	require.NoError(t, err)
-	require.True(t, out.Wallet.WindowStart.Equal(purposeAdjustWindowMin))
-	require.Equal(t, "1.00000000", out.Wallet.StoredUsedAmount)
+	_, err = svc.Adjust(context.Background(), base)
+	require.Equal(t, "PURPOSE_YUAN_RETIRED", infraerrors.Reason(err))
 }
 
 func TestPurposeAdjustEqualAmountSkipsAudit(t *testing.T) {
@@ -222,14 +225,14 @@ func TestPurposeAdjustEqualAmountSkipsAudit(t *testing.T) {
 	store := newMemoryAdjustStore()
 	store.users[12] = true
 	store.users[13] = true
-	store.wallets[walletKey(12, PurposeOpenAI)] = walletRow(12, PurposeOpenAI, "100.00000000", "1.25000000", "week", window)
-	store.wallets[walletKey(13, PurposeOpenAI)] = walletRow(13, PurposeOpenAI, "90.00000000", "2.00000000", "week", window)
+	store.wallets[walletKey(12, PurposeExperiment)] = walletRow(12, PurposeExperiment, "100.00000000", "1.25000000", "month", window)
+	store.wallets[walletKey(13, PurposeExperiment)] = walletRow(13, PurposeExperiment, "90.00000000", "2.00000000", "month", window)
 	store.settings = "policy"
 
 	out, err := newAdjustService(store, now).Adjust(context.Background(), PurposeAdjustInput{
 		ActorUserID: 7,
 		UserID:      12,
-		Purpose:     PurposeOpenAI,
+		Purpose:     PurposeExperiment,
 		Action:      PurposeAdjustSetLimit,
 		Value:       "100.000000004",
 		Confirm:     true,
@@ -238,7 +241,7 @@ func TestPurposeAdjustEqualAmountSkipsAudit(t *testing.T) {
 	require.False(t, out.Changed)
 	require.Nil(t, out.Audit)
 	require.Equal(t, "100.00000000", out.Wallet.LimitAmount)
-	require.Equal(t, "90.00000000", store.wallets[walletKey(13, PurposeOpenAI)].LimitAmount)
+	require.Equal(t, "90.00000000", store.wallets[walletKey(13, PurposeExperiment)].LimitAmount)
 	require.Equal(t, "policy", store.settings)
 	require.Empty(t, store.audits)
 
@@ -278,7 +281,7 @@ func TestPurposeAdjustMissingUser(t *testing.T) {
 	_, err := newAdjustService(store, time.Date(2026, 10, 21, 0, 0, 0, 0, time.UTC)).Adjust(context.Background(), PurposeAdjustInput{
 		ActorUserID: 7,
 		UserID:      99,
-		Purpose:     PurposeOpenAI,
+		Purpose:     PurposeExperiment,
 		Action:      PurposeAdjustSetLimit,
 		Value:       "80",
 		Confirm:     true,

@@ -4133,46 +4133,66 @@
 
               <div class="rounded-xl border border-sky-200 bg-sky-50/60 p-4 dark:border-sky-900 dark:bg-sky-950/20">
                 <label class="font-medium text-gray-900 dark:text-white">
-                  {{ t("admin.settings.defaults.purposeAllowances") }}
+                  {{ t("admin.settings.defaults.studentQuota") }}
                 </label>
                 <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
-                  {{ t("admin.settings.defaults.purposeAllowancesHint") }}
-                </p>
-                <p class="mt-1 text-sm text-sky-800 dark:text-sky-200">
-                  {{ t("admin.settings.defaults.purposeAllowancesDistinct") }}
+                  {{ t("admin.settings.defaults.studentQuotaHint") }}
                 </p>
                 <div class="mt-4 overflow-x-auto">
                   <table class="min-w-full text-sm">
-                    <thead>
-                      <tr class="text-left text-xs text-gray-500 dark:text-gray-400">
-                        <th class="pb-2 pr-4 font-medium">{{ t("admin.groups.usageKind.label") }}</th>
-                        <th class="pb-2 pr-4 font-medium">{{ t("admin.settings.defaults.purposeAmount") }}</th>
-                        <th class="pb-2 font-medium">{{ t("admin.settings.defaults.purposeRefresh") }}</th>
-                      </tr>
-                    </thead>
                     <tbody>
-                      <tr v-for="row in purposeAllowanceRows" :key="row.key">
-                        <td class="py-1 pr-4 text-gray-800 dark:text-gray-100">{{ row.label }}</td>
-                        <td class="py-1 pr-4">
-                          <input
-                            v-model.number="form.purpose_allowance_policy[row.key].limit"
-                            type="number"
-                            min="0"
-                            step="1"
-                            class="input h-8 w-28 text-sm"
-                          />
+                      <tr>
+                        <td class="py-2 pr-4 text-gray-800 dark:text-gray-100">Codex</td>
+                        <td class="py-2 pr-3">
+                          <input v-model="officialPointBudget.openai" class="input h-8 w-28 text-sm" />
                         </td>
-                        <td class="py-1">
-                          <Select
-                            v-model="form.purpose_allowance_policy[row.key].period"
-                            :options="purposeAllowancePeriodOptions"
-                          />
+                        <td class="py-2 pr-4 text-gray-500 dark:text-gray-400">{{ t("admin.settings.defaults.pointUnit") }}</td>
+                        <td class="py-2 text-gray-600 dark:text-gray-300">{{ t("admin.settings.defaults.codexPointHint") }}</td>
+                      </tr>
+                      <tr>
+                        <td class="py-2 pr-4 text-gray-800 dark:text-gray-100">Grok</td>
+                        <td class="py-2 pr-3">
+                          <input v-model="officialPointBudget.grok" class="input h-8 w-28 text-sm" />
                         </td>
+                        <td class="py-2 pr-4 text-gray-500 dark:text-gray-400">{{ t("admin.settings.defaults.pointUnit") }}</td>
+                        <td class="py-2 text-gray-600 dark:text-gray-300">{{ t("admin.settings.defaults.grokPointHint") }}</td>
                       </tr>
                     </tbody>
                   </table>
                 </div>
+                <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
+                  {{ t("admin.settings.defaults.officialPointBudgetHint") }}
+                </p>
+                <button type="button" class="btn btn-primary mt-3" :disabled="officialPointSaving" @click="saveOfficialPointBudget">
+                  {{ t("admin.settings.defaults.officialPointSave") }}
+                </button>
               </div>
+
+              <div class="mt-4 rounded-xl border border-gray-200 p-4 dark:border-dark-700">
+                <label class="font-medium text-gray-900 dark:text-white">
+                  {{ t("admin.settings.defaults.experimentQuota") }}
+                </label>
+                <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
+                  {{ t("admin.settings.defaults.experimentQuotaHint") }}
+                </p>
+                <div class="mt-3 flex flex-wrap items-center gap-3">
+                  <span class="text-sm text-gray-800 dark:text-gray-100">{{ t("dashboard.purpose.experiment") }}</span>
+                  <input
+                    v-model.number="form.purpose_allowance_policy.experiment.limit"
+                    type="number"
+                    min="0"
+                    step="1"
+                    class="input h-8 w-28 text-sm"
+                  />
+                  <span class="text-sm text-gray-500 dark:text-gray-400">{{ t("admin.settings.defaults.purposeAmount") }}</span>
+                  <Select
+                    v-model="form.purpose_allowance_policy.experiment.period"
+                    :options="purposeAllowancePeriodOptions"
+                  />
+                </div>
+              </div>
+
+
 
 
             </div>
@@ -9905,16 +9925,34 @@ function normalizePurposeAllowancePolicy(value: PurposeAllowancePolicy | undefin
   }
 }
 
-const purposeAllowanceRows = computed(() => [
-  { key: 'openai' as const, label: t('dashboard.purpose.openai') },
-  { key: 'grok' as const, label: t('dashboard.purpose.grok') },
-  { key: 'experiment' as const, label: t('dashboard.purpose.experiment') },
-])
-
 const purposeAllowancePeriodOptions = computed<SelectOption[]>(() => [
   { value: 'week', label: t('admin.settings.defaults.purposeWeek') },
   { value: 'month', label: t('admin.settings.defaults.purposeMonth') },
 ])
+
+const officialPointBudget = reactive({ openai: '50', grok: '80' })
+const officialPointStudentPercent = ref(false)
+const officialPointSaving = ref(false)
+
+async function saveOfficialPointBudget() {
+  officialPointSaving.value = true
+  try {
+    const updated = await adminAPI.settings.updateSettings({
+      official_point_budget: {
+        openai: officialPointBudget.openai.trim(),
+        grok: officialPointBudget.grok.trim(),
+      },
+      official_point_student_percent: officialPointStudentPercent.value,
+    })
+    if (updated.official_point_budget) {
+      officialPointBudget.openai = updated.official_point_budget.openai
+      officialPointBudget.grok = updated.official_point_budget.grok
+    }
+    officialPointStudentPercent.value = !!updated.official_point_student_percent
+  } finally {
+    officialPointSaving.value = false
+  }
+}
 
 const form = reactive<SettingsForm>({
   registration_enabled: true,
@@ -11329,6 +11367,9 @@ async function loadSettings() {
     form.payment_recharge_bonus_notice = settings.payment_recharge_bonus_notice || "";
     form.default_platform_quotas = normalizePlatformQuotasMap(settings.default_platform_quotas);
     form.purpose_allowance_policy = normalizePurposeAllowancePolicy(settings.purpose_allowance_policy);
+    officialPointBudget.openai = settings.official_point_budget?.openai || '50'
+    officialPointBudget.grok = settings.official_point_budget?.grok || '80'
+    officialPointStudentPercent.value = !!settings.official_point_student_percent
     form.platform_quota_week_mode = settings.platform_quota_week_mode === 'monday' ? 'monday' : 'registration';
     form.account_scheduling_thresholds = normalizeAccountSchedulingThresholdsMap(
       settings.account_scheduling_thresholds,

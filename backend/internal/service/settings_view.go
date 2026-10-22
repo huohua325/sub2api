@@ -320,6 +320,11 @@ type SystemSettings struct {
 	// 用途额度。nil 表示这次保存不修改。和平台日/周/月限额不是同一套。
 	PurposeAllowancePolicy *PurposeAllowancePolicy `json:"purpose_allowance_policy,omitempty"`
 
+	// 每人官方点数上限。nil 表示这次保存不修改，也不会改写元钱包。
+	OfficialPointBudget *OfficialPointBudget `json:"official_point_budget,omitempty"`
+	// 学员 Codex / Grok 百分比改用官方点数。nil 表示不修改。
+	OfficialPointStudentPercent *bool `json:"official_point_student_percent,omitempty"`
+
 	// 系统全局账号自动停调阈值（key = platform，100 = disabled）
 	AccountSchedulingThresholds map[string]int `json:"account_scheduling_thresholds"`
 
