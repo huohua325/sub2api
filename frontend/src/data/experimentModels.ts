@@ -1,5 +1,5 @@
 export type ModelFamily = 'gpt' | 'grok' | 'claude' | 'gemini' | 'qwen' | 'kimi' | 'deepseek' | 'glm'
-export type ModelUse = 'chat' | 'coding'
+export type ModelUse = 'chat'
 export type ModelNote = 'peak' | 'long2' | 'long3' | 'long5' | 'long55'
 
 export interface ExperimentModel {
@@ -13,7 +13,6 @@ export interface ExperimentModel {
 }
 
 export const modelFamilies: ModelFamily[] = ['gpt', 'grok', 'claude', 'gemini', 'qwen', 'kimi', 'deepseek', 'glm']
-export const modelUses: ModelUse[] = ['chat', 'coding']
 
 export const experimentModels: ExperimentModel[] = [
   { id: 'gpt-3.5-turbo', family: 'gpt', use: 'chat', input: 0.3, output: 0.6, cache: 0 },
@@ -43,7 +42,6 @@ export const experimentModels: ExperimentModel[] = [
   { id: 'gpt-5.2-2025-12-11', family: 'gpt', use: 'chat', input: 1.05, output: 8.4, cache: 0.105 },
   { id: 'gpt-5.2-chat-2025-12-11', family: 'gpt', use: 'chat', input: 1.05, output: 8.4, cache: 0 },
   { id: 'gpt-5.2-chat-latest', family: 'gpt', use: 'chat', input: 1.05, output: 8.4, cache: 0 },
-  { id: 'gpt-5.3-codex', family: 'gpt', use: 'coding', input: 1.05, output: 8.4, cache: 0.105 },
   { id: 'gpt-5.4-mini', family: 'gpt', use: 'chat', input: 0.45, output: 2.7, cache: 0 },
   { id: 'gpt-5.4-mini-2026-03-17', family: 'gpt', use: 'chat', input: 0.12, output: 0.72, cache: 0 },
   { id: 'gpt-5.4-nano', family: 'gpt', use: 'chat', input: 0.12, output: 0.75, cache: 0 },

@@ -19,6 +19,14 @@
               <template v-else>{{ meter.percent }}%</template>
             </template>
             <template v-else>{{ formatAmount(meter.used) }} / {{ formatAmount(meter.limit) }}</template>
+            <span
+              v-if="meter.quietAmount"
+              class="ml-2 align-middle text-xs font-normal tabular-nums text-gray-400 dark:text-gray-500"
+              :data-testid="`${meter.id}-quiet-amount`"
+            >
+              {{ meter.quietAmount }}
+              <span class="ml-0.5">{{ t('dashboard.purpose.yuan') }}</span>
+            </span>
           </p>
           <p class="text-xs text-gray-500 dark:text-gray-400">
             {{ meter.asPoints || hideMoney ? (meter.percent >= 100 ? t('dashboard.codexQuota.exhausted') : t('dashboard.purpose.used')) : t('dashboard.purpose.yuan') }}
@@ -476,6 +484,9 @@ const purposeMeters = computed(() => {
       percent,
       asPoints,
       missing,
+      quietAmount: props.hideMoney && id === 'experiment' && row?.used_amount != null && row?.limit_amount != null
+        ? `${formatAmount(used)} / ${formatAmount(limit)}`
+        : '',
       resetsAt: missing ? undefined : row?.resets_at,
       ...style[id],
     }

@@ -43,22 +43,6 @@
         </button>
       </div>
 
-      <div class="mt-2 flex flex-wrap gap-2" :aria-label="t('models.useLabel')">
-        <button
-          v-for="item in useFilters"
-          :key="item.id"
-          type="button"
-          class="rounded-lg px-3 py-1.5 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40"
-          :class="use === item.id
-            ? 'bg-gray-900 font-medium text-white dark:bg-white dark:text-gray-900'
-            : 'text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-dark-700'"
-          :aria-pressed="use === item.id"
-          @click="use = item.id"
-        >
-          {{ item.label }}
-        </button>
-      </div>
-
       <p
         v-if="visible.length === 0"
         data-testid="model-empty"
@@ -122,9 +106,7 @@ import { useClipboard } from '@/composables/useClipboard'
 import {
   experimentModels,
   modelFamilies,
-  modelUses,
   type ModelFamily,
-  type ModelUse,
 } from '@/data/experimentModels'
 
 const { t } = useI18n()
@@ -132,7 +114,6 @@ const { copyToClipboard } = useClipboard()
 
 const query = ref('')
 const family = ref<'all' | ModelFamily>('all')
-const use = ref<'all' | ModelUse>('all')
 const copiedId = ref('')
 let copiedTimer: ReturnType<typeof setTimeout> | undefined
 
@@ -141,16 +122,10 @@ const familyFilters = computed(() => [
   ...modelFamilies.map((id) => ({ id, label: t(`models.families.${id}`) })),
 ])
 
-const useFilters = computed(() => [
-  { id: 'all' as const, label: t('models.uses.all') },
-  ...modelUses.map((id) => ({ id, label: t(`models.uses.${id}`) })),
-])
-
 const visible = computed(() => {
   const needle = query.value.trim().toLowerCase()
   return experimentModels.filter((model) => {
     if (family.value !== 'all' && model.family !== family.value) return false
-    if (use.value !== 'all' && model.use !== use.value) return false
     if (needle && !model.id.toLowerCase().includes(needle)) return false
     return true
   })

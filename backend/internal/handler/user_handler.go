@@ -107,7 +107,9 @@ func (h *UserHandler) GetMyPlatformQuotas(c *gin.Context) {
 		for _, row := range rows {
 			used, resetsAt := service.EffectivePurposeUsage(row, nowUsage)
 			item := map[string]any{"purpose": row.Purpose}
-			if showYuan || cards == nil {
+			// Experiment yuan is shown to every role. Codex and Grok yuan stays
+			// in storage and is not the number students see.
+			if showYuan || cards == nil || row.Purpose == service.PurposeExperiment {
 				item["limit_amount"] = row.LimitAmount
 				item["used_amount"] = used
 			}

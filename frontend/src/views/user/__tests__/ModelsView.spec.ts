@@ -23,7 +23,6 @@ vi.mock('vue-i18n', () => ({
         'models.copy': '复制',
         'models.copied': '已复制',
         'models.familyLabel': '家族',
-        'models.useLabel': '用途',
         'models.footnote': '密钥要建在对应分组',
         'models.input': '输入',
         'models.output': '输出',
@@ -38,9 +37,6 @@ vi.mock('vue-i18n', () => ({
         'models.families.kimi': 'Kimi',
         'models.families.deepseek': 'DeepSeek',
         'models.families.glm': 'GLM',
-        'models.uses.all': '全部用途',
-        'models.uses.chat': '对话',
-        'models.uses.coding': '编程',
         'models.notes.peak': '高峰两倍',
         'models.notes.long2': '20万两倍',
         'models.notes.long3': '25.6万三倍',
@@ -67,6 +63,7 @@ describe('ModelsView', () => {
     expect(ids).toContain('gpt-5-nano')
     expect(ids).toContain('claude-haiku-4-5-20251001')
     expect(ids).not.toContain('gpt-6.1-sol')
+    expect(ids).not.toContain('gpt-5.3-codex')
     expect(ids).not.toContain('grok-4.20-0309-reasoning')
 
     const nano = experimentModels.find((model) => model.id === 'gpt-5-nano')
@@ -81,6 +78,8 @@ describe('ModelsView', () => {
     expect(wrapper.text()).toContain('元/百万 token')
     expect(wrapper.text()).not.toContain('订阅账号')
     expect(wrapper.text()).not.toContain('gpt-6.1-sol')
+    expect(wrapper.text()).not.toContain('gpt-5.3-codex')
+    expect(wrapper.text()).not.toContain('编程')
 
     await wrapper.get('[data-testid="copy-qwen3.8-max"]').trigger('click')
     expect(copyToClipboard).toHaveBeenCalledWith('qwen3.8-max', '已复制')

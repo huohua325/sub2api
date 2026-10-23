@@ -129,7 +129,6 @@ export default {
     copy: '复制',
     copied: '已复制',
     familyLabel: '家族',
-    useLabel: '用途',
     input: '输入',
     output: '输出',
     cache: '缓存',
@@ -145,11 +144,6 @@ export default {
       kimi: 'Kimi',
       deepseek: 'DeepSeek',
       glm: 'GLM'
-    },
-    uses: {
-      all: '全部用途',
-      chat: '对话',
-      coding: '编程'
     },
     notes: {
       peak: '工作日 9:00–12:00、14:00–18:00 按两倍',

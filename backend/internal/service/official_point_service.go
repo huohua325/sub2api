@@ -137,7 +137,8 @@ func snapshotString(value any) *string {
 }
 
 // CardsForUser returns one Codex result and one Grok result. Several parent
-// accounts of the same platform are added into that one person total.
+// accounts of the same platform are added into that one person total. A parent
+// that is no longer scheduled still counts while its official window is open.
 func (s *OfficialPointService) CardsForUser(ctx context.Context, userID int64) map[string]OfficialPointResult {
 	return s.pointsForUser(ctx, userID, true)
 }
@@ -179,9 +180,6 @@ func (s *OfficialPointService) pointsForUser(ctx context.Context, userID int64, 
 	windows := make([]UsageMonitorWindowQuery, 0, len(rows))
 	meta := make([]snapshotParent, 0, len(rows))
 	for _, row := range rows {
-		if !row.Schedulable {
-			continue
-		}
 		decision, start, ok := snapshotWindow(row, now)
 		if !ok {
 			meta = append(meta, snapshotParent{row: row})
@@ -281,7 +279,7 @@ func pointsFromParents(parents []UsageMonitorParent, userID int64, purpose, budg
 	var sum *big.Rat
 	var earliest *time.Time
 	for _, parent := range parents {
-		if parent.Inactive || parent.Purpose != purpose || parent.OfficialUsedPercent == nil {
+		if parent.Purpose != purpose || parent.OfficialUsedPercent == nil {
 			continue
 		}
 		var share *string

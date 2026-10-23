@@ -55,7 +55,8 @@ type UsageMonitorParent struct {
 	WalletRemainingYuan      string                    `json:"wallet_remaining_yuan"`
 	PointBudget              *string                   `json:"point_budget,omitempty"`
 	Oversubscribe            UsageMonitorOversubscribe `json:"oversubscribe"`
-	// Inactive is a subscription parent that is no longer scheduled.
+	// Inactive means new requests are not scheduled here. The current official
+	// window still counts toward each person's points until that window ends.
 	Inactive bool `json:"inactive,omitempty"`
 }
 

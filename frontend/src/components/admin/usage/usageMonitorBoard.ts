@@ -190,7 +190,7 @@ export function purposeResetAt(parents: UsageMonitorParent[], purpose: string, w
   let earliest: number | null = null
   let chosen: string | null = null
   for (const parent of parents) {
-    if (parent.inactive || parent.purpose !== purpose || parent.official_used_percent == null || !parent.official_reset_at) continue
+    if (parent.purpose !== purpose || parent.official_used_percent == null || !parent.official_reset_at) continue
     const time = Date.parse(parent.official_reset_at)
     if (Number.isNaN(time)) continue
     if (earliest === null || time < earliest) {

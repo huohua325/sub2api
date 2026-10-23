@@ -129,7 +129,6 @@ export default {
     copy: 'Copy',
     copied: 'Copied',
     familyLabel: 'Family',
-    useLabel: 'Use',
     input: 'Input',
     output: 'Output',
     cache: 'Cache',
@@ -145,11 +144,6 @@ export default {
       kimi: 'Kimi',
       deepseek: 'DeepSeek',
       glm: 'GLM'
-    },
-    uses: {
-      all: 'All uses',
-      chat: 'Chat',
-      coding: 'Coding'
     },
     notes: {
       peak: 'Weekdays 9:00–12:00 and 14:00–18:00 cost double',

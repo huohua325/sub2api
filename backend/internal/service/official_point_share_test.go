@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"math/big"
 	"testing"
 	"time"
@@ -106,6 +107,68 @@ func TestParseOfficialPointBudget(t *testing.T) {
 	normalized, err := NormalizeOfficialPointBudget(OfficialPointBudget{OpenAI: "50"})
 	require.NoError(t, err)
 	require.Equal(t, "80", normalized.Grok)
+}
+
+func TestPointsFromParentsKeepsStoppedAccountWindow(t *testing.T) {
+	percent := "20"
+	reset := time.Date(2026, 10, 29, 10, 0, 0, 0, time.UTC)
+	kept := pointsFromParents([]UsageMonitorParent{{
+		Purpose:             PurposeOpenAI,
+		Inactive:            true,
+		OfficialUsedPercent: &percent,
+		OfficialResetAt:     &reset,
+		Users: []UsageMonitorParentUser{{
+			UserID:        7,
+			ObservedShare: stringPtr("12.0000"),
+		}},
+	}}, 7, PurposeOpenAI, "50")
+	require.NotNil(t, kept.Points)
+	require.Equal(t, "12.0000", *kept.Points)
+	require.False(t, kept.Blocked)
+	require.True(t, kept.Reset.Equal(reset))
+
+	unread := pointsFromParents([]UsageMonitorParent{{
+		Purpose:  PurposeGrok,
+		Inactive: true,
+	}}, 7, PurposeGrok, "30")
+	require.Nil(t, unread.Points)
+}
+
+type retainStoppedStore struct {
+	rows  []UsageMonitorParentRow
+	costs []OfficialWindowCost
+}
+
+func (s retainStoppedStore) ListOfficialParents(context.Context) ([]UsageMonitorParentRow, error) {
+	return s.rows, nil
+}
+
+func (s retainStoppedStore) SumOfficialWindowCost(context.Context, int64, []UsageMonitorWindowQuery, time.Duration) ([]OfficialWindowCost, error) {
+	return s.costs, nil
+}
+
+func TestPointsForUserKeepsStoppedAccountWindow(t *testing.T) {
+	now := time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC)
+	used := "18"
+	reset := now.Add(48 * time.Hour).Format(time.RFC3339)
+	updated := now.Add(-time.Minute).Format(time.RFC3339)
+	svc := NewOfficialPointService(nil, retainStoppedStore{
+		rows: []UsageMonitorParentRow{{
+			ID:                  5,
+			Platform:            PlatformOpenAI,
+			Schedulable:         false,
+			CodexUsedPercent:    &used,
+			CodexResetAt:        &reset,
+			CodexUsageUpdatedAt: &updated,
+		}},
+		costs: []OfficialWindowCost{{ParentID: 5, TotalCost: "10", UserCost: "4"}},
+	}, nil)
+	svc.now = func() time.Time { return now }
+
+	card := svc.pointsForUser(context.Background(), 7, false)[PurposeOpenAI]
+	require.NotNil(t, card.Points)
+	require.Equal(t, "7.2000", *card.Points)
+	require.False(t, card.Blocked)
 }
 
 func TestOfficialPointParentsSumIntoOneCap(t *testing.T) {
