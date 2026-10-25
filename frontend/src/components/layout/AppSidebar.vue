@@ -11,10 +11,16 @@
       <!-- Custom Logo or Default Logo -->
       <router-link
         :to="homePath"
-        class="sidebar-logo flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl shadow-glow transition-opacity hover:opacity-80"
+        class="sidebar-logo flex items-center justify-center overflow-hidden rounded-lg bg-white ring-1 ring-gray-200/80 transition-opacity hover:opacity-80 dark:ring-white/10"
+        :class="sidebarCollapsed ? 'sidebar-logo-mark' : 'sidebar-logo-word'"
         @click="handleMenuItemClick(homePath)"
       >
-        <img v-if="settingsLoaded" :src="siteLogo || '/logo.svg'" alt="Logo" class="h-full w-full object-contain" />
+        <img
+          v-if="settingsLoaded"
+          :src="siteLogo || (sidebarCollapsed ? '/logo.svg' : '/mile-lab.svg')"
+          alt="MILE Lab"
+          class="h-full w-full object-contain"
+        />
       </router-link>
       <div class="sidebar-brand" :class="{ 'sidebar-brand-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">
         <VersionBadge :version="siteVersion" />
@@ -1001,8 +1007,18 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .sidebar-logo {
-  flex: 0 0 2.25rem;
+  flex: 0 0 auto;
+  height: 2.25rem;
   min-width: 2.25rem;
+}
+
+.sidebar-logo-word {
+  width: 7.75rem;
+}
+
+.sidebar-logo-mark {
+  width: 2.25rem;
+  flex-basis: 2.25rem;
 }
 
 .sidebar-header-collapsed {
