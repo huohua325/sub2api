@@ -37,6 +37,7 @@ func (h *UsageMonitorHandler) Get(c *gin.Context) {
 		response.ErrorFrom(c, infraerrors.ServiceUnavailable("USAGE_MONITOR_UNAVAILABLE", "用量监控尚未就绪"))
 		return
 	}
+	c.Header("Cache-Control", "no-store")
 	started := time.Now()
 	view, err := h.svc.Read(c.Request.Context())
 	if elapsed := time.Since(started); elapsed > time.Second {

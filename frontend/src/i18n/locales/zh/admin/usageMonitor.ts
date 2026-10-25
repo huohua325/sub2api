@@ -3,6 +3,7 @@ export default {
     title: '用量监控',
     description: '看每个人离上限还有多远，并在这里改每人上限。Codex 和 Grok 按点数，API 实验按元。',
     reload: '重新读取',
+    reloaded: '已重新读取',
     generatedAt: '读取于',
     loading: '正在读取',
     loadFailed: '读取用量监控失败',

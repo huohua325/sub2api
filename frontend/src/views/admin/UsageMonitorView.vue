@@ -13,6 +13,7 @@
             <template v-if="paused"> · {{ t('admin.usageMonitor.pausedLabel') }}</template>
             <template v-else-if="ageLabel"> · {{ ageLabel }}</template>
             <template v-if="refreshing"> · {{ t('admin.usageMonitor.refreshing') }}</template>
+            <template v-else-if="reloaded"> · {{ t('admin.usageMonitor.reloaded') }}</template>
           </p>
           <button type="button" class="btn btn-secondary" data-testid="usage-monitor-live" @click="paused = !paused">
             {{ paused ? t('admin.usageMonitor.resume') : t('admin.usageMonitor.pause') }}
@@ -109,6 +110,7 @@ const { t } = useI18n()
 const route = useRoute()
 const loading = ref(true)
 const refreshing = ref(false)
+const reloaded = ref(false)
 const paused = ref(false)
 const errorText = ref('')
 const quietError = ref('')
@@ -135,9 +137,11 @@ const capsLoaded = ref(false)
 const nowTick = ref(Date.now())
 let auditToken = 0
 let recentToken = 0
+let monitorToken = 0
 let liveTimer = 0
 let clockTimer = 0
 let flashTimer = 0
+let reloadedTimer = 0
 
 const liveSeconds = USAGE_MONITOR_LIVE_MS / 1000
 const parents = computed(() => monitor.value?.parents || [])
@@ -245,21 +249,37 @@ function scheduleFlashClear() {
 }
 
 async function loadMonitor(quiet = false) {
+  const token = ++monitorToken
   if (quiet) refreshing.value = true
-  else loading.value = true
+  else {
+    loading.value = true
+    reloaded.value = false
+  }
   if (!quiet) errorText.value = ''
   quietError.value = ''
   try {
     const next = await getUsageMonitor()
+    if (token !== monitorToken) return
     changedKeys.value = changedMonitorKeys(monitor.value, next)
     monitor.value = next
     seedCapsFromMonitor()
     scheduleFlashClear()
+    if (!quiet) {
+      reloaded.value = true
+      window.clearTimeout(reloadedTimer)
+      reloadedTimer = window.setTimeout(() => {
+        reloaded.value = false
+      }, 2500)
+    } else {
+      reloaded.value = false
+    }
   } catch (error) {
+    if (token !== monitorToken) return
     const text = usageMonitorErrorText(error) || t('admin.usageMonitor.loadFailed')
     if (quiet && monitor.value) quietError.value = t('admin.usageMonitor.quietFailed')
     else errorText.value = text
   } finally {
+    if (token !== monitorToken) return
     loading.value = false
     refreshing.value = false
   }
@@ -332,7 +352,7 @@ async function reload() {
 }
 
 async function refreshQuiet() {
-  if (paused.value || document.hidden) return
+  if (paused.value || document.hidden || loading.value) return
   await Promise.all([loadMonitor(true), loadRecent()])
 }
 
@@ -386,5 +406,6 @@ onUnmounted(() => {
   window.clearInterval(liveTimer)
   window.clearInterval(clockTimer)
   window.clearTimeout(flashTimer)
+  window.clearTimeout(reloadedTimer)
 })
 </script>

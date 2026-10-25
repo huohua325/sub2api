@@ -451,6 +451,38 @@ describe('usage monitor page query', () => {
     expect(api.listPurposeAdjustments).toHaveBeenCalledWith(expect.objectContaining({ user_id: 12 }))
   })
 
+  it('keeps a manual reload when an older automatic read returns later', async () => {
+    vi.useFakeTimers()
+    try {
+      const wrapper = await mountPage()
+      await flushPromises()
+      let releaseOld: (value: object) => void = () => {}
+      api.getUsageMonitor.mockImplementationOnce(() => new Promise((resolve) => { releaseOld = resolve }))
+      await vi.advanceTimersByTimeAsync(20_000)
+      api.getUsageMonitor.mockResolvedValueOnce({
+        generated_at: '2026-10-25T08:23:31Z',
+        disclaimer: 'gateway_observed_only',
+        parents: [parent({ official_used_percent: '0' })],
+        users: [user({ wallets: [wallet({ official_points: '0', student_percent: 0, point_budget: '50' })] })],
+      })
+      await wrapper.get('[data-testid="usage-monitor-reload"]').trigger('click')
+      await flushPromises()
+      expect(wrapper.text()).toContain('已重新读取')
+      releaseOld({
+        generated_at: '2026-10-25T08:22:08Z',
+        disclaimer: 'gateway_observed_only',
+        parents: [parent({ official_used_percent: '4' })],
+        users: [user({ wallets: [wallet({ official_points: '3.3217', student_percent: 7, point_budget: '50' })] })],
+      })
+      await flushPromises()
+      expect(wrapper.text()).toContain('已重新读取')
+      expect(wrapper.text()).not.toContain('3.3217')
+      wrapper.unmount()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('reloads the monitor before another confirm can use the adjusted wallet', async () => {
     const updated = {
       generated_at: '2026-10-21T02:05:00Z',

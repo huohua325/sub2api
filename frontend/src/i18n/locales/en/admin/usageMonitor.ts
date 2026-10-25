@@ -3,6 +3,7 @@ export default {
     title: 'Usage monitor',
     description: 'See how close each person is to the cap, and change the caps here. Codex and Grok use points. API experiments use yuan.',
     reload: 'Reload',
+    reloaded: 'Read again',
     generatedAt: 'Read at',
     loading: 'Loading',
     loadFailed: 'Failed to load the usage monitor',
