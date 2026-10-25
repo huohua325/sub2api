@@ -18,6 +18,9 @@ type OfficialPointResult struct {
 	Points  *string
 	Percent *int
 	Reset   *time.Time
+	// OfficialResets are the readable parent windows for this purpose.
+	// The student countdown follows them only when they agree.
+	OfficialResets []time.Time
 	// Blocked is true only when this window's points are at least the per-person cap.
 	// A card can already read 100% while Blocked is still false.
 	Blocked bool

@@ -198,6 +198,7 @@ func (s *OfficialPointService) pointsForUser(ctx context.Context, userID int64, 
 	}
 	grouped := map[string][]OfficialPointInput{}
 	resets := map[string]*time.Time{}
+	allResets := map[string][]time.Time{}
 	for _, item := range meta {
 		if !item.ok {
 			continue
@@ -218,12 +219,15 @@ func (s *OfficialPointService) pointsForUser(ctx context.Context, userID int64, 
 			continue
 		}
 		reset := item.decision.Point.Reset
+		allResets[purpose] = append(allResets[purpose], reset)
 		if current, ok := resets[purpose]; !ok || current == nil || reset.Before(*current) {
 			resets[purpose] = &reset
 		}
 	}
 	for _, purpose := range []string{PurposeOpenAI, PurposeGrok} {
-		out[purpose] = OfficialPointsForPurpose(grouped[purpose], budget.ForPurpose(purpose), resets[purpose])
+		card := OfficialPointsForPurpose(grouped[purpose], budget.ForPurpose(purpose), resets[purpose])
+		card.OfficialResets = allResets[purpose]
+		out[purpose] = card
 	}
 	return out
 }

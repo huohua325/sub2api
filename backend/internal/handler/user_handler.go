@@ -125,8 +125,12 @@ func (h *UserHandler) GetMyPlatformQuotas(c *gin.Context) {
 				}
 			} else if card, ok := cards[row.Purpose]; ok && card.Percent != nil {
 				item["display_percent"] = *card.Percent
-				if card.Reset != nil {
-					item["resets_at"] = *card.Reset
+				// A shared official reset is a collective refresh, not the
+				// person's 7 days running out. Differing account clocks keep
+				// the personal window so routing cannot move the countdown.
+				reset := service.StudentCodingReset(resetsAt, card.OfficialResets)
+				if !reset.IsZero() {
+					item["resets_at"] = reset
 				}
 			} else {
 				item["display_percent"] = nil

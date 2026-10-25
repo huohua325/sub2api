@@ -72,6 +72,43 @@ func officialResetMoved(a, b time.Time) bool {
 	return delta > officialWindowResetGap
 }
 
+// SharedOfficialReset is the reset ordinary users can follow. It is set only
+// when every readable subscription account of that purpose ends together.
+// Header drift of a few minutes is still one reset day. A wider spread is not
+// a personal timer and must not replace the person's own 7-day window.
+func SharedOfficialReset(resets []time.Time) (time.Time, bool) {
+	var earliest, latest time.Time
+	count := 0
+	for _, reset := range resets {
+		if reset.IsZero() {
+			continue
+		}
+		reset = reset.UTC()
+		if count == 0 || reset.Before(earliest) {
+			earliest = reset
+		}
+		if count == 0 || reset.After(latest) {
+			latest = reset
+		}
+		count++
+	}
+	if count == 0 || officialResetMoved(earliest, latest) {
+		return time.Time{}, false
+	}
+	return earliest, true
+}
+
+// StudentCodingReset is the countdown on an ordinary Codex or Grok card.
+// A shared official reset is a collective refresh: after it, that subscription
+// window is new and the person can use again. Differing account clocks keep
+// the personal window, so routing does not move the countdown.
+func StudentCodingReset(personal time.Time, official []time.Time) time.Time {
+	if shared, ok := SharedOfficialReset(official); ok {
+		return shared
+	}
+	return personal
+}
+
 // stampOfficialQuota 把这一笔网关计费发生时、该订阅账号的官方额度写到用量行上。
 // 影子账号的实扣仍记在用量行的 account_id，官方额度记母账号。
 // 没有新鲜读数时沿用账号上尚未过期的快照，并保留快照自己的观察时间。

@@ -112,12 +112,16 @@ describe('usage monitor board', () => {
     expect(quiet.map((item) => item.id)).toEqual([])
   })
 
-  it('uses the month we set for experiments and the sooner official window for Codex or Grok', () => {
+  it('uses a shared official reset and keeps the personal window when accounts differ', () => {
     const parents = [
       parent({ official_reset_at: '2026-10-29T10:00:00Z' }),
       parent({ account_id: 14, official_reset_at: '2026-10-27T10:00:00Z' }),
     ]
-    expect(purposeResetAt(parents, 'grok', '2026-11-01T00:00:00+08:00')).toBe('2026-10-27T10:00:00Z')
+    expect(purposeResetAt(parents, 'grok', '2026-11-01T00:00:00+08:00')).toBe('2026-11-01T00:00:00+08:00')
+    expect(purposeResetAt([
+      parent({ official_reset_at: '2026-10-29T10:00:00Z' }),
+      parent({ account_id: 14, official_reset_at: '2026-10-29T10:03:00Z' }),
+    ], 'grok', '2026-11-01T00:00:00+08:00')).toBe('2026-10-29T10:00:00Z')
     expect(purposeResetAt([
       parent({ official_reset_at: '2026-10-27T07:32:11Z', official_used_percent: null }),
       parent({ account_id: 14, name: 'Grok Build milelab', official_reset_at: '2026-10-29T10:36:49Z', official_used_percent: '5' }),
@@ -125,7 +129,7 @@ describe('usage monitor board', () => {
     expect(purposeResetAt([
       parent({ official_reset_at: '2026-10-25T08:00:00Z', inactive: true, official_used_percent: '18' }),
       parent({ account_id: 14, official_reset_at: '2026-10-29T10:00:00Z', official_used_percent: '5' }),
-    ], 'grok', null)).toBe('2026-10-25T08:00:00Z')
+    ], 'grok', '2026-11-04T07:00:00Z')).toBe('2026-11-04T07:00:00Z')
     expect(purposeResetAt(parents, 'experiment', '2026-11-01T00:00:00+08:00')).toBe('2026-11-01T00:00:00+08:00')
     expect(purposeResetAt([], 'openai', null)).toBeNull()
   })
