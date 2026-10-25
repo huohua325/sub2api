@@ -836,6 +836,7 @@ func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsage
 			}
 		}
 	}
+	cost = applyGlobalAIExperimentCharge(ctx, account, apiKeyGroup(apiKey), result.UpstreamHeaders, cost)
 
 	// 判断计费方式：订阅模式 vs 余额模式
 	isSubscriptionBilling := subscription != nil && apiKey.Group != nil && apiKey.Group.IsSubscriptionType()
@@ -1302,7 +1303,7 @@ func (s *GatewayService) buildRecordUsageLog(
 		APIKeyID:                 apiKey.ID,
 		AccountID:                account.ID,
 		RequestID:                requestID,
-		UpstreamRequestID:        usageUpstreamRequestIDPtr(account, result.UpstreamHeaders, false),
+		UpstreamRequestID:        recordedUpstreamRequestID(account, result.UpstreamHeaders, false),
 		Model:                    result.Model,
 		RequestedModel:           requestedModel,
 		UpstreamModel:            optionalTrimmedStringPtr(result.UpstreamModel),
@@ -1345,6 +1346,9 @@ func (s *GatewayService) buildRecordUsageLog(
 	}
 	if result.ImageCount > 0 && (cost == nil || cost.BillingMode != string(BillingModeToken)) {
 		usageLog.RateMultiplier = imageMultiplier
+	}
+	if globalAIQuotaApplied(cost) {
+		usageLog.RateMultiplier = 1
 	}
 	if cost != nil {
 		usageLog.InputCost = cost.InputCost
