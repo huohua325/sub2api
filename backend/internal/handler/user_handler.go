@@ -125,10 +125,9 @@ func (h *UserHandler) GetMyPlatformQuotas(c *gin.Context) {
 				}
 			} else if card, ok := cards[row.Purpose]; ok && card.Percent != nil {
 				item["display_percent"] = *card.Percent
-				// The card counts 7 days from registration. One subscription's
-				// period end does not replace it. Only two or more accounts
-				// resetting together can.
-				reset := service.StudentCodingReset(resetsAt, card.OfficialResets)
+				// Codex keeps the official reset from the overall recharge.
+				// Grok keeps each person's 7 days from registration.
+				reset := service.StudentCodingReset(row.Purpose, resetsAt, card.OfficialResets)
 				if !reset.IsZero() {
 					item["resets_at"] = reset
 				}

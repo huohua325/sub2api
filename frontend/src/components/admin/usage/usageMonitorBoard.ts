@@ -204,9 +204,10 @@ export function purposeResetAt(parents: UsageMonitorParent[], purpose: string, w
     }
     if (time > latest) latest = time
   }
-  // Two or more accounts resetting together is a collective refresh. One
-  // account's period end is not, so the person keeps the registration window.
-  if (count >= 2 && earliest !== null && latest - earliest <= officialResetGapMs) return chosen
+  // Codex already had an overall recharge, so one remaining account still
+  // carries that shared reset. Grok has not, so one period end stays personal.
+  const minimum = purpose === 'openai' ? 1 : 2
+  if (count >= minimum && earliest !== null && latest - earliest <= officialResetGapMs) return chosen
   const personal = (walletReset || '').trim()
   return personal || null
 }

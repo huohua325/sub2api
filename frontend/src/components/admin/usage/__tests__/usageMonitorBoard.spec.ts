@@ -132,6 +132,9 @@ describe('usage monitor board', () => {
     ], 'grok', '2026-11-04T07:00:00Z')).toBe('2026-11-04T07:00:00Z')
     expect(purposeResetAt(parents, 'experiment', '2026-11-01T00:00:00+08:00')).toBe('2026-11-01T00:00:00+08:00')
     expect(purposeResetAt([], 'openai', null)).toBeNull()
+    expect(purposeResetAt([
+      parent({ purpose: 'openai', platform: 'openai', official_reset_at: '2026-11-01T08:23:37Z' }),
+    ], 'openai', '2026-10-28T07:07:11Z')).toBe('2026-11-01T08:23:37Z')
   })
 
   it('counts down to an account recharge and stops at zero', () => {

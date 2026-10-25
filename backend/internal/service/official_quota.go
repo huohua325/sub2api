@@ -72,11 +72,13 @@ func officialResetMoved(a, b time.Time) bool {
 	return delta > officialWindowResetGap
 }
 
-// SharedOfficialReset is a collective refresh, not one subscription's natural
-// end. At least two readable accounts must land on the same reset day. One
-// account's period end stays that account's clock and does not replace a
-// person's 7-day window from registration.
-func SharedOfficialReset(resets []time.Time) (time.Time, bool) {
+// SharedOfficialReset is the official clock ordinary users may follow.
+// Codex already had an overall recharge, so one remaining account still
+// carries that shared reset. Grok has not: one period end is only that
+// subscription's natural week, and it takes two accounts landing together
+// before that day replaces a person's registration window. A wider spread
+// is not one reset.
+func SharedOfficialReset(purpose string, resets []time.Time) (time.Time, bool) {
 	var earliest, latest time.Time
 	count := 0
 	for _, reset := range resets {
@@ -92,18 +94,21 @@ func SharedOfficialReset(resets []time.Time) (time.Time, bool) {
 		}
 		count++
 	}
-	if count < 2 || officialResetMoved(earliest, latest) {
+	minimum := 2
+	if purpose == PurposeOpenAI {
+		minimum = 1
+	}
+	if count < minimum || officialResetMoved(earliest, latest) {
 		return time.Time{}, false
 	}
 	return earliest, true
 }
 
 // StudentCodingReset is the countdown on an ordinary Codex or Grok card.
-// It is the person's own window, 7 days from registration, rolled forward in
-// whole weeks. A collective reset of two or more accounts can move it, because
-// that refresh is not the personal timer ending. One account cannot.
-func StudentCodingReset(personal time.Time, official []time.Time) time.Time {
-	if shared, ok := SharedOfficialReset(official); ok {
+// Grok counts 7 days from registration. Codex follows the official reset
+// left by the overall recharge, including when only one account remains.
+func StudentCodingReset(purpose string, personal time.Time, official []time.Time) time.Time {
+	if shared, ok := SharedOfficialReset(purpose, official); ok {
 		return shared
 	}
 	return personal
