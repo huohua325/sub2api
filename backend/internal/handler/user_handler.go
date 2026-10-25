@@ -125,9 +125,9 @@ func (h *UserHandler) GetMyPlatformQuotas(c *gin.Context) {
 				}
 			} else if card, ok := cards[row.Purpose]; ok && card.Percent != nil {
 				item["display_percent"] = *card.Percent
-				// A shared official reset is a collective refresh, not the
-				// person's 7 days running out. Differing account clocks keep
-				// the personal window so routing cannot move the countdown.
+				// The card counts 7 days from registration. One subscription's
+				// period end does not replace it. Only two or more accounts
+				// resetting together can.
 				reset := service.StudentCodingReset(resetsAt, card.OfficialResets)
 				if !reset.IsZero() {
 					item["resets_at"] = reset

@@ -192,19 +192,21 @@ export function purposeResetAt(parents: UsageMonitorParent[], purpose: string, w
   let earliest: number | null = null
   let latest = 0
   let chosen: string | null = null
+  let count = 0
   for (const parent of parents) {
     if (parent.purpose !== purpose || parent.official_used_percent == null || !parent.official_reset_at) continue
     const time = Date.parse(parent.official_reset_at)
     if (Number.isNaN(time)) continue
+    count += 1
     if (earliest === null || time < earliest) {
       earliest = time
       chosen = parent.official_reset_at
     }
     if (time > latest) latest = time
   }
-  // Accounts that reset together are one collective refresh. A person can use
-  // again at that date. Differing clocks are not the person's timer.
-  if (earliest !== null && latest - earliest <= officialResetGapMs) return chosen
+  // Two or more accounts resetting together is a collective refresh. One
+  // account's period end is not, so the person keeps the registration window.
+  if (count >= 2 && earliest !== null && latest - earliest <= officialResetGapMs) return chosen
   const personal = (walletReset || '').trim()
   return personal || null
 }

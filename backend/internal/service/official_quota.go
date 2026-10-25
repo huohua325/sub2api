@@ -72,10 +72,10 @@ func officialResetMoved(a, b time.Time) bool {
 	return delta > officialWindowResetGap
 }
 
-// SharedOfficialReset is the reset ordinary users can follow. It is set only
-// when every readable subscription account of that purpose ends together.
-// Header drift of a few minutes is still one reset day. A wider spread is not
-// a personal timer and must not replace the person's own 7-day window.
+// SharedOfficialReset is a collective refresh, not one subscription's natural
+// end. At least two readable accounts must land on the same reset day. One
+// account's period end stays that account's clock and does not replace a
+// person's 7-day window from registration.
 func SharedOfficialReset(resets []time.Time) (time.Time, bool) {
 	var earliest, latest time.Time
 	count := 0
@@ -92,16 +92,16 @@ func SharedOfficialReset(resets []time.Time) (time.Time, bool) {
 		}
 		count++
 	}
-	if count == 0 || officialResetMoved(earliest, latest) {
+	if count < 2 || officialResetMoved(earliest, latest) {
 		return time.Time{}, false
 	}
 	return earliest, true
 }
 
 // StudentCodingReset is the countdown on an ordinary Codex or Grok card.
-// A shared official reset is a collective refresh: after it, that subscription
-// window is new and the person can use again. Differing account clocks keep
-// the personal window, so routing does not move the countdown.
+// It is the person's own window, 7 days from registration, rolled forward in
+// whole weeks. A collective reset of two or more accounts can move it, because
+// that refresh is not the personal timer ending. One account cannot.
 func StudentCodingReset(personal time.Time, official []time.Time) time.Time {
 	if shared, ok := SharedOfficialReset(official); ok {
 		return shared

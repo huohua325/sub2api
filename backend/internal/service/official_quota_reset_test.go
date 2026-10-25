@@ -17,6 +17,9 @@ func TestSharedOfficialResetRequiresAgreement(t *testing.T) {
 	if _, ok := SharedOfficialReset(nil); ok {
 		t.Fatal("missing resets were shared")
 	}
+	if _, ok := SharedOfficialReset([]time.Time{day}); ok {
+		t.Fatal("one account was treated as a collective reset")
+	}
 }
 
 func TestStudentCodingResetKeepsPersonalWindow(t *testing.T) {
@@ -31,5 +34,8 @@ func TestStudentCodingResetKeepsPersonalWindow(t *testing.T) {
 	}
 	if got := StudentCodingReset(personal, nil); !got.Equal(personal) {
 		t.Fatalf("missing official reset = %s", got)
+	}
+	if got := StudentCodingReset(personal, []time.Time{sharedDay}); !got.Equal(personal) {
+		t.Fatalf("one account replaced the personal window with %s", got)
 	}
 }
