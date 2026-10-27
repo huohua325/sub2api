@@ -16,6 +16,8 @@
 
 官方上游合并范围、MILE 定制保留项和验证记录见 [UPSTREAM-SYNC-2026-10-27.md](UPSTREAM-SYNC-2026-10-27.md)。
 
+Codex 官方全体异常重置的确认、补记及 2026-10-26 事件修复见 [CODEX-GLOBAL-RESET-RUNBOOK.md](CODEX-GLOBAL-RESET-RUNBOOK.md)。
+
 ## 本地位置与使用
 
 ```text

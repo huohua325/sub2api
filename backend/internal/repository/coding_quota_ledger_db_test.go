@@ -148,6 +148,65 @@ func TestCodingQuotaDBResetOnlyAffectsCodexAndIsIdempotent(t *testing.T) {
 	require.True(t, quotaUsed(t, r, 1, base.Add(time.Hour), "openai").End.Equal(base.Add(10*time.Minute+7*24*time.Hour)))
 }
 
+// A platform event can predate deployment of the ledger. Confirming it later
+// must replace the old personal clock, including when that clock already rolled
+// into another week, without deleting post-event usage or resetting Grok.
+func TestCodingQuotaDBHistoricalResetRestoresExhaustionAfterPersonalRollover(t *testing.T) {
+	db, r, _ := quotaTestDB(t, "")
+	ctx := context.Background()
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	anchor := now.Add(-7*24*time.Hour - 2*time.Hour)
+	effective := now.Add(-30 * time.Hour)
+	opening := now.Add(-7 * time.Hour)
+	_, err := db.Exec(`UPDATE users SET created_at=$1`, anchor)
+	require.NoError(t, err)
+	_, err = db.Exec(`UPDATE user_purpose_allowances SET window_start=$1`, anchor)
+	require.NoError(t, err)
+	_, err = db.Exec(`INSERT INTO coding_quota_requests(request_id,api_key_id,user_id,purpose,started_at,completed_at,weight,points,state)
+ VALUES('opening:1:openai',0,1,'openai',$1,$1,0,51.2975,'imported'),
+ ('opening:2:openai',0,2,'openai',$1,$1,0,4.4418,'imported'),
+ ('post-event',2,2,'openai',$2,$2,1,3,'settled'),
+ ('pre-event',1,1,'openai',$3,$3,1,40,'settled'),
+ ('grok',1,1,'grok',$4,$4,1,12,'settled')`,
+		opening, now.Add(-time.Hour), effective.Add(-time.Hour), now.Add(-time.Minute))
+	require.NoError(t, err)
+	before := quotaUsed(t, r, 1, now, service.PurposeOpenAI)
+	require.Equal(t, "0", before.Used, "old personal clock has already excluded the exhausted opening entry")
+	points := service.NewOfficialPointService(nil, r, nil)
+	blocked, checked := points.Blocks(ctx, 1, service.PurposeOpenAI)
+	require.True(t, checked)
+	require.False(t, blocked)
+
+	event := service.CodingQuotaReset{ID: "historical:official-global-reset", EffectiveAt: effective, Note: "operator confirmed historical platform-wide reset"}
+	_, err = r.ConfirmCodingReset(ctx, event, 1)
+	require.NoError(t, err)
+	readings, err := r.ReadCodingQuotas(ctx, []int64{1, 2}, now)
+	require.NoError(t, err)
+	for _, reading := range readings {
+		if reading.Purpose == service.PurposeOpenAI {
+			require.True(t, reading.Start.Equal(effective))
+			require.True(t, reading.End.Equal(effective.Add(7*24*time.Hour)))
+			require.Equal(t, "platform_reset", reading.ResetReason)
+		}
+	}
+	require.Equal(t, "51.29750000", quotaUsed(t, r, 1, now, service.PurposeOpenAI).Used)
+	require.Equal(t, "7.44180000", quotaUsed(t, r, 2, now, service.PurposeOpenAI).Used)
+	blocked, checked = points.Blocks(ctx, 1, service.PurposeOpenAI)
+	require.True(t, checked)
+	require.True(t, blocked, "dashboard ledger and authentication must both retain exhaustion")
+	require.Equal(t, "12.00000000", quotaUsed(t, r, 1, now, service.PurposeGrok).Used)
+
+	// Replaying confirmation with a later timestamp cannot postpone the reset.
+	event.EffectiveAt = now
+	_, err = r.ConfirmCodingReset(ctx, event, 1)
+	require.NoError(t, err)
+	require.True(t, quotaUsed(t, r, 1, now, service.PurposeOpenAI).End.Equal(effective.Add(7*24*time.Hour)))
+	require.Equal(t, "0", quotaUsed(t, r, 1, effective.Add(7*24*time.Hour), service.PurposeOpenAI).Used)
+	var count int
+	require.NoError(t, db.QueryRow(`SELECT count(*) FROM coding_quota_requests`).Scan(&count))
+	require.Equal(t, 5, count, "confirmation must preserve every charge")
+}
+
 func TestCodingQuotaDBWholePoolDetection(t *testing.T) {
 	for _, tc := range []struct {
 		name                   string

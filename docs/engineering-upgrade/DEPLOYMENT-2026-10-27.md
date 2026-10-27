@@ -2,6 +2,8 @@
 
 当前线上版本为 `0.2.18-mile.20261027.upstream1`，22:48 完成切换。下方保留历次发布记录，最新上游合并与验收见 [UPSTREAM-SYNC-2026-10-27.md](UPSTREAM-SYNC-2026-10-27.md)。
 
+23:16 补记昨天 OpenAI 全体异常重置的历史事件，修正 Codex 个人倒计时与耗尽拦截；没有更换程序。详情与备份索引见 [CODEX-GLOBAL-RESET-RUNBOOK.md](CODEX-GLOBAL-RESET-RUNBOOK.md)。
+
 ## 部署结果
 
 - 服务器：`172.104.117.114`，Linux x86_64。
