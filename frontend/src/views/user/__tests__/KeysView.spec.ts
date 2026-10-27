@@ -6,6 +6,9 @@ import type { ApiKey } from '@/types'
 import { keysAPI } from '@/api'
 import KeysView from '../KeysView.vue'
 
+const route = vi.hoisted(() => ({ query: {} as Record<string, string> }))
+vi.mock('vue-router', () => ({ useRoute: () => route }))
+
 const {
   listKeys,
   updateKey,
@@ -239,7 +242,7 @@ const mountView = async () => {
         Select: SelectStub,
         SearchInput: SearchInputStub,
         Icon: IconStub,
-        UseKeyModal: true,
+        UseKeyModal: { name: 'UseKeyModal', props: ['show', 'apiKey', 'platform', 'purpose', 'keyId', 'keyName'], template: '<div data-test="connection-panel" />' },
         BulkEditKeysModal: true,
         EndpointPopover: true,
         GroupBadge: true,
@@ -269,6 +272,7 @@ const getButtonByText = (wrapper: VueWrapper, text: string) => {
 
 describe('user KeysView column settings', () => {
   beforeEach(() => {
+    route.query = {}
     localStorage.clear()
 
     listKeys.mockReset()
@@ -585,6 +589,36 @@ describe('user KeysView column settings', () => {
       getAvailableGroups.mockResolvedValue(availableGroups)
     })
 
+    it.each([['codex', 2], ['grok_build', 8], ['experiment', 5]] as const)('opens the returned %s Key even if the list refresh fails', async (purpose, groupId) => {
+      route.query = { purpose }
+      const wrapper = await openCreate()
+      await wrapper.get('[data-tour="key-form-name"]').setValue('New connection')
+      await groupSelect(wrapper).vm.$emit('update:modelValue', groupId)
+      vi.mocked(keysAPI.create).mockResolvedValue({ ...createApiKey(), id: 82, name: 'New connection', key: 'sk-returned-key', group_id: groupId, group: undefined })
+      listKeys.mockRejectedValueOnce(new Error('List unavailable'))
+      await wrapper.get('#key-form').trigger('submit')
+      await flushPromises()
+      expect(keysAPI.create).toHaveBeenCalledOnce()
+      const modal = wrapper.findComponent({ name: 'UseKeyModal' })
+      expect(modal.props('apiKey')).toBe('sk-returned-key')
+      expect(modal.props('purpose')).toBe(purpose)
+      expect(modal.props('platform')).toBe(availableGroups[groupId - 1]!.platform)
+      await modal.vm.$emit('close')
+      await nextTick()
+      expect(wrapper.findComponent({ name: 'UseKeyModal' }).exists()).toBe(false)
+      wrapper.unmount()
+    })
+
+    it('keeps an explicitly requested unassigned purpose instead of switching silently', async () => {
+      route.query = { purpose: 'codex' }
+      getAvailableGroups.mockResolvedValue([availableGroups[5]])
+      const wrapper = await openCreate()
+      expect(wrapper.get<HTMLInputElement>('input[value="codex"]').element.checked).toBe(true)
+      expect(optionIds(wrapper)).toEqual([])
+      expect(wrapper.get('[data-tour="key-form-provider"]').text()).toContain('keys.connection.noPurposeGroup')
+      wrapper.unmount()
+    })
+
     it('classifies all configured platforms and retains the complete table filter', async () => {
       const wrapper = await openCreate()
       expect(wrapper.findAll('input[name="key-provider"]')).toHaveLength(3)
@@ -625,7 +659,7 @@ describe('user KeysView column settings', () => {
     it('shows the empty state when no groups are available', async () => {
       getAvailableGroups.mockResolvedValue([])
       const wrapper = await openCreate()
-      expect(wrapper.get('[data-tour="key-form-provider"]').text()).toContain('common.noGroupsAvailable')
+      expect(wrapper.get('[data-tour="key-form-provider"]').text()).toContain('keys.connection.noPurposeGroup')
       expect(optionIds(wrapper)).toEqual([])
       expect(wrapper.findAll<HTMLInputElement>('input[name="key-provider"]').every((input) => input.element.disabled)).toBe(true)
     })

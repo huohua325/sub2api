@@ -1,7 +1,9 @@
 <template>
   <AppLayout :page-header="false">
     <div class="mx-auto w-full max-w-6xl">
-      <PageHeader :title="t('models.title')" :description="t('models.lead')" />
+      <PageHeader :title="t('models.title')" :description="t('models.lead')">
+        <template #actions><router-link class="btn btn-primary" :to="{ path: '/guide', query: { purpose: 'experiment' } }">{{ t('keys.providers.experiment') }}</router-link></template>
+      </PageHeader>
       <div class="lab-model-toolbar">
       <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
         <label class="relative min-w-0 flex-1" for="model-search">

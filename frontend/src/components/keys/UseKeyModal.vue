@@ -1,7 +1,7 @@
 <template>
   <BaseDialog
     :show="show"
-    :title="t('keys.useKeyModal.title')"
+:title="keyName ? `${t('keys.useKeyModal.title')} ? ${keyName}` : t('keys.useKeyModal.title')"
     width="wide"
     @close="emit('close')"
   >
@@ -23,6 +23,10 @@
 
       <!-- Platform-specific content -->
       <template v-else>
+        <section class="connection-identity" :aria-label="t('keys.connection.credentials')">
+          <div><span>{{ t('keys.connection.address') }}</span><code>{{ connectionApiBase(baseUrl || windowOrigin) }}</code><button type="button" class="btn btn-secondary btn-sm" @click="copyCredential(connectionApiBase(baseUrl || windowOrigin))">{{ t('common.copy') }}</button></div>
+          <div><span>API Key</span><code data-testid="connection-key">{{ revealKey ? apiKey : 'sk-••••••••••••' }}</code><button type="button" class="btn btn-secondary btn-sm" data-testid="reveal-connection-key" :aria-pressed="revealKey" @click="revealKey = !revealKey">{{ t(revealKey ? 'keys.connection.hide' : 'keys.connection.reveal') }}</button><button type="button" class="btn btn-secondary btn-sm" @click="copyCredential(apiKey)">{{ t('common.copy') }}</button></div>
+        </section>
         <!-- Description -->
         <p class="text-sm text-gray-600 dark:text-gray-400">
           {{ platformDescription }}
@@ -34,6 +38,7 @@
             <button
               v-for="tab in clientTabs"
               :key="tab.id"
+              v-show="tab.id === defaultClientTab || advancedClients"
               type="button"
               @click="activeClientTab = tab.id"
               :class="[
@@ -51,6 +56,7 @@
           </nav>
         </div>
 
+        <button v-if="clientTabs.length > 1" type="button" class="btn btn-secondary btn-sm min-h-11" :aria-expanded="advancedClients" @click="advancedClients = !advancedClients">{{ t('keys.connection.otherClients') }}</button>
         <!-- Codex Authentication Mode -->
         <div
           v-if="showCodexAuthMode"
@@ -136,10 +142,11 @@
         <!-- Code Blocks (Stacked for multi-file platforms) -->
         <div class="space-y-4">
           <div
-            v-for="(file, index) in currentFiles"
+            v-for="(file, index) in displayFiles"
             :key="index"
             class="relative"
           >
+            <p v-if="copyFailedIndex === index" class="mb-2 text-sm text-amber-700 dark:text-amber-300" role="alert">{{ t('keys.connection.copyFallback') }}</p>
             <!-- File Hint (if exists) -->
             <p v-if="file.hint" class="text-xs text-amber-600 dark:text-amber-400 mb-1.5 flex items-center gap-1">
               <Icon name="exclamationCircle" size="sm" class="flex-shrink-0" />
@@ -151,8 +158,8 @@
                 <span class="min-w-0 truncate text-xs text-gray-400 font-mono">{{ file.path }}</span>
                 <button
                   type="button"
-                  @click="copyContent(file.content, index)"
-                  class="flex flex-shrink-0 items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-lg transition-colors"
+                  @click="copyContent(currentFiles[index]!.content, index)"
+                  class="flex min-h-11 flex-shrink-0 items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-lg transition-colors"
                   :class="copiedIndex === index
                     ? 'bg-green-500/20 text-green-400'
                     : 'bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white'"
@@ -166,6 +173,7 @@
                   {{ copiedIndex === index ? t('keys.useKeyModal.copied') : t('keys.useKeyModal.copy') }}
                 </button>
               </div>
+              <button type="button" class="connection-download" :data-testid="`download-config-${index}`" @click="downloadFile(index)">{{ downloadedIndex === index ? t('keys.connection.downloaded') : t('keys.connection.download') }}</button>
               <!-- Code Content -->
               <pre class="p-4 text-sm font-mono text-gray-100 overflow-x-auto"><code v-if="file.highlighted" v-html="file.highlighted"></code><code v-else v-text="file.content"></code></pre>
             </div>
@@ -243,6 +251,13 @@
           </p>
         </section>
 
+        <section class="connection-next">
+          <h3>{{ t('keys.connection.next') }}</h3>
+          <p>{{ t('keys.connection.localInstructions') }}</p>
+          <pre translate="no">{{ startupCommand }}</pre>
+          <p>{{ t('keys.connection.templateScope') }}</p>
+          <details><summary>{{ t('keys.connection.troubleshooting') }}</summary><p>{{ t('keys.connection.troubleshootingHint') }}</p></details>
+        </section>
         <!-- Usage Note -->
         <div v-if="showPlatformNote" class="flex items-start gap-3 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800">
           <Icon name="infoCircle" size="md" class="text-blue-500 flex-shrink-0 mt-0.5" />
@@ -254,7 +269,8 @@
     </div>
 
     <template #footer>
-      <div class="flex justify-end">
+      <div class="flex flex-wrap justify-end gap-3">
+        <router-link v-if="keyId" class="btn btn-primary" :to="{ path: '/usage', query: { api_key_id: keyId } }" @click="emit('close')">{{ t('dashboard.ruler.viewUsage') }}</router-link>
         <button
           @click="emit('close')"
           class="btn btn-secondary"
@@ -267,13 +283,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, h, watch, type Component } from 'vue'
+import { ref, computed, h, watch, onUnmounted, type Component } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { saveAs } from 'file-saver'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { useClipboard } from '@/composables/useClipboard'
 import { buildCodexModelCatalogUrl, fetchCodexModelsManifest } from '@/api/codex'
+import { generateCodexFiles, generateGrokFiles as generateGrokConnectionFiles, DEFAULT_CODEX_MODEL, connectionApiBase, generateExperimentFiles } from '@/utils/connectionConfig'
+import type { KeyGroupProvider } from '@/utils/keyGroupProviders'
 import type { GroupPlatform } from '@/types'
 import {
   findCodexCatalogModel,
@@ -287,6 +305,9 @@ interface Props {
   apiKey: string
   baseUrl: string
   platform: GroupPlatform | null
+  keyId?: number
+  keyName?: string
+  purpose?: KeyGroupProvider
   claudeCodeOnly?: boolean
   allowMessagesDispatch?: boolean
 }
@@ -314,7 +335,31 @@ const emit = defineEmits<Emits>()
 const { t } = useI18n()
 const { copyToClipboard: clipboardCopy } = useClipboard()
 
+const windowOrigin = window.location.origin
+const revealKey = ref(false)
+const downloadedIndex = ref<number | null>(null)
 const copiedIndex = ref<number | null>(null)
+const copyFailedIndex = ref<number | null>(null)
+let feedbackTimer: ReturnType<typeof setTimeout> | undefined
+let connectionRevision = 0
+function resetFeedback() {
+  connectionRevision += 1
+  clearTimeout(feedbackTimer)
+  copiedIndex.value = null
+  copyFailedIndex.value = null
+  downloadedIndex.value = null
+}
+async function copyCredential(value: string) { await clipboardCopy(value, t('keys.copied')) }
+function downloadFile(index: number) {
+  const file = currentFiles.value[index]
+  if (!file) return
+  const name = file.path.split(/[\\/]/).pop() || 'configuration.txt'
+  const filename = name.includes('.') ? name : `${name === 'PowerShell' ? 'environment.ps1' : name === 'Command Prompt' ? 'environment.cmd' : 'environment.sh'}`
+  saveAs(new Blob([file.content], { type: 'text/plain;charset=utf-8' }), filename)
+  downloadedIndex.value = index
+}
+const startupCommand = computed(() => activeClientTab.value.startsWith('codex') ? 'codex' : activeClientTab.value === 'grok' ? 'grok inspect\ngrok' : ['systemone', 'api'].includes(activeClientTab.value) ? t('keys.connection.manualRequest') : activeClientTab.value)
+
 const activeTab = ref<string>('unix')
 const activeClientTab = ref<string>('claude')
 type CodexAuthMode = 'legacy' | 'api-key'
@@ -357,6 +402,7 @@ const codexManifestContext = computed(() => {
 // Reset tabs when platform changes
 const defaultClientTab = computed(() => {
   if (props.claudeCodeOnly) return 'claude'
+  if (props.purpose === 'experiment' && ['openai', 'grok', 'anthropic', 'gemini'].includes(props.platform ?? '')) return 'api'
   switch (props.platform) {
     case 'openai':
       return 'codex'
@@ -373,7 +419,7 @@ const defaultClientTab = computed(() => {
   }
 })
 
-watch(() => [props.platform, props.claudeCodeOnly], () => {
+watch(() => [props.platform, props.claudeCodeOnly, props.apiKey, props.show, props.purpose], () => {
   activeTab.value = 'unix'
   activeClientTab.value = defaultClientTab.value
   codexAuthMode.value = 'legacy'
@@ -397,6 +443,10 @@ watch(codexManifestContext, (context, previousContext) => {
 watch(activeClientTab, () => {
   activeTab.value = 'unix'
 })
+
+watch(() => [props.apiKey, props.show, props.purpose], () => { revealKey.value = false; resetFeedback() })
+watch(() => [activeTab.value, activeClientTab.value, codexAuthMode.value, codexModelCatalogMode.value, codexModelManifestContent.value], resetFeedback)
+onUnmounted(() => { resetFeedback(); resetCodexModelManifest() })
 
 // Icon components
 const AppleIcon = {
@@ -461,7 +511,7 @@ const SparkleIcon = {
   }
 }
 
-const clientTabs = computed((): TabConfig[] => {
+const platformClientTabs = computed((): TabConfig[] => {
   if (!props.platform) return []
   if (props.claudeCodeOnly) {
     return [{ id: 'claude', label: t('keys.useKeyModal.cliTabs.claudeCode'), icon: TerminalIcon }]
@@ -518,6 +568,12 @@ const clientTabs = computed((): TabConfig[] => {
       ]
   }
 })
+
+const advancedClients = ref(false)
+watch(() => [props.apiKey, props.show], () => { advancedClients.value = false })
+const clientTabs = computed((): TabConfig[] => defaultClientTab.value === 'api'
+  ? [{ id: 'api', label: t('keys.providers.experiment'), icon: TerminalIcon }, ...platformClientTabs.value]
+  : platformClientTabs.value)
 
 // Shell tabs (3 types for environment variable based configs)
 const shellTabs: TabConfig[] = [
@@ -735,9 +791,8 @@ const comment = (value: string) => wrapToken('text-slate-500', value)
 
 // Syntax highlighting helpers
 // Generate file configs based on platform and active tab
-const currentFiles = computed((): FileConfig[] => {
+function buildFiles(apiKey: string): FileConfig[] {
   const baseUrl = props.baseUrl || window.location.origin
-  const apiKey = props.apiKey
   const baseRoot = baseUrl.replace(/\/v1\/?$/, '').replace(/\/+$/, '')
   const ensureV1 = (value: string) => {
     const trimmed = value.replace(/\/+$/, '')
@@ -753,6 +808,8 @@ const currentFiles = computed((): FileConfig[] => {
     const trimmed = baseRoot.replace(/\/+$/, '')
     return trimmed.endsWith('/v1beta') ? trimmed : `${trimmed}/v1beta`
   })()
+
+  if (activeClientTab.value === 'api') return generateExperimentFiles({ baseUrl, apiKey, shell: activeTab.value, platform: props.platform ?? '' })
 
   if (activeClientTab.value === 'opencode') {
     switch (props.platform) {
@@ -829,7 +886,8 @@ const currentFiles = computed((): FileConfig[] => {
       }
       return generateAnthropicFiles(baseUrl, apiKey)
   }
-})
+}
+const currentFiles = computed(() => buildFiles(props.apiKey))
 
 function generateSystemOneCurl(baseUrl: string, apiKey: string): FileConfig {
   const endpoint = `${baseUrl}/v1/systemone`
@@ -1024,30 +1082,11 @@ ${keyword('$env:')}${variable('GEMINI_MODEL')}${operator('=')}${string(`"${model
 }
 
 function generateOpenAIFiles(baseUrl: string, apiKey: string): FileConfig[] {
-  const isWindows = activeTab.value === 'windows'
-  const configDir = isWindows ? '%userprofile%\\.codex' : '~/.codex'
-
-  const model = selectCodexCatalogModel('gpt-5.5')
-  const reasoningEffortLine = codexReasoningEffortTomlLine(model)
-
-  // config.toml content
-  const configContent = `model_provider = "OpenAI"
-model = "${model}"
-review_model = "${model}"
-${reasoningEffortLine}disable_response_storage = true
-${codexLocalCatalogToml.value}network_access = "enabled"
-windows_wsl_setup_acknowledged = true
-
-[model_providers.OpenAI]
-name = "OpenAI"
-base_url = "${baseUrl}"
-${codexModelCatalogMode.value === 'remote' ? `model_catalog_url = "${escapeTomlBasicString(buildCodexModelCatalogUrl(baseUrl))}"\n` : ''}wire_api = "responses"
-${generateCodexProviderAuthConfig(apiKey)}
-
-[features]
-${codexModelCatalogMode.value === 'remote' ? 'api_key_model_discovery = true\n' : ''}goals = true`
-
-  return buildOpenAICodexFileConfigs(configDir, configContent, apiKey)
+  const model = selectCodexCatalogModel(DEFAULT_CODEX_MODEL)
+  return generateCodexFiles({ baseUrl, apiKey, shell: activeTab.value, model,
+    authMode: codexAuthMode.value, catalogMode: codexModelCatalogMode.value,
+    reasoningEffortLine: codexReasoningEffortTomlLine(model)
+  }).map((file, index) => ({ ...file, hint: index === 0 ? t('keys.useKeyModal.openai.configTomlHint') : undefined }))
 }
 
 function generateCodexProviderAuthConfig(apiKey: string): string {
@@ -1093,145 +1132,8 @@ function escapeTomlBasicString(value: string): string {
 }
 
 function generateGrokFiles(baseUrl: string, apiKey: string): FileConfig[] {
-  // Prefer unix/cmd/powershell when shell tabs are shown; fall back to windows tab.
-  const shell = activeTab.value
-  const isWindowsPath = shell === 'windows' || shell === 'cmd' || shell === 'powershell'
-  const configDir = isWindowsPath ? '%userprofile%\\.grok' : '~/.grok'
-
-  let envPath: string
-  let envContent: string
-  switch (shell) {
-    case 'cmd':
-      envPath = 'Command Prompt'
-      envContent = `set GROK_MODELS_BASE_URL=${baseUrl}
-set XAI_API_KEY=${apiKey}`
-      break
-    case 'powershell':
-    case 'windows':
-      envPath = 'PowerShell'
-      envContent = `$env:GROK_MODELS_BASE_URL="${baseUrl}"
-$env:XAI_API_KEY="${apiKey}"`
-      break
-    default:
-      envPath = 'Terminal'
-      envContent = `export GROK_MODELS_BASE_URL="${baseUrl}"
-export XAI_API_KEY="${apiKey}"`
-  }
-
-  // Shape follows Grok Build user guide (~/.grok/docs + custom-models) and production-ready MILE Lab setups.
-  // Text models only (Responses). Image/video: Imagine model IDs on media endpoints / feature overrides.
-  // Credential order: api_key field → env_key → signed-in session → XAI_API_KEY global fallback.
-  const modelsListUrl = `${baseUrl.replace(/\/+$/, '')}/models`
-  const configContent = `# Grok Build CLI → MILE Lab Grok group (API key auth).
-# Docs: ~/.grok/docs/user-guide/05-configuration.md + 11-custom-models.md
-# Verify after save: grok inspect
-#
-# IMPORTANT: api_backend must be "responses" for MILE Lab Grok (POST /v1/responses).
-# If omitted, Grok Build defaults to chat_completions (/v1/chat/completions).
-# Keep api_backend = "responses" on every model entry.
-#
-# Prefer env_key over hardcoding api_key (never commit secrets).
-# Also export GROK_MODELS_BASE_URL + XAI_API_KEY in the shell block above.
-
-# Global inference / catalog endpoints (same role as env GROK_MODELS_BASE_URL).
-# When models_base_url is set, Grok uses API-key Bearer auth (no grok login required).
-[endpoints]
-models_base_url = "${baseUrl}"              # inference base; model list defaults to {base}/models
-models_list_url = "${modelsListUrl}"        # optional override (env: GROK_MODELS_LIST_URL)
-xai_api_base_url = "${baseUrl}"             # public xAI API base override for gateway routing
-cli_chat_proxy_base_url = "${baseUrl}"      # CLI chat-proxy base (env: GROK_CLI_CHAT_PROXY_BASE_URL)
-
-# Prefer API key when using a custom gateway (matches MILE Lab).
-# Requires XAI_API_KEY env or per-model env_key / api_key.
-[auth]
-preferred_method = "api_key"
-
-[model."grok-4.5"]
-model = "grok-4.5"                          # id sent to the API
-name = "Grok 4.5"                           # shown in /model picker
-description = "Grok 4.5 via MILE Lab (Responses)"
-# base_url inherits from [endpoints].models_base_url; override only if needed:
-# base_url = "${baseUrl}"
-env_key = "XAI_API_KEY"                     # or: api_key = "${apiKey}"  (not recommended)
-api_backend = "responses"                   # chat_completions | responses | messages
-context_window = 500000                     # drives auto-compaction timing
-# Optional sampling (global defaults can live under [models] instead):
-# temperature = 0.7
-# top_p = 0.95
-# max_completion_tokens = 8192
-# Server-side (backend) web_search tools — only if your gateway exposes them:
-supports_backend_search = true
-
-[model."grok-build-0.1"]
-model = "grok-build-0.1"
-name = "Grok Build"
-description = "Coding / agent sessions (xAI recommends grok-build* for coding)"
-env_key = "XAI_API_KEY"
-api_backend = "responses"
-context_window = 256000
-supports_backend_search = true
-
-# Text multi-agent / client web_search sub-agent (NOT Imagine image/video).
-[model."grok-4.20-multi-agent-0309"]
-model = "grok-4.20-multi-agent-0309"
-name = "Grok 4.20 Multi Agent (text / web_search)"
-description = "Text multi-agent; use for web_search sub-agent, not image/video"
-env_key = "XAI_API_KEY"
-api_backend = "responses"
-context_window = 1000000
-supports_backend_search = true
-
-[model."grok-4.3"]
-model = "grok-4.3"
-name = "Grok 4.3"
-env_key = "XAI_API_KEY"
-api_backend = "responses"
-context_window = 1000000
-supports_backend_search = true
-
-# Optional short alias for /model grok:
-# [model."grok"]
-# model = "grok-4.5"
-# name = "Grok"
-# env_key = "XAI_API_KEY"
-# api_backend = "responses"
-# context_window = 1000000
-# supports_backend_search = true
-
-[models]
-# xAI recommends grok-build* for coding/agent sessions; use grok-4.5 for general chat.
-default = "grok-4.5"
-web_search = "grok-4.5"                     # client-side web_search tool model (must exist as [model.*])
-image_description = "grok-4.5"              # vision/describe-image helper model
-# Optional environment-wide sampling defaults (per-model values win):
-# temperature = 0.7
-# top_p = 0.95
-# max_completion_tokens = 8192
-# max_retries = 8
-
-[session]
-auto_compact_threshold_percent = 80         # auto-compact at this % of context_window (default 85)
-
-# Imagine tools: model IDs go to MILE Lab media endpoints (not the text [model.*] catalog).
-# Enable only if the Grok group allows image/video generation.
-[features]
-image_gen = true
-video_gen = true
-image_gen_model_override = "grok-imagine-image-quality"   # or grok-imagine-image
-image_edit_model_override = "grok-imagine-edit"
-# Optional feature flags (defaults shown in docs):
-# telemetry = false
-# remote_fetch = true                         # set false for air-gapped / pure-gateway catalogs
-# lsp_tools = false`
-
-  return [
-    { path: envPath, content: envContent },
-    {
-      path: joinConfigPath(configDir, 'config.toml', isWindowsPath),
-      content: configContent,
-      hint: t('keys.useKeyModal.grok.configTomlHint')
-    }
-  ]
+  return generateGrokConnectionFiles({ baseUrl, apiKey, shell: activeTab.value })
+    .map((file) => ({ ...file, hint: file.hint ? t(file.hint) : undefined }))
 }
 
 function generateGrokCodexFiles(baseUrl: string, apiKey: string): FileConfig[] {
@@ -2075,13 +1977,32 @@ function generateOpenCodeConfig(platform: string, baseUrl: string, apiKey: strin
   }
 }
 
+// Generate the preview with a placeholder so every encoding/highlighter stays secret-free.
+const displayFiles = computed(() => buildFiles(revealKey.value ? props.apiKey : 'sk-************'))
 const copyContent = async (content: string, index: number) => {
+  const revision = connectionRevision
   const success = await clipboardCopy(content, t('keys.copied'))
-  if (success) {
+  if (revision === connectionRevision) copyFailedIndex.value = success ? null : index
+  if (success && revision === connectionRevision) {
+    clearTimeout(feedbackTimer)
     copiedIndex.value = index
-    setTimeout(() => {
-      copiedIndex.value = null
-    }, 2000)
+    feedbackTimer = setTimeout(() => { copiedIndex.value = null }, 2000)
   }
 }
 </script>
+
+<style scoped>
+nav button, [role="radio"] { min-height: 44px; }
+.connection-identity { padding: 14px 16px; border: 1px solid rgb(var(--color-line)); border-radius: 16px; background: rgb(var(--color-page)); }
+.connection-identity > div { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.connection-identity > div + div { margin-top: 10px; }
+.connection-identity span { width: 76px; color: rgb(var(--color-muted)); font-size: 12px; }
+.connection-identity code { flex: 1; min-width: 100px; overflow-wrap: anywhere; font-size: 12px; }
+.connection-identity button, .connection-download { min-height: 44px; }
+.connection-download { display: block; margin-left: auto; padding: 4px 16px; color: #c4b5fd; font-size: 12px; }
+.connection-next { padding: 16px; border-left: 2px solid rgb(var(--color-brand)); background: rgb(var(--color-page)); border-radius: 0 12px 12px 0; font-size: 13px; line-height: 1.8; }
+.connection-next h3 { font-weight: 600; }
+.connection-next pre { margin-block: 10px; }
+.connection-next p { color: rgb(var(--color-muted)); }
+.connection-next summary { min-height: 44px; padding-top: 10px; cursor: pointer; }
+</style>

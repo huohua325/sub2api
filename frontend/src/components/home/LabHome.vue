@@ -59,7 +59,7 @@
               <details><summary>{{ t('design.configuration') }}<Icon name="chevronDown" size="sm" /></summary>
                 <div class="lab-home-config">
                   <div class="lab-home-config-bar"><span>config.toml</span><button class="btn btn-secondary btn-sm" @click="copyBlock('grok', grokConfig)">{{ copyLabel('grok', t('home.sheet.copyConfig')) }}</button></div>
-                  <pre translate="no">{{ grokConfig }}</pre>
+                  <pre translate="no">{{ grokEnvironment }}</pre><pre translate="no">{{ grokConfig }}</pre>
                   <p class="lab-home-location" translate="no">%USERPROFILE%\.grok\config.toml · ~/.grok/config.toml</p>
                 </div>
               </details>
@@ -87,6 +87,7 @@ import { useI18n } from 'vue-i18n'
 import { useAuthStore, useAppStore } from '@/stores'
 import { setLocale } from '@/i18n'
 import { sanitizeUrl } from '@/utils/url'
+import { generateCodexFiles, generateGrokFiles } from '@/utils/connectionConfig'
 import { FeatureFlags, isFeatureFlagEnabled } from '@/utils/featureFlags'
 
 const { t, locale } = useI18n()
@@ -117,61 +118,12 @@ const apiV1 = computed(() => {
   return raw.endsWith('/v1') ? raw : `${raw}/v1`
 })
 const keyPlaceholder = computed(() => `sk-${t('guide.keyToken')}`)
-const codexConfig = computed(() => `disable_response_storage = true
-model = "gpt-6.1-sol"
-model_provider = "mile"
-model_reasoning_effort = "xhigh"
-model_verbosity = "high"
-
-[features]
-web_search_request = true
-
-[model_providers.mile]
-base_url = "${apiV1.value}"
-name = "mile"
-requires_openai_auth = true
-wire_api = "responses"
-
-[tui]
-screen_reader_detection_done = true
-
-[windows]
-sandbox = "elevated"`)
-const authJson = computed(() => `{
-  "OPENAI_API_KEY": "${keyPlaceholder.value}"
-}`)
-const grokConfig = computed(() => `[models]
-default = "grok-4.7"
-web_search = "grok-4.7"
-
-[endpoints]
-models_base_url = "${apiV1.value}"
-
-[model."grok-4.7"]
-model = "grok-4.7"
-name = "Grok 4.7"
-description = "Grok 4.7 via MILE"
-api_key = "${keyPlaceholder.value}"
-api_backend = "responses"
-context_window = 500000
-supports_reasoning_effort = true
-supports_backend_search = false
-
-[marketplace]
-default_skills_installs_purged = true
-official_marketplace_auto_installed = true
-
-[[marketplace.sources]]
-name = "xAI Official"
-git = "https://github.com/xai-org/plugin-marketplace.git"
-
-[cli]
-auto_update = true
-installer = "internal"
-
-[ui]
-yolo = true
-compact_mode = false`)
+const codexFiles = computed(() => generateCodexFiles({ baseUrl: apiV1.value, apiKey: keyPlaceholder.value }))
+const codexConfig = computed(() => codexFiles.value[0]!.content)
+const authJson = computed(() => codexFiles.value[1]!.content)
+const grokFiles = computed(() => generateGrokFiles({ baseUrl: apiV1.value, apiKey: keyPlaceholder.value }))
+const grokConfig = computed(() => grokFiles.value[1]!.content)
+const grokEnvironment = computed(() => grokFiles.value[0]!.content)
 
 const copiedId = shallowRef('')
 let copiedTimer = 0

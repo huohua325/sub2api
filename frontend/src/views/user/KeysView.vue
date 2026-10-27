@@ -540,7 +540,7 @@
             </label>
           </div>
           <p class="mt-2 text-xs leading-5 text-gray-500 dark:text-gray-400" aria-live="polite">
-            {{ groups.length === 0 ? t('common.noGroupsAvailable') : t(`keys.providerHints.${createProvider}`) }}
+            {{ formGroupOptions.length === 0 ? t('keys.connection.noPurposeGroup') : t(`keys.providerHints.${createProvider}`) }}
           </p>
         </fieldset>
 
@@ -1082,12 +1082,17 @@
 
     <!-- Use Key Modal -->
     <UseKeyModal
+      v-if="connectionKey"
+      :key="connectionKey.id"
+      :key-id="connectionKey.id"
+      :key-name="connectionKey.name"
+      :purpose="connectionKey.group ? getKeyGroupProvider(connectionKey.group) : undefined"
       :show="showUseKeyModal"
-      :api-key="selectedKey?.key || ''"
+      :api-key="connectionKey?.key || ''"
       :base-url="publicSettings?.api_base_url || ''"
-      :platform="selectedKey?.group?.platform || null"
-      :claude-code-only="selectedKey?.group?.claude_code_only || false"
-      :allow-messages-dispatch="selectedKey?.group?.allow_messages_dispatch || false"
+      :platform="connectionKey?.group?.platform || null"
+      :claude-code-only="connectionKey?.group?.claude_code_only || false"
+      :allow-messages-dispatch="connectionKey?.group?.allow_messages_dispatch || false"
       @close="closeUseKeyModal"
     />
 
@@ -1210,7 +1215,7 @@
 </template>
 
 <script setup lang="ts">
-	import { ref, reactive, computed, watch, onMounted, onUnmounted, type ComponentPublicInstance } from 'vue'
+	import { nextTick, defineAsyncComponent, ref, reactive, computed, watch, onMounted, onUnmounted, type ComponentPublicInstance } from 'vue'
 	import { useI18n } from 'vue-i18n'
 	import { useAppStore } from '@/stores/app'
 	import { showConsoleMoney } from '@/utils/showConsoleMoney'
@@ -1220,6 +1225,7 @@ import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
 
 const { t } = useI18n()
 import { keysAPI, authAPI, usageAPI, userGroupsAPI } from '@/api'
+import { useRoute } from 'vue-router'
 import PageHeader from '@/components/common/PageHeader.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
@@ -1232,7 +1238,7 @@ import BulkEditKeysModal from '@/components/keys/BulkEditKeysModal.vue'
 	import Select from '@/components/common/Select.vue'
 	import SearchInput from '@/components/common/SearchInput.vue'
 	import Icon from '@/components/icons/Icon.vue'
-	import UseKeyModal from '@/components/keys/UseKeyModal.vue'
+const UseKeyModal = defineAsyncComponent(() => import('@/components/keys/UseKeyModal.vue'))
 	import EndpointPopover from '@/components/keys/EndpointPopover.vue'
 	import GroupBadge from '@/components/common/GroupBadge.vue'
 	import GroupOptionItem from '@/components/common/GroupOptionItem.vue'
@@ -1417,7 +1423,9 @@ const showEditModal = ref(false)
 const showDeleteDialog = ref(false)
 const showResetQuotaDialog = ref(false)
 const showResetRateLimitDialog = ref(false)
-const showUseKeyModal = ref(false)
+const route = useRoute()
+const connectionKey = ref<ApiKey | null>(null)
+const showUseKeyModal = computed(() => connectionKey.value != null)
 const showCcsClientSelect = ref(false)
 const showColumnDropdown = ref(false)
 const pendingCcsRow = ref<ApiKey | null>(null)
@@ -1556,6 +1564,11 @@ const formGroupOptions = computed(() => showEditModal.value
   : groupOptions.value.filter((group) => getKeyGroupProvider({ platform: group.platform, usage_kind: group.usage_kind }) === createProvider.value)
 )
 
+const requestedProvider = computed(() => {
+  const value = route?.query?.purpose
+  return KEY_GROUP_PROVIDERS.includes(value as KeyGroupProvider) ? value as KeyGroupProvider : null
+})
+
 const selectCreateProvider = (provider: KeyGroupProvider) => {
   if (createProvider.value === provider) return
   createProvider.value = provider
@@ -1565,8 +1578,8 @@ const selectCreateProvider = (provider: KeyGroupProvider) => {
 // Also handles groups arriving after the create dialog has already opened.
 watch([showCreateModal, createProviderOptions], ([isOpen, providers], [wasOpen]) => {
   if (!isOpen) return
-  if (!wasOpen || !providers.some((provider) => provider.value === createProvider.value && provider.count > 0)) {
-    selectCreateProvider(providers.find((provider) => provider.count > 0)?.value ?? 'codex')
+  if (!wasOpen || (!requestedProvider.value && !providers.some((provider) => provider.value === createProvider.value && provider.count > 0))) {
+    selectCreateProvider(requestedProvider.value ?? providers.find((provider) => provider.count > 0)?.value ?? 'codex')
   }
   if (!formGroupOptions.value.some((group) => group.value === formData.value.group_id)) {
     formData.value.group_id = null
@@ -1679,14 +1692,18 @@ const loadPublicSettings = async () => {
   }
 }
 
+let connectionTrigger: HTMLElement | null = null
 const openUseKeyModal = (key: ApiKey) => {
-  selectedKey.value = key
-  showUseKeyModal.value = true
+  const active = document.activeElement as HTMLElement | null
+  connectionTrigger = active?.closest('[role="dialog"]')
+    ? document.querySelector<HTMLElement>('[data-tour="keys-create-btn"]')
+    : active
+  connectionKey.value = { ...key, group: key.group ? { ...key.group } : undefined }
 }
 
 const closeUseKeyModal = () => {
-  showUseKeyModal.value = false
-  selectedKey.value = null
+  connectionKey.value = null
+  void nextTick(() => { if (connectionTrigger?.isConnected) connectionTrigger.focus(); connectionTrigger = null })
 }
 
 const handlePageChange = (page: number) => {
@@ -1815,6 +1832,11 @@ const confirmDelete = (key: ApiKey) => {
 }
 
 const handleSubmit = async () => {
+  if (submitting.value) return
+  if (!showEditModal.value && !formGroupOptions.value.some((group) => group.value === formData.value.group_id)) {
+    appStore.showError(t('keys.groupRequired'))
+    return
+  }
   // Validate group_id is required
   if (formData.value.group_id === null) {
     appStore.showError(t('keys.groupRequired'))
@@ -1870,6 +1892,7 @@ const handleSubmit = async () => {
 
   submitting.value = true
   try {
+    let createdForConnection: ApiKey | null = null
     if (showEditModal.value && selectedKey.value) {
       const updates: UpdateApiKeyRequest = {
         name: formData.value.name,
@@ -1889,7 +1912,8 @@ const handleSubmit = async () => {
       appStore.showSuccess(t('keys.keyUpdatedSuccess'))
     } else {
       const customKey = formData.value.use_custom_key ? formData.value.custom_key : undefined
-      await keysAPI.create(
+      const submittedGroup = groups.value.find((group) => group.id === formData.value.group_id)
+      const created = await keysAPI.create(
         formData.value.name,
         formData.value.group_id,
         customKey,
@@ -1899,6 +1923,7 @@ const handleSubmit = async () => {
         expiresInDays,
         rateLimitData
       )
+      if (created) createdForConnection = { ...created, group: submittedGroup && submittedGroup.id === created.group_id ? { ...submittedGroup } : undefined }
       appStore.showSuccess(t('keys.keyCreatedSuccess'))
       // Only advance tour if active, on submit step, and creation succeeded
       if (onboardingStore.isCurrentStep('[data-tour="key-form-submit"]')) {
@@ -1906,7 +1931,8 @@ const handleSubmit = async () => {
       }
     }
     closeModals()
-    loadApiKeys()
+    if (createdForConnection) openUseKeyModal(createdForConnection)
+    void loadApiKeys()
   } catch (error: any) {
     const errorMsg = error.response?.data?.detail || t('keys.failedToSave')
     appStore.showError(errorMsg)
@@ -2097,6 +2123,7 @@ function formatResetTime(resetAt: string | null): string {
 
 onMounted(() => {
   loadSavedColumns()
+  if (route?.query?.create === '1') showCreateModal.value = true
   loadApiKeys()
   loadGroups()
   loadUserGroupRates()
@@ -2106,6 +2133,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  connectionKey.value = null
   document.removeEventListener('click', closeGroupSelector)
   if (resetTimer) clearInterval(resetTimer)
 })

@@ -220,6 +220,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { showConsoleMoney } from '@/utils/showConsoleMoney'
@@ -360,7 +361,10 @@ const endpointDistributionSource = ref<EndpointSource>('inbound')
 const activeTab = ref<'usage' | 'errors'>('usage')
 const errorViewEnabled = computed(() => appStore.cachedPublicSettings?.allow_user_view_error_requests ?? false)
 
+const route = useRoute()
+const initialKeyId = Number(route?.query?.api_key_id)
 const filters = ref<UsageQueryParams>({
+  api_key_id: Number.isSafeInteger(initialKeyId) && initialKeyId > 0 ? initialKeyId : undefined,
   start_date: startDate.value,
   end_date: endDate.value,
   request_type: undefined,

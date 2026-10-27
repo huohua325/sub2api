@@ -3,6 +3,13 @@
     <div class="grid w-full grid-cols-1 items-start gap-8 xl:grid-cols-[minmax(0,46rem)_16rem]">
       <article class="lab-guide-content">
         <PageHeader :title="t('guide.title')" :description="t('guide.manual.lead')" />
+        <div class="mt-5 flex flex-wrap gap-2" :aria-label="t('keys.providerLabel')">
+          <button v-for="purpose in KEY_GROUP_PROVIDERS" :key="purpose" class="btn min-h-11" :class="selectedPurpose === purpose ? 'btn-primary' : 'btn-secondary'" type="button" :aria-pressed="selectedPurpose === purpose" @click="selectedPurpose = purpose">{{ t(`keys.providers.${purpose}`) }}</button>
+        </div>
+        <div class="mt-4 flex flex-wrap gap-3">
+          <router-link class="btn btn-primary" :to="{ path: '/keys', query: { purpose: selectedPurpose, create: '1' } }">{{ t('keys.createKey') }}</router-link>
+          <router-link class="btn btn-secondary" to="/keys">{{ t('keys.connection.chooseExisting') }}</router-link>
+        </div>
 
         <nav :aria-label="t('guide.tocLabel')" class="mt-6 flex flex-wrap gap-x-4 gap-y-2 border-b border-gray-100 pb-4 dark:border-dark-700 xl:hidden">
           <a
@@ -30,7 +37,7 @@
           <p class="mt-4 max-w-[40rem] text-sm leading-6 text-gray-500 dark:text-gray-400">{{ t('guide.manual.keyHint') }}</p>
         </section>
 
-        <section id="guide-codex" data-testid="guide-client" class="mt-12 scroll-mt-24 border-t border-gray-100 pt-10 dark:border-dark-700">
+        <section v-show="selectedPurpose === 'codex'" id="guide-codex" data-testid="guide-client" class="mt-12 scroll-mt-24 border-t border-gray-100 pt-10 dark:border-dark-700">
           <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('guide.manual.codex.title') }}</h3>
           <p class="mt-2 max-w-[40rem] text-sm leading-6 text-gray-600 dark:text-gray-300">{{ t('guide.manual.codex.ready') }}</p>
           <p class="mt-4 max-w-[40rem] text-sm leading-6 text-gray-600 dark:text-gray-300">{{ t('guide.manual.codex.install') }}</p>
@@ -74,7 +81,7 @@
           <GuideCommand class="mt-3" label="codex" command="codex" />
         </section>
 
-        <section id="guide-grok" data-testid="guide-client" class="mt-12 scroll-mt-24 border-t border-gray-100 pt-10 dark:border-dark-700">
+        <section v-show="selectedPurpose === 'grok_build'" id="guide-grok" data-testid="guide-client" class="mt-12 scroll-mt-24 border-t border-gray-100 pt-10 dark:border-dark-700">
           <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('guide.manual.grok.title') }}</h3>
           <p class="mt-2 max-w-[40rem] text-sm leading-6 text-gray-600 dark:text-gray-300">{{ t('guide.manual.grok.ready') }}</p>
           <p class="mt-4 max-w-[40rem] text-sm leading-6 text-gray-600 dark:text-gray-300">{{ t('guide.manual.grok.install') }}</p>
@@ -102,6 +109,7 @@
           />
           <p class="mt-4 max-w-[40rem] text-sm leading-6 text-gray-600 dark:text-gray-300">{{ t('guide.manual.grok.envKey') }}</p>
           <h4 class="mt-8 text-sm font-semibold text-gray-900 dark:text-white">{{ t('guide.manual.fieldsTitle') }}</h4>
+          <GuideFile class="mt-3" filename="Terminal" :code="grokEnvironment" :copy-label="t('common.copy')" :copied-label="t('common.copied')" :copied="copiedId === 'grok-env'" @copy="copyText(grokEnvironment, 'grok-env')" />
           <GuideFields :items="grokFields" />
           <p class="mt-4 max-w-[40rem] text-sm leading-6 text-gray-600 dark:text-gray-300">{{ t('guide.manual.grok.effort') }}</p>
           <p class="mt-3 max-w-[40rem] text-sm leading-6 text-gray-600 dark:text-gray-300">{{ t('guide.manual.grok.search') }}</p>
@@ -111,6 +119,11 @@
           <GuideCommand class="mt-3" label="grok" :command="grokProbe" />
         </section>
 
+        <section v-show="selectedPurpose === 'experiment'" id="guide-experiment" class="mt-12 scroll-mt-24 border-t border-gray-100 pt-10 dark:border-dark-700">
+          <h3 class="text-lg font-semibold">{{ t('keys.providers.experiment') }}</h3>
+          <p class="mt-3 text-sm leading-7 text-gray-500">{{ t('keys.connection.experimentGuide') }}</p>
+          <router-link class="btn btn-secondary mt-4" to="/models">{{ t('models.title') }}</router-link>
+        </section>
         <section id="guide-check" data-testid="guide-step" class="mt-12 scroll-mt-24 border-t border-gray-100 pt-10 dark:border-dark-700">
           <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('guide.manual.check.title') }}</h3>
           <p class="mt-2 max-w-[40rem] text-sm leading-6 text-gray-600 dark:text-gray-300">{{ t('guide.manual.check.body') }}</p>
@@ -148,12 +161,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineComponent, h, onBeforeUnmount, onMounted, ref } from 'vue'
+import { watch, nextTick, computed, defineComponent, h, onBeforeUnmount, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
+import { KEY_GROUP_PROVIDERS, type KeyGroupProvider } from '@/utils/keyGroupProviders'
 import { useI18n } from 'vue-i18n'
 import PageHeader from '@/components/common/PageHeader.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import { useClipboard } from '@/composables/useClipboard'
 import { useAppStore } from '@/stores/app'
+import { generateCodexFiles, generateGrokFiles, DEFAULT_GROK_MODEL } from '@/utils/connectionConfig'
 
 const GuideCommand = defineComponent({
   props: {
@@ -228,6 +244,19 @@ const { t } = useI18n()
 const appStore = useAppStore()
 const { copyToClipboard } = useClipboard()
 
+const route = useRoute()
+const selectedPurpose = ref<KeyGroupProvider>('codex')
+function selectFromLocation() {
+  const purpose = route?.query?.purpose
+  if (KEY_GROUP_PROVIDERS.includes(purpose as KeyGroupProvider)) selectedPurpose.value = purpose as KeyGroupProvider
+  const hash = route?.hash || window.location.hash
+  if (hash === '#guide-grok') selectedPurpose.value = 'grok_build'
+  if (hash === '#guide-codex') selectedPurpose.value = 'codex'
+  if (hash === '#guide-experiment') selectedPurpose.value = 'experiment'
+  void nextTick(() => { if (hash) document.getElementById(hash.slice(1))?.scrollIntoView?.() })
+}
+watch(() => [route?.hash, route?.query?.purpose], selectFromLocation, { immediate: true })
+
 const activeStep = ref('guide-prep')
 const copiedId = ref('')
 let copiedTimer: number | undefined
@@ -239,66 +268,15 @@ const apiV1 = computed(() => {
 })
 
 const keyPlaceholder = computed(() => `sk-${t('guide.keyToken')}`)
-const grokProbe = 'grok -p "只回复 ok" -m grok-4.7'
+const grokProbe = `grok -p "只回复 ok" -m ${DEFAULT_GROK_MODEL}`
 const codexInstall = 'npm install -g @openai/codex@latest'
 
-const codexConfig = computed(() => `disable_response_storage = true
-model = "gpt-6.1-sol"
-model_provider = "mile"
-model_reasoning_effort = "xhigh"
-model_verbosity = "high"
-
-[features]
-web_search_request = true
-
-[model_providers.mile]
-base_url = "${apiV1.value}"
-name = "mile"
-requires_openai_auth = true
-wire_api = "responses"
-
-[tui]
-screen_reader_detection_done = true
-
-[windows]
-sandbox = "elevated"`)
-
-const authJson = computed(() => `{
-  "OPENAI_API_KEY": "${keyPlaceholder.value}"
-}`)
-
-const grokConfig = computed(() => `[models]
-default = "grok-4.7"
-web_search = "grok-4.7"
-
-[endpoints]
-models_base_url = "${apiV1.value}"
-
-[model."grok-4.7"]
-model = "grok-4.7"
-name = "Grok 4.7"
-description = "Grok 4.7 via MILE"
-api_key = "${keyPlaceholder.value}"
-api_backend = "responses"
-context_window = 500000
-supports_reasoning_effort = true
-supports_backend_search = false
-
-[marketplace]
-default_skills_installs_purged = true
-official_marketplace_auto_installed = true
-
-[[marketplace.sources]]
-name = "xAI Official"
-git = "https://github.com/xai-org/plugin-marketplace.git"
-
-[cli]
-auto_update = true
-installer = "internal"
-
-[ui]
-yolo = true
-compact_mode = false`)
+const codexFiles = computed(() => generateCodexFiles({ baseUrl: apiV1.value, apiKey: keyPlaceholder.value }))
+const codexConfig = computed(() => codexFiles.value[0]!.content)
+const authJson = computed(() => codexFiles.value[1]!.content)
+const grokFiles = computed(() => generateGrokFiles({ baseUrl: apiV1.value, apiKey: keyPlaceholder.value }))
+const grokConfig = computed(() => grokFiles.value[1]!.content)
+const grokEnvironment = computed(() => grokFiles.value[0]!.content)
 
 const toc = computed(() => [
   { id: 'guide-prep', title: t('guide.manual.prep.title') },
@@ -310,14 +288,10 @@ const toc = computed(() => [
 const codexFieldNames = [
   'model',
   'model_provider',
-  'model_reasoning_effort',
-  'model_verbosity',
   'disable_response_storage',
-  'web_search_request',
   'base_url',
   'wire_api',
   'requires_openai_auth',
-  'screen_reader_detection_done',
 ]
 const grokFieldNames = [
   ['default', 'default'],
@@ -325,15 +299,10 @@ const grokFieldNames = [
   ['models_base_url', 'models_base_url'],
   ['model', 'model'],
   ['name_description', 'name / description'],
-  ['api_key', 'api_key'],
+  ['api_key', 'env_key / XAI_API_KEY'],
   ['api_backend', 'api_backend'],
   ['context_window', 'context_window'],
-  ['supports_reasoning_effort', 'supports_reasoning_effort'],
   ['supports_backend_search', 'supports_backend_search'],
-  ['installer', 'installer'],
-  ['auto_update', 'auto_update'],
-  ['yolo', 'yolo'],
-  ['marketplace', 'marketplace'],
 ] as const
 
 const codexFields = computed(() => codexFieldNames.map((name) => ({
@@ -362,6 +331,7 @@ async function copyText(value: string, id: string) {
 }
 
 onMounted(() => {
+  window.addEventListener('hashchange', selectFromLocation)
   if (typeof IntersectionObserver === 'undefined') return
   stepObserver = new IntersectionObserver((entries) => {
     const visible = entries
@@ -376,6 +346,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('hashchange', selectFromLocation)
   stepObserver?.disconnect()
   if (copiedTimer !== undefined) window.clearTimeout(copiedTimer)
 })

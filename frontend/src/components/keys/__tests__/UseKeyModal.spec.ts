@@ -35,6 +35,45 @@ function readBlobAsText(blob: Blob): Promise<string> {
 }
 
 describe('UseKeyModal', () => {
+  const connectionStubs = {
+    BaseDialog: { template: '<div><slot /><slot name="footer" /></div>' },
+    RouterLink: { template: '<a><slot /></a>' },
+    Icon: { template: '<span />' },
+  }
+
+  it('masks previews but copies and downloads real values; resets reveal when changing Keys', async () => {
+    const secret = 'sk-fixture-$dollar'
+    const wrapper = mount(UseKeyModal, { props: { show: true, apiKey: secret, baseUrl: 'https://example.test/prefix', platform: 'openai', keyId: 23 }, global: { stubs: connectionStubs } })
+    expect(wrapper.html()).not.toContain(secret)
+    expect(wrapper.findAll('pre code')[1]!.text()).toContain('sk-************')
+    const copy = wrapper.findAll('button').find((button) => button.text() === 'keys.useKeyModal.copy')!
+    await copy.trigger('click')
+    expect(copyToClipboardMock).toHaveBeenLastCalledWith(expect.stringContaining('base_url = "https://example.test/prefix/v1"'), 'keys.copied')
+    await wrapper.get('[data-testid="download-config-1"]').trigger('click')
+    const [blob, filename] = saveAsMock.mock.calls.at(-1)!
+    expect(filename).toBe('auth.json')
+    expect(JSON.parse(await readBlobAsText(blob)).OPENAI_API_KEY).toBe(secret)
+    await wrapper.get('[data-testid="reveal-connection-key"]').trigger('click')
+    expect(wrapper.text()).toContain(secret)
+    await wrapper.setProps({ apiKey: 'sk-second-session', keyId: 24 })
+    expect(wrapper.html()).not.toContain(secret)
+    expect(wrapper.html()).not.toContain('sk-second-session')
+    expect(wrapper.find('[data-testid="codex-model-catalog-fetch"]').exists()).toBe(true)
+    wrapper.unmount()
+  })
+
+  it.each(['openai', 'grok', 'anthropic', 'gemini'] as const)('defaults experiment %s to its native protocol without issuing a request', async (platform) => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const wrapper = mount(UseKeyModal, { props: { show: true, apiKey: 'sk-native-fixture', baseUrl: 'https://example.test/v1', platform, purpose: 'experiment' }, global: { stubs: connectionStubs } })
+    expect(wrapper.get('nav[aria-label="Client"]').text()).toContain('keys.providers.experiment')
+    const code = wrapper.findAll('pre code').map((node) => node.text()).join('\n')
+    expect(code).toContain(platform === 'gemini' ? ':generateContent' : platform === 'anthropic' ? '/messages' : '/responses')
+    expect(code).not.toContain('sk-native-fixture')
+    expect(fetchMock).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
   afterEach(() => {
     vi.unstubAllGlobals()
     saveAsMock.mockClear()
@@ -112,7 +151,8 @@ describe('UseKeyModal', () => {
         await nextTick()
       }
 
-      const codeBlocks = wrapper.findAll('pre code').map((code) => code.text())
+      await wrapper.get('[data-testid="reveal-connection-key"]').trigger('click')
+    const codeBlocks = wrapper.findAll('pre code').map((code) => code.text())
       const allCode = codeBlocks.join('\n')
       const settings = JSON.parse(codeBlocks.find((content) => content.includes('"$schema"'))!)
 
@@ -200,6 +240,7 @@ describe('UseKeyModal', () => {
     await opencodeTab!.trigger('click')
     await nextTick()
 
+    await wrapper.get('[data-testid="reveal-connection-key"]').trigger('click')
     const parsed = JSON.parse(wrapper.find('pre code').text())
     expect(parsed.provider.grok.npm).toBe('@ai-sdk/openai-compatible')
     expect(parsed.provider.grok.name).toBe('Grok via MILE Lab')
@@ -243,6 +284,7 @@ describe('UseKeyModal', () => {
     await claudeTab!.trigger('click')
     await nextTick()
 
+    await wrapper.get('[data-testid="reveal-connection-key"]').trigger('click')
     let codeBlocks = wrapper.findAll('pre code').map((code) => code.text())
     expect(codeBlocks.join('\n')).toContain('ANTHROPIC_BASE_URL="https://example.com"')
     expect(codeBlocks.join('\n')).toContain('ANTHROPIC_AUTH_TOKEN="sk-grok-claude-test"')
@@ -346,6 +388,7 @@ describe('UseKeyModal', () => {
     await codexTab!.trigger('click')
     await nextTick()
 
+    await wrapper.get('[data-testid="reveal-connection-key"]').trigger('click')
     let codeBlocks = wrapper.findAll('pre code').map((code) => code.text())
     const configToml = codeBlocks.find((content) => content.includes('[model_providers.sub2api]'))
     expect(configToml).toBeDefined()
@@ -379,7 +422,7 @@ describe('UseKeyModal', () => {
     expect(codeBlocks.join('\n')).toContain('experimental_bearer_token = "sk-grok-codex-test"')
   })
 
-  it('keeps legacy OpenAI Codex config as the default', () => {
+  it('keeps legacy OpenAI Codex config as the default', async () => {
     const wrapper = mount(UseKeyModal, {
       props: {
         show: true,
@@ -399,6 +442,7 @@ describe('UseKeyModal', () => {
       }
     })
 
+    await wrapper.get('[data-testid="reveal-connection-key"]').trigger('click')
     const codeBlocks = wrapper.findAll('pre code').map((code) => code.text())
     const configToml = codeBlocks.find((content) => content.includes('model_provider = "OpenAI"'))
 
@@ -486,6 +530,7 @@ describe('UseKeyModal', () => {
     await apiKeyMode.trigger('click')
     await nextTick()
 
+    await wrapper.get('[data-testid="reveal-connection-key"]').trigger('click')
     const codeBlocks = wrapper.findAll('pre code').map((code) => code.text())
     const configToml = codeBlocks.find((content) => content.includes('model_provider = "OpenAI"'))
 
@@ -543,6 +588,7 @@ describe('UseKeyModal', () => {
     await wsTab!.trigger('click')
     await nextTick()
 
+    await wrapper.get('[data-testid="reveal-connection-key"]').trigger('click')
     const codeBlocks = wrapper.findAll('pre code').map((code) => code.text())
     const configToml = codeBlocks.find((content) => content.includes('supports_websockets = true'))
 
@@ -595,6 +641,7 @@ describe('UseKeyModal', () => {
     await wsTab!.trigger('click')
     await nextTick()
 
+    await wrapper.get('[data-testid="reveal-connection-key"]').trigger('click')
     const codeBlocks = wrapper.findAll('pre code').map((code) => code.text())
     const configToml = codeBlocks.find((content) => content.includes('supports_websockets = true'))
     expect(configToml).toContain('model_catalog_url = "https://example.com/v1/models"')
