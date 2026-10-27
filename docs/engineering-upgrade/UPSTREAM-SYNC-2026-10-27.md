@@ -38,4 +38,16 @@
 - Chromium、WebKit 各 45 项功能/响应式检查通过；Firefox 34 项功能检查通过。Firefox 本地驱动调整窗口存在已知问题，响应式覆盖由前两种引擎完成。浏览器业务接口使用固定 mock，不触发付费模型调用。
 - 上线前核对：307 个既有迁移无校验和冲突，仅一个新增迁移待执行；Codex 50 / Grok 30 的线上预算保持原值。
 
-上线版本与备份信息将在部署完成后补充。完整运行日志保存在本地 `output/upstream-*`，发布制品和备份索引保存在 `output/releases/mile-20261027-upstream1/`。
+- 最终只读 ESLint、TypeScript 检查、Go vet、Go 增量 golangci-lint（相对合并前版本）通过，Go lint 为 0 issues；Linux 内嵌前端生产构建通过。
+
+## 上线结果
+
+- 2026-10-27 22:48（北京时间）上线 `0.2.18-mile.20261027.upstream1`，源码 `5f35977b454edd18418512be219eb6c566cc6c56`，已推送 `huohua325/sub2api` 的 `lab/0.2.17`。
+- 服务器 `172.104.117.114`；程序 SHA-256 为 `015199784d715a568e98cabd6ef4f3836edc03e01738f33585bf9c34a7515f48`。
+- 备份 `/opt/sub2api/backups/before-mile-20261027T144836Z`，数据库备份 3,247,684 字节，通过 `pg_restore --list`；未做完整恢复演练。备份与私密配置留在服务器。
+- 迁移 308 个全部应用，无待执行项、无校验和冲突。Codex 50 / Grok 30 及 6 名用户的两类周周期、API 实验月周期保留；账本聚合检查无负点数、无异常周期，未触发任何人为重置。
+- 公网 18 个前端资源的 SHA-256 与发布构建一致，健康检查、登录页和公开配置接口均返回 200。公网 Chromium 固定 mock 业务检查 45 项通过，无页面错误。
+- sub2api、PostgreSQL、Redis 容器健康；Caddy 与 MemSlides 中转服务 active，后者 `/healthz` 为 200。新服务启动日志仅 INFO/WARN，未发现 ERROR/FATAL、panic 或迁移校验失败。
+- 没有使用真实用户密钥发起模型调用；新模型可用性仍由账号、分组与上游决定。没有声称本次做过真实模型性能基准或所有 Go 集成测试。
+
+完整运行日志保存在本地 `output/upstream-*`，发布制品、校验记录和备份索引保存在 `output/releases/mile-20261027-upstream1/`。
