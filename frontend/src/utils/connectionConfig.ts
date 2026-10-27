@@ -23,14 +23,15 @@ export function generateExperimentFiles(options: ConnectionOptions & { platform:
     : messages
       ? { model: 'YOUR_MODEL_ID', max_tokens: 128, messages: [{ role: 'user', content: 'Hello' }] }
       : { model: 'YOUR_MODEL_ID', input: 'Hello', stream: true }
-  const token = escapeShellValue(apiKey, shell)
   const headers = messages
-    ? `-H "x-api-key: ${token}" -H "anthropic-version: 2023-06-01"`
-    : gemini ? `-H "x-goog-api-key: ${token}"` : `-H "Authorization: Bearer ${token}"`
+    ? `x-api-key: ${apiKey}\nanthropic-version: 2023-06-01`
+    : gemini ? `x-goog-api-key: ${apiKey}` : `Authorization: Bearer ${apiKey}`
+  if (/[\r\n\0]/.test(apiKey)) throw new Error('Invalid header value')
   return [
     { path: 'request.json', content: JSON.stringify(payload, null, 2) },
+    { path: 'headers.txt', content: headers },
     { path: shell === 'powershell' ? 'request.ps1' : shell === 'cmd' ? 'request.cmd' : 'request.sh',
-      content: `${shell === 'unix' ? 'curl' : 'curl.exe'} -N "${escapeShellValue(endpoint, shell)}" ${headers} -H "Content-Type: application/json" --data-binary "@request.json"` },
+      content: `${shell === 'unix' ? 'curl' : 'curl.exe'} -N "${escapeShellValue(endpoint, shell)}" -H "@headers.txt" -H "Content-Type: application/json" --data-binary "@request.json"` },
   ]
 }
 

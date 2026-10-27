@@ -405,7 +405,8 @@
             <div class="flex items-center gap-1">
               <!-- Use Key Button -->
               <button
-                @click="openUseKeyModal(row)"
+                @click="openUseKeyModal(row, $event)"
+                :data-use-key-id="row.id"
                 class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-green-50 hover:text-green-600 dark:hover:bg-green-900/20 dark:hover:text-green-400"
               >
                 <Icon name="terminal" size="sm" />
@@ -1693,17 +1694,23 @@ const loadPublicSettings = async () => {
 }
 
 let connectionTrigger: HTMLElement | null = null
-const openUseKeyModal = (key: ApiKey) => {
-  const active = document.activeElement as HTMLElement | null
-  connectionTrigger = active?.closest('[role="dialog"]')
-    ? document.querySelector<HTMLElement>('[data-tour="keys-create-btn"]')
-    : active
+const openUseKeyModal = (key: ApiKey, event?: MouseEvent) => {
+  connectionTrigger = event?.currentTarget instanceof HTMLElement
+    ? event.currentTarget
+    : document.querySelector<HTMLElement>('[data-tour="keys-create-btn"]')
   connectionKey.value = { ...key, group: key.group ? { ...key.group } : undefined }
 }
 
 const closeUseKeyModal = () => {
+  const keyId = connectionKey.value?.id
   connectionKey.value = null
-  void nextTick(() => { if (connectionTrigger?.isConnected) connectionTrigger.focus(); connectionTrigger = null })
+  void nextTick(() => {
+    const target = connectionTrigger?.isConnected ? connectionTrigger
+      : document.querySelector<HTMLElement>(`[data-use-key-id="${keyId}"]`)
+        ?? document.querySelector<HTMLElement>('[data-tour="keys-create-btn"]')
+    target?.focus()
+    connectionTrigger = null
+  })
 }
 
 const handlePageChange = (page: number) => {

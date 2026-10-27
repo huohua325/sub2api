@@ -27,7 +27,7 @@ export default {
       codexBody: 'Choose the Codex group when you create the key. The gateway goes in config.toml. The key goes in auth.json.',
       experimentTitle: 'API experiment',
       experimentStatus: 'Monthly',
-      experimentBody: 'There is no local config file. After you log in, the dashboard shows the remaining amount. It resets on the Beijing calendar month and comes from the upstream quota.',
+      experimentBody: 'Use your assigned personal experiment allowance at model prices. It renews on the Beijing calendar month by default. Create a Key to get an example matching its protocol.',
       viewQuota: 'Open dashboard',
       viewAfterLogin: 'View after login',
       copyConfig: 'Copy config.toml',

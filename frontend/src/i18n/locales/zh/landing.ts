@@ -27,7 +27,7 @@ export default {
       codexBody: '创建密钥时选择 Codex 分组。网关写入 config.toml，密钥写入 auth.json。',
       experimentTitle: 'API 实验',
       experimentStatus: '按月',
-      experimentBody: '没有本机配置文件。登录后在仪表盘看剩余金额。金额按北京时间自然月重置，来自上游返回的额度。',
+      experimentBody: '使用分配的个人实验额度，按模型价格计费。默认按北京时间自然月更新；创建 Key 后可获取对应协议的请求示例。',
       viewQuota: '打开仪表盘',
       viewAfterLogin: '登录后查看',
       copyConfig: '复制 config.toml',

@@ -215,6 +215,7 @@ export default {
     lastUsedIP: 'Last Used IP',
     useKey: 'Use Key',
     connection: {
+      modelPlaceholder: 'Replace YOUR_MODEL_ID with a model allowed by your group. Save the request script, request body and headers.txt together, then run the script manually; usage may be charged. Store headers.txt as a credential.',
       copyFallback: 'Copy failed. Select Show to copy the code manually, or download the file.',
       chooseExisting: 'Choose an existing Key',
       experimentGuide: 'Choose an experiment group and create a Key, then open its connection panel for a matching protocol example. Groups may use Responses, Messages or Gemini. Available models depend on group permissions. Run requests manually; usage may be charged.',

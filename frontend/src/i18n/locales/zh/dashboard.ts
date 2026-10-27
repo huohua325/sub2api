@@ -215,6 +215,7 @@ export default {
     lastUsedIP: '最近使用 IP',
     useKey: '使用密钥',
     connection: {
+      modelPlaceholder: '将 YOUR_MODEL_ID 换成分组允许的模型。把请求、请求体和 headers.txt 保存在同一目录，再手动运行请求脚本；这会产生用量。headers.txt 含密钥，请按密钥保存。',
       copyFallback: '复制失败。可以点击“显示”，再手动选择代码复制，或下载文件。',
       chooseExisting: '选择现有 Key',
       experimentGuide: '先选择实验分组并创建 Key，再从接入面板获取匹配协议的请求示例。不同分组可能使用 Responses、Messages 或 Gemini 协议；请以实际分组和模型权限为准。请求需要手动执行，会产生用量。',

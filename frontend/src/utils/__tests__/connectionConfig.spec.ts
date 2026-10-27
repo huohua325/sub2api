@@ -1,13 +1,34 @@
 import { describe, expect, it } from 'vitest'
-import { execFileSync } from 'node:child_process'
-import { connectionApiBase, generateCodexFiles, generateGrokFiles } from '../connectionConfig'
+import { parse } from 'smol-toml'
+import { connectionApiBase, generateCodexFiles, generateGrokFiles, generateExperimentFiles } from '../connectionConfig'
 
-// Parse with a real TOML parser, rather than accepting a string snapshot.
+interface ParsedConfig {
+  model_providers: { OpenAI: { base_url: string; wire_api: string; experimental_bearer_token?: string } }
+  model_catalog_json?: string
+  endpoints: { models_base_url: string }
+  model: Record<string, { api_backend: string; env_key: string }>
+  models: { default: string }
+}
+
+// Use an independent TOML parser, with no Python requirement for frontend CI.
 function parseToml(content: string) {
-  return JSON.parse(execFileSync('python', ['-c', 'import sys,tomllib,json; print(json.dumps(tomllib.loads(sys.stdin.read())))'], { input: content, encoding: 'utf8' }))
+  return parse(content) as unknown as ParsedConfig
 }
 
 describe('connection configurations', () => {
+  it.each(['unix', 'powershell', 'cmd'])('keeps special credentials out of the experiment shell command (%s)', (shell) => {
+    const apiKey = 'sk-"$percent%&caret^backtick`'
+    for (const platform of ['openai', 'grok', 'anthropic', 'gemini']) {
+      const files = generateExperimentFiles({ baseUrl: 'https://example.test/proxy/v1', apiKey, shell, platform })
+      expect(() => JSON.parse(files[0]!.content)).not.toThrow()
+      expect(files[1]!.content).toContain(apiKey)
+      expect(files[2]!.content).not.toContain(apiKey)
+      expect(files[2]!.content).toContain('@headers.txt')
+      expect(files[2]!.content).toContain(platform === 'gemini' ? '/proxy/v1beta/models/' : '/proxy/v1/')
+    }
+    expect(() => generateExperimentFiles({ baseUrl: 'https://example.test', apiKey: 'invalid\nheader', shell, platform: 'openai' })).toThrow()
+  })
+
   it.each(['https://example.test/gateway', 'https://example.test/gateway/v1', 'https://example.test/gateway/v1/'])('preserves proxy prefixes: %s', (baseUrl) => {
     expect(connectionApiBase(baseUrl)).toBe('https://example.test/gateway/v1')
     const files = generateCodexFiles({ baseUrl, apiKey: 'sk-example' })

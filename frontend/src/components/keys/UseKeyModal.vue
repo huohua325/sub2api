@@ -1,7 +1,7 @@
 <template>
   <BaseDialog
     :show="show"
-:title="keyName ? `${t('keys.useKeyModal.title')} ? ${keyName}` : t('keys.useKeyModal.title')"
+    :title="keyName ? `${t('keys.useKeyModal.title')} · ${keyName}` : t('keys.useKeyModal.title')"
     width="wide"
     @close="emit('close')"
   >
@@ -253,6 +253,7 @@
 
         <section class="connection-next">
           <h3>{{ t('keys.connection.next') }}</h3>
+          <p v-if="activeClientTab === 'api'">{{ t('keys.connection.modelPlaceholder') }}</p>
           <p>{{ t('keys.connection.localInstructions') }}</p>
           <pre translate="no">{{ startupCommand }}</pre>
           <p>{{ t('keys.connection.templateScope') }}</p>
