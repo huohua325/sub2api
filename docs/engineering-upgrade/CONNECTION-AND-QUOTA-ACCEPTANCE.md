@@ -1,6 +1,6 @@
 # 学员接入与额度可信度验收
 
-日期：2026-10-27。目标发布版本：`0.2.18-mile.20261027.connect1`；业务源码提交 `56e9e1cd8`。发布完成后补齐服务端记录。
+日期：2026-10-27。已发布版本：`0.2.18-mile.20261027.connect1`；业务源码提交 `56e9e1cd8`。
 
 ## 实现
 
@@ -46,6 +46,8 @@
 
 存在待同步调用，因此不能把全部读数标为“精确已结算”。官方累计增量仍按观测区间内的请求权重分配，不能解释为每段对话的精确实测消耗。并发 admission 仍为软上限，本轮未实现额度预占。
 
+部署后 18:12 再次以只读事务核对：三类用途仍各有 6 个个人周期，周期异常和负数计量仍为 0。Codex 已结算记录自然增长至 192 条，待同步 42 条；Grok 待同步 22 条。没有测试流量写入、人工清零或异常重置。
+
 ## 浏览器与性能
 
 脚本：`tools/review_connection_quota.cjs`。生产构建、固定 mock 业务数据，所有业务 API 被拦截；没有使用生产账号或真实密钥，没有实际收费模型请求。
@@ -68,4 +70,13 @@ Firefox 自动化在 `about:blank` 执行 `page.setViewportSize({width:1024,heig
 
 ## 发布记录
 
-待填写备份路径、最终源代码提交、SHA256、健康检查和公网静态资源校验。服务端继续共用现有 Caddy、PostgreSQL、Redis，保留 MemSlides relay。
+- 2026-10-27 18:09（北京时间）部署至 [MILE Lab](https://sub2api.172.104.117.114.sslip.io)。版本 `0.2.18-mile.20261027.connect1`；运行程序报告提交 `56e9e1cd84e073e590d922c9460c45fe43c84272`。
+- 程序 SHA256：`ec9e50bf02dcf316db5bf5233b1a2a5f1aeef56f07710ddf7081b2d7ad3f4798`。发布目录：`/opt/sub2api/releases/mile-20261027-connect1`。
+- 备份：`/opt/sub2api/backups/before-mile-20261027T100903Z`。包含旧程序、私密配置及应用数据；数据库自定义格式备份 3,184,720 字节，已通过 `pg_restore --list`，未进行完整恢复演练。
+- 原子替换挂载程序后强制重建 Sub2API 容器。Sub2API、PostgreSQL、Redis 均 healthy；Caddy、MemSlides relay 仍 active，两个服务健康接口正常。
+- 仍为 307 个已应用迁移；无新增、待执行或 checksum 不一致项。启动日志级别汇总未发现 ERROR/FATAL，未发现 panic 或迁移校验失败。
+- 公网 `/health`、登录页、公开配置接口均为 200；18 个入口/关键页面/配置面板/品牌资源与本地构建 SHA256 一致。
+- 公网静态资源配合模拟认证与业务 API，Chromium 40 / 40 检查通过，页面异常 0。未使用生产账号、真实密钥或收费请求。这不代替真实客户端端到端调用验收。
+- 此次公网 mock 仪表盘的观测 LCP 1296ms、CLS 0.000111，五次热面板操作为 46、36、41、37、48ms；只代表这次固定环境，不作为现场性能保证。
+
+发布与公网校验结果：`output/releases/mile-20261027-connect1/{manifest,deployment,public-verification,browser-review}.json`。浏览器截图：`output/playwright/connection-quota/`，最后一轮 Chromium 图片使用线上资源；Firefox 固定视口与 WebKit 图片使用相同源代码的本地生产构建。私密备份保留在服务器，不提交仓库。

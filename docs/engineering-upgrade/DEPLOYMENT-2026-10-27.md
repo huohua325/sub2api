@@ -1,5 +1,7 @@
 # MILE Lab 线上同步记录 · 2026-10-27
 
+当前线上版本为 `0.2.18-mile.20261027.connect1`，18:09 完成切换。下方保留历次发布记录，最新记录见文末。
+
 ## 部署结果
 
 - 服务器：`172.104.117.114`，Linux x86_64。
@@ -77,3 +79,14 @@
 - 发布目录：`/opt/sub2api/releases/mile-20261027-ui2`；备份目录：`/opt/sub2api/backups/before-mile-20261027T082854Z`。数据库备份 3,139,149 字节，已读取目录检查；本轮没有新迁移。
 - SHA256：`dae16f0f85de979095e4f8ca68810d228018771550e5611d736a752356eccf28`。
 - 截图：`output/playwright/keys-space-before.png`、`output/playwright/keys-space-after-{1440,1280,1024,768,375}.png`；尺寸对照：`output/releases/mile-20261027-ui2/layout-comparison.json`。
+
+## 18:09 学员接入与额度状态统一
+
+已部署 `0.2.18-mile.20261027.connect1`，业务源码提交 `56e9e1cd84e073e590d922c9460c45fe43c84272`。创建 Key 后直接进入对应接入面板，统一首页、指引与实际配置；支持遮罩、显隐、复制和单文件下载。额度继续隐藏 Coding 点数，补齐已用比例、周期与数据可信度，修正空账本的更新时间，合并重复刷新。计费规则和数据库结构未改变。
+
+- 发布目录：`/opt/sub2api/releases/mile-20261027-connect1`。
+- SHA256：`ec9e50bf02dcf316db5bf5233b1a2a5f1aeef56f07710ddf7081b2d7ad3f4798`。
+- 备份目录：`/opt/sub2api/backups/before-mile-20261027T100903Z`；数据库备份 3,184,720 字节，已读取目录检查。
+- 运行程序版本与提交、18 个公网资源校验一致；三个容器健康，Caddy 与 MemSlides 正常；仍为 307 个迁移，无待执行或校验冲突。
+- 公网静态资源配合模拟业务响应，Chromium 40 项检查通过，无页面异常；没有生产账号写入或收费调用。部署后个人周期与计量只读核对正常。
+- 自动化、浏览器结果、Firefox 驱动限制及计量边界详见 [接入与额度验收](CONNECTION-AND-QUOTA-ACCEPTANCE.md)。
