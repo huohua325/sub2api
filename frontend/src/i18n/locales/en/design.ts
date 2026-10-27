@@ -1,0 +1,20 @@
+export default {
+  design: {
+    workspace: 'Workspace', activity: 'Activity', account: 'My account',
+    heroTitle: 'Take your ideas further.', heroLead: 'From a line of code to a new discovery. Connect your creativity with AI at MILE Lab.',
+    heroLine1: 'Take your ideas', heroLine2: 'further.',
+    enter: 'Open workspace', explore: 'Explore models', routes: 'Find your creative path',
+    routesLead: 'Code, research and experiment. Start here.', configuration: 'View connection settings',
+    welcome: 'Room for your next idea.', welcomeLead: 'Check your allowance, choose a model and bring your next idea to life.',
+    connect: 'Get connected', modelsLead: 'Find the right model for your next discovery.',
+    keysLead: 'Manage your credentials and keep every connection secure.',
+    guideLead: 'From creating a key to your first request. Connect step by step.',
+    quotaTitle: 'Your room to explore', quotaLead: 'Usage in the current window and the next reset',
+    shortcuts: 'Keep exploring', modelsShortcut: 'Explore models and pricing', keysShortcut: 'Manage API keys',
+    guideShortcut: 'Connect your tools', skip: 'Skip to main content', theme: 'Change appearance',
+    showcase: 'Design system', showcaseLead: 'MILE Lab components, materials and interaction states.',
+    sampleDialog: 'Confirm your action', sampleDescription: 'A standard dialog. Focus stays inside and returns to the trigger when closed.',
+    openDialog: 'Open dialog', sampleInput: 'Name', samplePlaceholder: 'Name your next discovery',
+    sampleEmpty: 'Your next discovery starts here', sampleEmptyDescription: 'Create your first project or read the connection guide.',
+  },
+}

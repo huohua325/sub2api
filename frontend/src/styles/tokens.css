@@ -1,0 +1,83 @@
+@font-face {
+  font-family: 'Sora';
+  src: url('../assets/fonts/sora-latin-variable.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+:root {
+  --palette-primary-50: 246 244 255;
+  --palette-primary-100: 237 232 255;
+  --palette-primary-200: 220 211 252;
+  --palette-primary-300: 194 177 246;
+  --palette-primary-400: 161 139 238;
+  --palette-primary-500: 130 105 228;
+  --palette-primary-600: 103 80 216;
+  --palette-primary-700: 85 61 184;
+  --palette-primary-800: 70 51 147;
+  --palette-primary-900: 57 44 116;
+  --palette-primary-950: 35 25 74;
+  --palette-gray-50: 245 247 252;
+  --palette-gray-100: 236 239 247;
+  --palette-gray-200: 220 226 239;
+  --palette-gray-300: 194 204 224;
+  --palette-gray-400: 139 153 179;
+  --palette-gray-500: 98 112 138;
+  --palette-gray-600: 75 88 113;
+  --palette-gray-700: 57 70 95;
+  --palette-gray-800: 42 53 77;
+  --palette-gray-900: 32 41 65;
+  --palette-gray-950: 18 25 44;
+  --palette-dark-50: 245 247 252;
+  --palette-dark-100: 232 237 249;
+  --palette-dark-200: 212 220 238;
+  --palette-dark-300: 185 197 220;
+  --palette-dark-400: 150 166 196;
+  --palette-dark-500: 114 132 164;
+  --palette-dark-600: 76 93 126;
+  --palette-dark-700: 48 62 91;
+  --palette-dark-800: 32 43 67;
+  --palette-dark-900: 23 32 53;
+  --palette-dark-950: 15 22 39;
+  --color-page: 245 247 252;
+  --color-surface: 255 255 255;
+  --color-elevated: 255 255 255;
+  --color-ink: 32 41 65;
+  --color-muted: 98 112 138;
+  --color-line: 220 226 239;
+  --color-brand: 103 80 216;
+  --color-action: 103 80 216;
+  --color-action-hover: 89 66 199;
+  --color-brand-soft: 237 232 255;
+  --color-cyan: 57 198 214;
+  --color-success: 20 126 103;
+  --color-warning: 156 96 10;
+  --color-danger: 187 55 77;
+  --radius-control: 10px;
+  --radius-panel: 16px;
+  --radius-feature: 24px;
+  --shadow-panel: 0 2px 4px rgb(32 41 65 / .025), 0 12px 40px -18px rgb(65 67 119 / .12);
+  --shadow-float: 0 4px 12px rgb(32 41 65 / .04), 0 24px 64px -20px rgb(65 67 119 / .2);
+  --shadow-focus: 0 0 0 3px rgb(103 80 216 / .15);
+  --duration-fast: 160ms;
+  --duration-overlay: 220ms;
+  --ease-out: cubic-bezier(.22, 1, .36, 1);
+}
+
+.dark {
+  --color-success: 80 199 169;
+  --color-warning: 239 190 103;
+  --color-danger: 247 133 153;
+  --color-page: 15 22 39;
+  --color-surface: 23 32 53;
+  --color-elevated: 32 43 67;
+  --color-ink: 232 237 249;
+  --color-muted: 150 166 196;
+  --color-line: 48 62 91;
+  --color-brand: 194 177 246;
+  --color-brand-soft: 48 38 83;
+  --shadow-panel: 0 2px 4px rgb(0 0 0 / .08), 0 12px 40px -18px rgb(0 0 0 / .25);
+  --shadow-float: 0 4px 12px rgb(0 0 0 / .1), 0 24px 64px -20px rgb(0 0 0 / .4);
+}

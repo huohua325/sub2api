@@ -1,5 +1,5 @@
 <template>
-  <AppLayout>
+  <AppLayout :page-header="false">
     <div class="space-y-6 pb-12">
       <!-- Ops-style elevated shell: title toolbar + filters (mirrors OpsDashboardHeader) -->
       <section

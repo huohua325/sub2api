@@ -11,7 +11,7 @@
         @click.self="handleClose"
       >
         <!-- Modal panel -->
-        <div ref="dialogRef" :class="['modal-content', widthClasses]" @click.stop>
+        <div ref="dialogRef" tabindex="-1" :class="['modal-content', widthClasses]" @click.stop>
           <!-- Header -->
           <div class="modal-header">
             <h3 :id="dialogId" class="modal-title">
@@ -58,6 +58,14 @@ const dialogId = `modal-title-${++dialogIdCounter}`
 const dialogRef = ref<HTMLElement | null>(null)
 const modalBodyRef = ref<HTMLElement | null>(null)
 let previousActiveElement: HTMLElement | null = null
+let pointerTrigger: HTMLElement | null = null
+let pointerTime = 0
+
+function rememberTrigger(event: PointerEvent) {
+  if (props.show || !(event.target instanceof Element)) return
+  pointerTrigger = event.target.closest<HTMLElement>('button, a[href], [role="button"]')
+  pointerTime = performance.now()
+}
 
 type DialogWidth = 'narrow' | 'normal' | 'wide' | 'extra-wide' | 'full'
 
@@ -110,9 +118,24 @@ const handleClose = () => {
   }
 }
 
+const getFocusable = () => Array.from(dialogRef.value?.querySelectorAll<HTMLElement>(
+  'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex="0"]'
+) ?? []).filter(el => el.tabIndex >= 0 && !el.closest('[hidden], [inert]') && getComputedStyle(el).display !== 'none' && getComputedStyle(el).visibility !== 'hidden')
+
 const handleEscape = (event: KeyboardEvent) => {
-  if (props.show && props.closeOnEscape && event.key === 'Escape' && [...openDialogs].pop() === dialogId) {
+  if (!props.show || [...openDialogs].pop() !== dialogId) return
+  if (props.closeOnEscape && event.key === 'Escape') {
     emit('close')
+  }
+  if (event.key !== 'Tab') return
+  const items = getFocusable()
+  const first = items[0]
+  const last = items[items.length - 1]
+  if (!first) { event.preventDefault(); dialogRef.value?.focus(); return }
+  if (event.shiftKey && (document.activeElement === first || !dialogRef.value?.contains(document.activeElement))) {
+    event.preventDefault(); last?.focus()
+  } else if (!event.shiftKey && (document.activeElement === last || !dialogRef.value?.contains(document.activeElement))) {
+    event.preventDefault(); first.focus()
   }
 }
 
@@ -128,7 +151,10 @@ watch(
   async (isOpen) => {
     if (isOpen) {
       // 保存当前焦点元素
-      previousActiveElement = document.activeElement as HTMLElement
+      previousActiveElement = pointerTrigger?.isConnected && performance.now() - pointerTime < 1000
+        ? pointerTrigger
+        : document.activeElement as HTMLElement
+      pointerTrigger = null
       // 使用CSS类而不是直接操作style,更易于管理多个对话框
       updateScrollLock(true)
 
@@ -138,10 +164,8 @@ watch(
         modalBodyRef.value.scrollTop = 0
       }
       if (dialogRef.value) {
-        const firstFocusable = dialogRef.value.querySelector<HTMLElement>(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-        )
-        firstFocusable?.focus()
+        const focusTarget = getFocusable()[0] ?? dialogRef.value
+        focusTarget.focus()
       }
     } else {
       updateScrollLock(false)
@@ -157,10 +181,12 @@ watch(
 
 onMounted(() => {
   document.addEventListener('keydown', handleEscape)
+  document.addEventListener('pointerdown', rememberTrigger, true)
 })
 
 onUnmounted(() => {
   document.removeEventListener('keydown', handleEscape)
+  document.removeEventListener('pointerdown', rememberTrigger, true)
   // 确保组件卸载时移除滚动锁定
   updateScrollLock(false)
 })

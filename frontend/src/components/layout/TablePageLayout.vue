@@ -1,5 +1,6 @@
 <template>
   <div class="table-page-layout" :class="{ 'mobile-mode': isMobile }">
+    <div v-if="$slots.header" class="layout-section-fixed table-page-header"><slot name="header" /></div>
     <!-- 固定区域：操作按钮 -->
     <div v-if="$slots.actions" class="layout-section-fixed">
       <slot name="actions" />
@@ -47,12 +48,14 @@ onUnmounted(() => {
 /* 桌面端：Flexbox 布局 */
 .table-page-layout {
   @apply flex flex-col gap-6;
-  height: calc(100vh - 64px - 4rem); /* 减去 header + lg:p-8 的上下padding */
+  height: calc(100vh - var(--layout-header-height, 64px) - var(--layout-heading-space, 0px) - 4rem);
+  min-height: 360px;
 }
 
 .layout-section-fixed {
   @apply flex-shrink-0;
 }
+.table-page-header :deep(.lab-page-header) { margin-bottom: 0; }
 
 .layout-section-scrollable {
   @apply flex-1 min-h-0 flex flex-col;

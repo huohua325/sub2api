@@ -1,6 +1,7 @@
 <template>
-  <AppLayout>
+  <AppLayout :page-header="false">
     <TablePageLayout>
+      <template #header><PageHeader :title="t('keys.title')" :description="t('design.keysLead')" /></template>
       <template #filters>
         <div class="flex flex-col gap-3">
           <div class="flex flex-wrap items-center gap-3">
@@ -1215,6 +1216,7 @@ import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
 
 const { t } = useI18n()
 import { keysAPI, authAPI, usageAPI, userGroupsAPI } from '@/api'
+import PageHeader from '@/components/common/PageHeader.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
 import BulkEditKeysModal from '@/components/keys/BulkEditKeysModal.vue'

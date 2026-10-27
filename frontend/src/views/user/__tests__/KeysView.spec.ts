@@ -567,6 +567,7 @@ describe('user KeysView column settings', () => {
       // Deliberately ambiguous names: classification must follow the platform.
       name: `Shared group ${index + 1}`,
       platform,
+      usage_kind: platform === 'openai' || platform === 'grok' ? 'coding' : 'experiment',
       rate_multiplier: 1,
       subscription_type: 'standard',
     }))
@@ -585,14 +586,12 @@ describe('user KeysView column settings', () => {
 
     it('classifies all configured platforms and retains the complete table filter', async () => {
       const wrapper = await openCreate()
-      expect(wrapper.findAll('input[name="key-provider"]')).toHaveLength(4)
-      expect(optionIds(wrapper)).toEqual([1])
-      await chooseProvider(wrapper, 'openai')
+      expect(wrapper.findAll('input[name="key-provider"]')).toHaveLength(3)
       expect(optionIds(wrapper)).toEqual([2])
-      await chooseProvider(wrapper, 'domestic')
-      expect(optionIds(wrapper)).toEqual([3, 4, 5, 6])
-      await chooseProvider(wrapper, 'other')
-      expect(optionIds(wrapper)).toEqual([7, 8, 9, 10, 11, 12])
+      await chooseProvider(wrapper, 'grok_build')
+      expect(optionIds(wrapper)).toEqual([8])
+      await chooseProvider(wrapper, 'experiment')
+      expect(optionIds(wrapper)).toEqual([1, 3, 4, 5, 6, 7, 9, 10, 11, 12])
       expect(wrapper.findAllComponents({ name: 'Select' })[0].props('options')).toHaveLength(14)
     })
 
@@ -600,7 +599,7 @@ describe('user KeysView column settings', () => {
       const wrapper = await openCreate()
       await wrapper.get('[data-tour="key-form-name"]').setValue('My key')
       await groupSelect(wrapper).vm.$emit('update:modelValue', 1)
-      await chooseProvider(wrapper, 'domestic')
+      await chooseProvider(wrapper, 'experiment')
       expect(groupSelect(wrapper).props('modelValue')).toBeNull()
       await wrapper.get('#key-form').trigger('submit')
       expect(keysAPI.create).not.toHaveBeenCalled()
@@ -617,8 +616,8 @@ describe('user KeysView column settings', () => {
     it('defaults to a provider with available groups and disables empty categories', async () => {
       getAvailableGroups.mockResolvedValue([availableGroups[5]])
       const wrapper = await openCreate()
-      expect(wrapper.get<HTMLInputElement>('input[value="domestic"]').element.checked).toBe(true)
-      expect(wrapper.get<HTMLInputElement>('input[value="anthropic"]').element.disabled).toBe(true)
+      expect(wrapper.get<HTMLInputElement>('input[value="experiment"]').element.checked).toBe(true)
+      expect(wrapper.get<HTMLInputElement>('input[value="codex"]').element.disabled).toBe(true)
       expect(optionIds(wrapper)).toEqual([6])
     })
 
@@ -636,17 +635,17 @@ describe('user KeysView column settings', () => {
       const wrapper = await openCreate()
       resolveGroups([availableGroups[1]])
       await flushPromises()
-      expect(wrapper.get<HTMLInputElement>('input[value="openai"]').element.checked).toBe(true)
+      expect(wrapper.get<HTMLInputElement>('input[value="codex"]').element.checked).toBe(true)
       expect(optionIds(wrapper)).toEqual([2])
     })
 
     it('resets provider and group when reopening create, and preserves edit options', async () => {
       const wrapper = await openCreate()
-      await chooseProvider(wrapper, 'domestic')
+      await chooseProvider(wrapper, 'experiment')
       await groupSelect(wrapper).vm.$emit('update:modelValue', 5)
       await wrapper.get('[data-test="close-dialog"]').trigger('click')
       await wrapper.get('[data-tour="keys-create-btn"]').trigger('click')
-      expect(optionIds(wrapper)).toEqual([1])
+      expect(optionIds(wrapper)).toEqual([2])
       expect(groupSelect(wrapper).props('modelValue')).toBeNull()
       await wrapper.get('[data-test="close-dialog"]').trigger('click')
       await getButtonByText(wrapper, 'common.edit').trigger('click')

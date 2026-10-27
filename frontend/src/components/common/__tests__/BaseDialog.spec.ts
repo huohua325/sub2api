@@ -8,6 +8,34 @@ vi.mock('vue-i18n', () => ({
 }))
 
 describe('BaseDialog', () => {
+  it('returns to a pointer trigger even on browsers that do not focus clicked buttons', async () => {
+    const trigger = document.createElement('button')
+    document.body.append(trigger)
+    const wrapper = mount(BaseDialog, { attachTo: document.body, props: { show: false, title: 'Create key' } })
+    trigger.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }))
+    await wrapper.setProps({ show: true })
+    await nextTick()
+    await wrapper.setProps({ show: false })
+    await nextTick()
+    expect(document.activeElement).toBe(trigger)
+    wrapper.unmount()
+  })
+  it('wraps Tab and Shift+Tab inside the topmost dialog', async () => {
+    const wrapper = mount(BaseDialog, {
+      attachTo: document.body,
+      props: { show: true, title: 'Create key' },
+      slots: { default: '<input aria-label="Name" />', footer: '<button id="last-dialog-action">Create</button>' },
+    })
+    await nextTick()
+    const first = document.querySelector('.modal-header button') as HTMLButtonElement
+    const last = document.querySelector('#last-dialog-action') as HTMLButtonElement
+    first.focus()
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true }))
+    expect(document.activeElement).toBe(last)
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }))
+    expect(document.activeElement).toBe(first)
+    wrapper.unmount()
+  })
   afterEach(() => {
     document.body.innerHTML = ''
     document.body.classList.remove('modal-open')

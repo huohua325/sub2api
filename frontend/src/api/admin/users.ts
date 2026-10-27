@@ -367,6 +367,9 @@ export interface PurposeAllowanceItem {
   used_amount?: number
   resets_at?: string
   display_percent?: number | null
+  point_used?: string
+  point_limit?: string
+  reset_scope?: 'shared' | 'personal' | 'month'
 }
 
 export interface PlatformQuotasResponse {

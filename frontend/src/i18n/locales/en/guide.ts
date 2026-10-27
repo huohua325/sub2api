@@ -133,7 +133,6 @@ export default {
     output: 'Output',
     cache: 'Cache',
     unit: 'yuan / million tokens',
-    footnote: 'Create the key in the matching group. Models marked peak or long context cost more, as the card says.',
     families: {
       all: 'All',
       gpt: 'GPT',
@@ -150,7 +149,9 @@ export default {
       long2: 'Above 200k tokens costs double',
       long3: 'Above 256k tokens costs triple',
       long5: 'Above 100k tokens costs five times',
-      long55: 'Above 272k tokens: input 6, output 27, cache 0.6'
+      long55: 'Above 272k tokens: input 6, output 27, cache 0.6',
+      long272: 'Above 272k tokens costs double',
+      tier: 'Longer context uses the next official tier'
     }
   }
 }

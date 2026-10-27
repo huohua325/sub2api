@@ -27,8 +27,10 @@ const PREFETCH_ADJACENCY: Record<string, string[]> = {
   '/admin/groups': ['/admin/subscriptions', '/admin/users'],
   '/admin/subscriptions': ['/admin/groups', '/admin/redeem'],
   // User routes
-  '/dashboard': ['/keys', '/usage'],
-  '/keys': ['/dashboard', '/usage'],
+  '/dashboard': ['/models', '/keys', '/guide'],
+  '/keys': ['/guide', '/usage'],
+  '/models': ['/keys', '/guide'],
+  '/guide': ['/models', '/keys'],
   '/usage': ['/keys', '/redeem'],
   '/redeem': ['/usage', '/profile'],
   '/profile': ['/dashboard', '/keys']
@@ -67,6 +69,10 @@ const cancelScheduledCallback = (handle: IdleCallbackHandle): void => {
  *
  * @param router - Vue Router 实例，用于获取路由组件
  */
+function saveDataEnabled(): boolean {
+  return Boolean((navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData)
+}
+
 export function useRoutePrefetch(router?: Router) {
   // 当前挂起的预加载任务句柄
   const pendingPrefetchHandle = ref<IdleCallbackHandle | null>(null)
@@ -130,12 +136,14 @@ export function useRoutePrefetch(router?: Router) {
   const triggerPrefetch = (route: RouteLocationNormalized): void => {
     cancelPendingPrefetch()
 
+    if (saveDataEnabled()) return
     const prefetchPaths = getPrefetchPaths(route)
     if (prefetchPaths.length === 0) return
 
     pendingPrefetchHandle.value = scheduleIdleCallback(
       () => {
         pendingPrefetchHandle.value = null
+        if (saveDataEnabled()) return
 
         const routePath = route.path
         if (prefetchedRoutes.value.has(routePath)) return

@@ -1,0 +1,20 @@
+export default {
+  design: {
+    workspace: '工作台', activity: '使用情况', account: '我的账户',
+    heroTitle: '让想法，抵达下一程。', heroLead: '从一行代码到一次探索，在 MILE Lab 连接你的 AI 创造力。',
+    heroLine1: '让想法，', heroLine2: '抵达下一程。',
+    enter: '进入工作台', explore: '探索可用模型', routes: '选择你的创作路径',
+    routesLead: '编程、研究与实验，从这里开始。', configuration: '查看接入配置',
+    welcome: '你的灵感，随时启程。', welcomeLead: '查看额度，选择模型，把下一个想法变成现实。',
+    connect: '开始接入', modelsLead: '找到适合下一次探索的模型。',
+    keysLead: '管理你的连接凭证，安全地连接每一次创作。',
+    guideLead: '从创建密钥到发起第一次请求，一步步完成连接。',
+    quotaTitle: '你的可用空间', quotaLead: '当前窗口的已用额度与重置时间',
+    shortcuts: '继续探索', modelsShortcut: '浏览模型与价格', keysShortcut: '管理 API Key',
+    guideShortcut: '连接你的工具', skip: '跳至主要内容', theme: '切换外观',
+    showcase: '设计系统', showcaseLead: 'MILE Lab 的组件、材质与交互状态。',
+    sampleDialog: '确认你的操作', sampleDescription: '这是标准弹窗。焦点会保持在弹窗中，关闭后返回触发按钮。',
+    openDialog: '打开弹窗', sampleInput: '名称', samplePlaceholder: '为你的下一次探索命名',
+    sampleEmpty: '下一次探索，从这里开始', sampleEmptyDescription: '创建第一个项目，或查看接入指引。',
+  },
+}

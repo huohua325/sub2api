@@ -7,6 +7,7 @@ import batchImage from './batchImage'
 import guide from './guide'
 import admin from './admin'
 import misc from './misc'
+import design from './design'
 
 export default {
   adminAccessKeys,
@@ -18,4 +19,5 @@ export default {
   ...guide,
   admin,
   ...misc,
+  ...design,
 }

@@ -108,7 +108,16 @@ describe('HomeView compact mode', () => {
     const wrapper = mountHome(settings)
 
     expect(wrapper.find('[data-testid="compact-home"]').exists()).toBe(false)
-    expect(wrapper.find('.terminal-container').exists()).toBe(true)
+    expect(wrapper.get('[data-testid="lab-home"]').text()).toContain('home.sheet.title')
+    expect(wrapper.find('.terminal-container').exists()).toBe(false)
+  })
+
+  it('sends a signed-in visitor to the console instead of login', () => {
+    authStore.isAuthenticated = true
+    const wrapper = mountHome()
+    const destinations = wrapper.findAllComponents(RouterLinkStub).map((link) => link.props('to'))
+    expect(destinations).toContain('/dashboard')
+    expect(destinations).not.toContain('/login')
   })
 
   it('links unauthenticated visitors to login', () => {

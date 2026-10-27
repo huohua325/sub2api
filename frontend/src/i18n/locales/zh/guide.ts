@@ -133,7 +133,6 @@ export default {
     output: '输出',
     cache: '缓存',
     unit: '元/百万 token',
-    footnote: '密钥要建在对应分组。标了高峰或超长的模型，按卡片上的说明加价。',
     families: {
       all: '全部',
       gpt: 'GPT',
@@ -150,7 +149,9 @@ export default {
       long2: '20 万 token 以上按两倍',
       long3: '超过 25.6 万 token 按三倍',
       long5: '超过 10 万 token 按五倍',
-      long55: '超过 27.2 万 token：输入 6，输出 27，缓存 0.6'
+      long55: '超过 27.2 万 token：输入 6，输出 27，缓存 0.6',
+      long272: '超过 27.2 万 token 按两倍',
+      tier: '更长上下文按官网更高一档'
     }
   }
 }

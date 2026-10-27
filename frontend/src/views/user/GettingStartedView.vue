@@ -1,13 +1,8 @@
 <template>
-  <AppLayout>
-    <div class="grid w-full items-start gap-8 xl:grid-cols-[minmax(0,46rem)_16rem]">
-      <article class="card px-6 py-8 sm:px-10 sm:py-10">
-        <h2 class="text-2xl font-semibold tracking-tight text-gray-900 dark:text-white">
-          {{ t('guide.title') }}
-        </h2>
-        <p class="mt-3 max-w-[40rem] text-sm leading-6 text-gray-600 dark:text-gray-300">
-          {{ t('guide.manual.lead') }}
-        </p>
+  <AppLayout :page-header="false">
+    <div class="grid w-full grid-cols-1 items-start gap-8 xl:grid-cols-[minmax(0,46rem)_16rem]">
+      <article class="lab-guide-content">
+        <PageHeader :title="t('guide.title')" :description="t('guide.manual.lead')" />
 
         <nav :aria-label="t('guide.tocLabel')" class="mt-6 flex flex-wrap gap-x-4 gap-y-2 border-b border-gray-100 pb-4 dark:border-dark-700 xl:hidden">
           <a
@@ -46,7 +41,7 @@
           <GuideCommand class="mt-3" label="codex --version" command="codex --version" />
 
           <h4 class="mt-8 text-sm font-semibold text-gray-900 dark:text-white">{{ t('guide.manual.openFolder') }}</h4>
-          <div class="mt-3 grid gap-3 sm:grid-cols-2">
+          <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <GuideCommand :label="t('guide.manual.windows')" command="%USERPROFILE%\.codex" />
             <GuideCommand :label="t('guide.manual.unix')" command="~/.codex" />
           </div>
@@ -83,7 +78,7 @@
           <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('guide.manual.grok.title') }}</h3>
           <p class="mt-2 max-w-[40rem] text-sm leading-6 text-gray-600 dark:text-gray-300">{{ t('guide.manual.grok.ready') }}</p>
           <p class="mt-4 max-w-[40rem] text-sm leading-6 text-gray-600 dark:text-gray-300">{{ t('guide.manual.grok.install') }}</p>
-          <div class="mt-4 grid gap-3 sm:grid-cols-2">
+          <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <GuideCommand :label="t('guide.manual.windows')" command="irm https://x.ai/cli/install.ps1 | iex" />
             <GuideCommand :label="t('guide.manual.unix')" command="curl -fsSL https://x.ai/cli/install.sh | bash" />
           </div>
@@ -91,7 +86,7 @@
           <p class="mt-2 text-sm leading-6 text-gray-500 dark:text-gray-400">{{ t('guide.manual.grok.version') }}</p>
 
           <h4 class="mt-8 text-sm font-semibold text-gray-900 dark:text-white">{{ t('guide.manual.openFolder') }}</h4>
-          <div class="mt-3 grid gap-3 sm:grid-cols-2">
+          <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <GuideCommand :label="t('guide.manual.windows')" command="%USERPROFILE%\.grok" />
             <GuideCommand :label="t('guide.manual.unix')" command="~/.grok" />
           </div>
@@ -155,6 +150,7 @@
 <script setup lang="ts">
 import { computed, defineComponent, h, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import PageHeader from '@/components/common/PageHeader.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import { useClipboard } from '@/composables/useClipboard'
 import { useAppStore } from '@/stores/app'
@@ -188,7 +184,7 @@ const GuideFile = defineComponent({
         h('span', { class: 'font-mono text-xs text-gray-700 dark:text-gray-200', translate: 'no' }, props.filename),
         h('button', {
           type: 'button',
-          class: 'text-xs font-medium text-gray-600 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40 dark:text-gray-300 dark:hover:text-white',
+          class: 'btn btn-secondary btn-sm',
           onClick: () => emit('copy'),
         }, props.copied ? props.copiedLabel : props.copyLabel),
       ]),

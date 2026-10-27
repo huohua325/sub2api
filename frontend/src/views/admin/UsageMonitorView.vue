@@ -279,9 +279,10 @@ async function loadMonitor(quiet = false) {
     if (quiet && monitor.value) quietError.value = t('admin.usageMonitor.quietFailed')
     else errorText.value = text
   } finally {
-    if (token !== monitorToken) return
-    loading.value = false
-    refreshing.value = false
+    if (token === monitorToken) {
+      loading.value = false
+      refreshing.value = false
+    }
   }
 }
 

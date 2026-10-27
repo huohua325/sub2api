@@ -1,14 +1,9 @@
 <template>
-  <AppLayout>
+  <AppLayout :page-header="false">
     <div class="mx-auto w-full max-w-6xl">
-      <h2 class="text-2xl font-semibold tracking-tight text-gray-900 dark:text-white">
-        {{ t('models.title') }}
-      </h2>
-      <p class="mt-2 max-w-2xl text-sm leading-6 text-gray-600 dark:text-gray-300">
-        {{ t('models.lead') }}
-      </p>
-
-      <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+      <PageHeader :title="t('models.title')" :description="t('models.lead')" />
+      <div class="lab-model-toolbar">
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
         <label class="relative min-w-0 flex-1" for="model-search">
           <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
             <Icon name="search" size="md" />
@@ -43,6 +38,8 @@
         </button>
       </div>
 
+      </div>
+
       <p
         v-if="visible.length === 0"
         data-testid="model-empty"
@@ -56,8 +53,9 @@
           v-for="model in visible"
           :key="model.id"
           data-testid="model-card"
-          class="rounded-xl border border-gray-200 bg-white px-4 py-4 dark:border-dark-700 dark:bg-dark-800"
+          class="lab-model-card"
         >
+          <span class="lab-model-family">{{ t(`models.families.${model.family}`) }}</span>
           <div class="flex items-start justify-between gap-3">
             <button
               type="button"
@@ -89,18 +87,15 @@
           </p>
         </li>
       </ul>
-
-      <p class="mt-6 max-w-2xl text-sm leading-6 text-gray-500 dark:text-gray-400">
-        {{ t('models.footnote') }}
-      </p>
     </div>
   </AppLayout>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import PageHeader from '@/components/common/PageHeader.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { useClipboard } from '@/composables/useClipboard'
 import {
@@ -116,6 +111,8 @@ const query = ref('')
 const family = ref<'all' | ModelFamily>('all')
 const copiedId = ref('')
 let copiedTimer: ReturnType<typeof setTimeout> | undefined
+
+onUnmounted(() => clearTimeout(copiedTimer))
 
 const familyFilters = computed(() => [
   { id: 'all' as const, label: t('models.families.all') },

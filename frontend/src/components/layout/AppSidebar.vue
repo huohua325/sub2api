@@ -1,6 +1,12 @@
 <template>
   <aside
+    ref="sidebarRef"
     class="sidebar"
+    :inert="isNarrow && !mobileOpen || undefined"
+    :role="isNarrow && mobileOpen ? 'dialog' : undefined"
+    :aria-modal="isNarrow && mobileOpen ? true : undefined"
+    :aria-label="t('common.toggleMenu')"
+    tabindex="-1"
     :class="[
       sidebarCollapsed ? 'w-[72px]' : 'w-64',
       { '-translate-x-full lg:translate-x-0': !mobileOpen }
@@ -8,6 +14,7 @@
   >
     <!-- Logo/Brand -->
     <div class="sidebar-header" :class="{ 'sidebar-header-collapsed': sidebarCollapsed }">
+      <button v-if="isNarrow" type="button" class="lab-drawer-close lab-theme-toggle" :aria-label="t('common.close')" @click="closeMobile"><Icon name="x" size="md" /></button>
       <!-- Custom Logo or Default Logo -->
       <router-link
         :to="homePath"
@@ -124,16 +131,18 @@
         </div>
       </template>
 
-      <!-- Regular User View -->
+      <!-- Groups contain only entries allowed by existing feature/permission filters. -->
       <template v-else-if="!appStore.backendModeEnabled">
-        <div class="sidebar-section">
+        <div v-for="group in userNavGroups" :key="group.id" class="sidebar-section">
+          <div v-if="!sidebarCollapsed" class="sidebar-section-title">{{ t(`design.${group.id}`) }}</div>
           <router-link
-            v-for="item in userNavItems"
+            v-for="item in group.items"
             :key="item.path"
             :to="item.path"
             class="sidebar-link mb-1"
             :class="{ 'sidebar-link-active': isActive(item.path), 'sidebar-link-collapsed': sidebarCollapsed }"
             :title="sidebarCollapsed ? item.label : undefined"
+            :aria-current="isActive(item.path) ? 'page' : undefined"
             :data-tour="item.path === '/keys' ? 'sidebar-my-keys' : undefined"
             @click="handleMenuItemClick(item.path)"
           >
@@ -163,6 +172,7 @@
 
       <!-- Collapse Button -->
       <button
+        v-if="!isNarrow"
         @click="toggleSidebar"
         class="sidebar-link w-full"
         :class="{ 'sidebar-link-collapsed': sidebarCollapsed }"
@@ -186,6 +196,8 @@
 </template>
 
 <script setup lang="ts">
+import { useTheme } from '@/composables/useTheme'
+import { useNavigationDrawer } from '@/composables/useNavigationDrawer'
 import { computed, h, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -196,6 +208,7 @@ import { sanitizeSvg } from '@/utils/sanitize'
 import { sanitizeUrl } from '@/utils/url'
 import { FeatureFlags, makeSidebarFlag } from '@/utils/featureFlags'
 import { resolveSiteBillingMode } from '@/utils/siteBillingMode'
+import { groupStudentNavigation } from '@/utils/studentNavigation'
 import { useBatchImageAccess } from '@/composables/useBatchImageAccess'
 
 interface NavItem {
@@ -244,11 +257,13 @@ const onboardingStore = useOnboardingStore()
 const adminSettingsStore = useAdminSettingsStore()
 const { canUseBatchImage, refreshBatchImageAccess } = useBatchImageAccess()
 
-const sidebarCollapsed = computed(() => appStore.sidebarCollapsed)
 const mobileOpen = computed(() => appStore.mobileOpen)
+const sidebarRef = ref<HTMLElement | null>(null)
+const { isNarrow } = useNavigationDrawer(sidebarRef, mobileOpen, () => appStore.setMobileOpen(false))
+const sidebarCollapsed = computed(() => appStore.sidebarCollapsed && !isNarrow.value)
 const isAdmin = computed(() => authStore.isAdmin)
 const sidebarNavRef = ref<HTMLElement | null>(null)
-const isDark = ref(document.documentElement.classList.contains('dark'))
+const { isDark, toggleTheme } = useTheme()
 
 const homePath = computed(() => (isAdmin.value ? '/admin/dashboard' : '/dashboard'))
 
@@ -781,11 +796,12 @@ function finalizeNav(items: NavItem[]): NavItem[] {
 
 // User navigation items (for regular users)
 const userNavItems = computed((): NavItem[] => finalizeNav(buildSelfNavItems(true)))
+const userNavGroups = computed(() => groupStudentNavigation(userNavItems.value))
 
 // Personal navigation items (for admin's "My Account" section, without Dashboard).
 // Admins access 可用渠道 from this section just like regular users — there is no
 // separate admin entry, since the page is purely a user-facing view.
-const personalNavItems = computed((): NavItem[] => finalizeNav(buildSelfNavItems(false)))
+const personalNavItems = computed((): NavItem[] => groupStudentNavigation(finalizeNav(buildSelfNavItems(false))).flatMap((group) => group.items))
 
 // Custom menu items filtered by visibility
 const customMenuItemsForUser = computed(() => {
@@ -893,11 +909,7 @@ function toggleSidebar() {
   appStore.toggleSidebar()
 }
 
-function toggleTheme() {
-  isDark.value = !isDark.value
-  document.documentElement.classList.toggle('dark', isDark.value)
-  localStorage.setItem('theme', isDark.value ? 'dark' : 'light')
-}
+
 
 function closeMobile() {
   appStore.setMobileOpen(false)
@@ -962,15 +974,7 @@ function handleGroupClick(item: NavItem) {
   groupExpandOverrides.value.set(item.path, true)
 }
 
-// Initialize theme
-const savedTheme = localStorage.getItem('theme')
-if (
-  savedTheme === 'dark' ||
-  (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)
-) {
-  isDark.value = true
-  document.documentElement.classList.add('dark')
-}
+
 
 // Fetch admin settings (for feature-gated nav items like Ops).
 watch(

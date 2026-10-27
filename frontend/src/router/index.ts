@@ -204,8 +204,7 @@ const routes: RouteRecordRaw[] = [
       requiresAuth: true,
       requiresAdmin: false,
       title: 'Dashboard',
-      titleKey: 'dashboard.title',
-      descriptionKey: 'dashboard.welcomeMessage'
+      titleKey: 'dashboard.title'
     }
   },
   {
@@ -767,6 +766,15 @@ const routes: RouteRecordRaw[] = [
 /**
  * Create router instance
  */
+if (import.meta.env.DEV) {
+  routes.unshift({
+    path: '/__design-system',
+    name: 'DesignSystem',
+    component: () => import('@/views/dev/DesignSystemView.vue'),
+    meta: { requiresAuth: false, title: 'MILE Lab Design System' },
+  })
+}
+
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes,
