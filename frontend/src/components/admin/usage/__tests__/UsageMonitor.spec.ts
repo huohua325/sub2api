@@ -52,6 +52,7 @@ vi.mock('@/api/admin/usageMonitor', async () => {
     getUsageMonitor: api.getUsageMonitor,
     listPurposeAdjustments: api.listPurposeAdjustments,
     adjustPurposeWallet: api.adjustPurposeWallet,
+    listCodexResets: vi.fn(async () => []),
   }
 })
 
@@ -276,12 +277,6 @@ describe('purpose wallet adjustment confirms', () => {
     api.adjustPurposeWallet.mockReset()
     api.adjustPurposeWallet.mockResolvedValue({ changed: true, wallet: openai, audit: null })
   })
-
-  function dialogMessage(wrapper: ReturnType<typeof mountWithI18n>): string {
-    const dialog = wrapper.findComponent(ConfirmDialog)
-    expect(dialog.props('show')).toBe(true)
-    return String(dialog.props('message'))
-  }
 
   async function confirm(wrapper: ReturnType<typeof mountWithI18n>) {
     const button = wrapper.findAll('button').find((item) => item.text() === '确认')
@@ -600,7 +595,6 @@ describe('usage monitor page query', () => {
     const payload = settingsApi.updateSettings.mock.calls[0][0] as Record<string, unknown>
     expect(payload).toEqual({
       official_point_budget: { openai: '50', grok: '30' },
-      official_point_student_percent: true,
     })
     expect(payload).not.toHaveProperty('purpose_allowance_policy')
     expect(wrapper.get('[data-testid="cap-status"]').text()).toContain('已保存')

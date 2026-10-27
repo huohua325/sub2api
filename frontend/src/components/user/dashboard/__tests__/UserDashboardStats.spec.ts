@@ -183,6 +183,23 @@ describe('UserDashboardStats usage meters', () => {
 })
 
 describe('UserDashboardStats 按平台拆分', () => {
+  it('keeps rounded 100% usable and marks an expired server deadline as awaiting confirmation', () => {
+    const w = mount(UserDashboardStats, {
+      props: {
+        stats: makeStats(), balance: 0, isSimple: false,
+        purposeAllowances: [{ purpose: 'openai', limit_amount: 50, used_amount: 49.8,
+          display_percent: 100, blocked: false,
+          resets_at: new Date(Date.now() + 60_000).toISOString(), clock_offset_ms: 120_000 }],
+      },
+      global: { stubs: { Icon: true } },
+    })
+    const card = w.get('[data-testid="openai-purpose-card"]')
+    expect(card.text()).toContain('100%')
+    expect(card.text()).not.toContain('dashboard.codexQuota.exhausted')
+    expect(card.text()).toContain('dashboard.ruler.awaitingReset')
+    w.unmount()
+  })
+
   it('只有用量的平台才产生卡片；三档全空的限额记录不产生卡片', () => {
     const w = mountStats(
       makeStats({ total_actual_cost: 0.03, today_actual_cost: 0.03, by_platform: [usage('grok', 0.03)] }),

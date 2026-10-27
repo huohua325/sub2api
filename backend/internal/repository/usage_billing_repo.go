@@ -173,14 +173,22 @@ func (r *usageBillingRepository) applyBatchImageBalanceHold(
 }
 
 func (r *usageBillingRepository) applyUsageBillingEffects(ctx context.Context, tx *sql.Tx, cmd *service.UsageBillingCommand, result *service.UsageBillingApplyResult) error {
+	if err := recordCodingQuotaCharge(ctx, tx, cmd); err != nil {
+		return err
+	}
 	if cmd.SubscriptionCost > 0 && cmd.SubscriptionID != nil {
 		if err := incrementUsageBillingSubscription(ctx, tx, *cmd.SubscriptionID, cmd.SubscriptionCost); err != nil {
 			return err
 		}
 	}
 
+	if cmd.Purpose == service.PurposeExperiment {
+		if err := recordExperimentQuotaCharge(ctx, tx, cmd); err != nil {
+			return err
+		}
+	}
 	if cmd.PurposeCost > 0 && cmd.Purpose == service.PurposeExperiment {
-		if err := incrementUsageBillingPurpose(ctx, tx, cmd.UserID, cmd.Purpose, cmd.PurposeCost); err != nil {
+		if err := incrementUsageBillingPurposeAt(ctx, tx, cmd.UserID, cmd.Purpose, cmd.PurposeCost, cmd.StartedAt); err != nil {
 			return err
 		}
 	}
@@ -249,11 +257,30 @@ func incrementUsageBillingSubscription(ctx context.Context, tx *sql.Tx, subscrip
 	return service.ErrSubscriptionNotFound
 }
 
-func incrementUsageBillingPurpose(ctx context.Context, tx *sql.Tx, userID int64, purpose string, amount float64) error {
+func incrementUsageBillingPurposeAt(ctx context.Context, tx *sql.Tx, userID int64, purpose string, amount float64, startedAt time.Time) error {
 	policy := loadPurposeAllowancePolicy(ctx, tx)
 	rule, ok := policy.Rule(purpose)
 	if !ok || rule.Limit <= 0 {
 		return nil
+	}
+	if !startedAt.IsZero() {
+		var start time.Time
+		var period string
+		err := tx.QueryRowContext(ctx, `SELECT window_start,period FROM user_purpose_allowances WHERE user_id=$1 AND purpose=$2 FOR UPDATE`, userID, purpose).Scan(&start, &period)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
+		if err == nil {
+			current := start
+			if service.PurposeWindowExpired(period, start, time.Now()) {
+				current = service.RenewedPurposeWindow(period, start, time.Now())
+			}
+			if startedAt.Before(current) {
+				return nil
+			} // The durable history retains the closed-period charge.
+		} else if rule.Period == "month" && startedAt.Before(service.ShanghaiMonthStart(time.Now())) {
+			return nil
+		}
 	}
 	windowStart := time.Now()
 	if rule.Period == "month" {

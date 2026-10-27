@@ -98,6 +98,9 @@ func TestApplyGlobalAIExperimentChargeZerosWhenLogIsMissing(t *testing.T) {
 	if got.ActualCost != 0 || got.TotalCost != 0 {
 		t.Fatalf("missing log kept local cost: %+v", got)
 	}
+	if !got.GlobalAIChargePending || got.GlobalAIRequestID != "req-2" {
+		t.Fatalf("missing upstream charge was not retained for reconciliation: %+v", got)
+	}
 }
 
 func TestFetchGlobalAILogsHTTP(t *testing.T) {

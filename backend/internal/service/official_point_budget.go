@@ -21,7 +21,7 @@ type OfficialPointBudget struct {
 
 const (
 	defaultCodexPointBudget = "50"
-	defaultGrokPointBudget  = "80"
+	defaultGrokPointBudget  = "30"
 	maxOfficialPointBudget  = 10000
 )
 

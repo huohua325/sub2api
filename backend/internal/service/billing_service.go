@@ -209,6 +209,8 @@ type CostBreakdown struct {
 	ActualCost                float64 // 应用倍率后的实际费用
 	BillingMode               string  // 计费模式（"token"/"per_request"/"image"），由 CalculateCostUnified 填充
 	LongContextBillingApplied bool
+	GlobalAIChargePending     bool
+	GlobalAIRequestID         string
 }
 
 func applyCostBreakdownMultiplier(cost *CostBreakdown, multiplier float64) {

@@ -38,7 +38,7 @@ func TestPurposeAdjustSetLimitDoesNotChangeAnotherUserOrSettings(t *testing.T) {
 	require.Equal(t, "1.25000000", out.Wallet.EffectiveUsedAmount)
 	require.Equal(t, "month", out.Wallet.Period)
 	require.True(t, out.Wallet.WindowStart.Equal(window))
-	require.Nil(t, out.Wallet.Official)
+	require.NotNil(t, out.Wallet.Official)
 	require.Equal(t, PurposeAdjustOriginTyped, out.Audit.Origin)
 	require.Equal(t, PurposeAdjustFieldLimit, out.Audit.Field)
 	require.Equal(t, int64(7), out.Audit.ActorUserID)
@@ -98,22 +98,7 @@ func TestPurposeAdjustRebuildDoesNotDeleteUsageLogs(t *testing.T) {
 	})
 	require.Equal(t, "PURPOSE_YUAN_RETIRED", infraerrors.Reason(err))
 	require.Equal(t, before, store.logs)
-	return
-	out, err := newAdjustService(store, now).Adjust(context.Background(), PurposeAdjustInput{
-		ActorUserID: 7,
-		UserID:      12,
-		Purpose:     PurposeGrok,
-		Action:      PurposeAdjustRebuildUsed,
-		Confirm:     true,
-	})
-	require.NoError(t, err)
-	require.True(t, out.Changed)
-	require.Equal(t, "1.25000000", out.Wallet.StoredUsedAmount)
-	require.Equal(t, "100.00000000", out.Wallet.LimitAmount)
-	require.True(t, out.Wallet.WindowStart.Equal(window))
-	require.Equal(t, PurposeAdjustOriginRebuild, out.Audit.Origin)
-	require.Equal(t, PurposeAdjustFieldUsed, out.Audit.Field)
-	require.Equal(t, before, store.logs)
+	require.Equal(t, "0.25000000", store.wallets[walletKey(12, PurposeGrok)].UsedAmount)
 	require.NotContains(t, store.touchedTables, "usage_logs_delete")
 }
 
@@ -148,17 +133,7 @@ func TestPurposeAdjustExpiredSetUsed(t *testing.T) {
 		Confirm:     true,
 	})
 	require.Equal(t, "PURPOSE_YUAN_RETIRED", infraerrors.Reason(err))
-	return
-	_, err = newAdjustService(store, now).Adjust(context.Background(), PurposeAdjustInput{
-		ActorUserID: 7,
-		UserID:      12,
-		Purpose:     PurposeOpenAI,
-		Action:      PurposeAdjustSetUsed,
-		Value:       "1",
-		Confirm:     true,
-	})
-	require.Equal(t, "PURPOSE_WINDOW_EXPIRED", infraerrors.Reason(err))
-	require.Equal(t, 409, infraerrors.Code(err))
+	require.Equal(t, 400, infraerrors.Code(err))
 	require.Equal(t, "3.00000000", store.wallets[walletKey(12, PurposeOpenAI)].UsedAmount)
 	require.Empty(t, store.audits)
 
@@ -169,8 +144,8 @@ func TestPurposeAdjustExpiredSetUsed(t *testing.T) {
 		Action:      PurposeAdjustRebuildUsed,
 		Confirm:     true,
 	})
-	require.Equal(t, "PURPOSE_WINDOW_EXPIRED", infraerrors.Reason(err))
-	require.Equal(t, len(store.logs), len(store.logs))
+	require.Equal(t, "PURPOSE_YUAN_RETIRED", infraerrors.Reason(err))
+	require.Empty(t, store.logs)
 }
 
 func TestPurposeAdjustValueRange(t *testing.T) {

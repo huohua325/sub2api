@@ -112,7 +112,7 @@ describe('usage monitor board', () => {
     expect(quiet.map((item) => item.id)).toEqual([])
   })
 
-  it('uses a shared official reset and keeps the personal window when accounts differ', () => {
+  it('uses the personal ledger deadline even when all parent resets match', () => {
     const parents = [
       parent({ official_reset_at: '2026-10-29T10:00:00Z' }),
       parent({ account_id: 14, official_reset_at: '2026-10-27T10:00:00Z' }),
@@ -121,7 +121,7 @@ describe('usage monitor board', () => {
     expect(purposeResetAt([
       parent({ official_reset_at: '2026-10-29T10:00:00Z' }),
       parent({ account_id: 14, official_reset_at: '2026-10-29T10:03:00Z' }),
-    ], 'grok', '2026-11-01T00:00:00+08:00')).toBe('2026-10-29T10:00:00Z')
+    ], 'grok', '2026-11-01T00:00:00+08:00')).toBe('2026-11-01T00:00:00+08:00')
     expect(purposeResetAt([
       parent({ official_reset_at: '2026-10-27T07:32:11Z', official_used_percent: null }),
       parent({ account_id: 14, name: 'Grok Build milelab', official_reset_at: '2026-10-29T10:36:49Z', official_used_percent: '5' }),
@@ -134,7 +134,8 @@ describe('usage monitor board', () => {
     expect(purposeResetAt([], 'openai', null)).toBeNull()
     expect(purposeResetAt([
       parent({ purpose: 'openai', platform: 'openai', official_reset_at: '2026-11-01T08:23:37Z' }),
-    ], 'openai', '2026-10-28T07:07:11Z')).toBe('2026-11-01T08:23:37Z')
+    ], 'openai', '2026-10-28T07:07:11Z')).toBe('2026-10-28T07:07:11Z')
+    expect(purposeResetAt(parents, 'grok', null)).toBeNull()
   })
 
   it('counts down to an account recharge and stops at zero', () => {

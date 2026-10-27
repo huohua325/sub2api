@@ -126,7 +126,10 @@ func applyGlobalAIExperimentCharge(
 			"request_id", requestID,
 			"error", errString(err),
 		)
-		return clearExperimentCost(cost)
+		cost = clearExperimentCost(cost)
+		cost.GlobalAIChargePending = true
+		cost.GlobalAIRequestID = requestID
+		return cost
 	}
 	yuan := globalAIYuan(quota)
 	slog.Info("globalai_quota.applied",
@@ -145,6 +148,8 @@ func applyGlobalAIExperimentCharge(
 	cost.ActualCost = yuan
 	cost.LongContextBillingApplied = false
 	cost.BillingMode = globalAIQuotaBillingMode
+	cost.GlobalAIChargePending = false
+	cost.GlobalAIRequestID = requestID
 	return cost
 }
 
@@ -183,7 +188,7 @@ func lookupGlobalAIQuota(ctx context.Context, account *Account, requestID string
 	if lookupCtx == nil {
 		lookupCtx = context.Background()
 	}
-	lookupCtx, cancel := context.WithTimeout(context.WithoutCancel(lookupCtx), 4*time.Second)
+	lookupCtx, cancel := context.WithTimeout(lookupCtx, 4*time.Second)
 	defer cancel()
 
 	var lastErr error
@@ -226,7 +231,7 @@ func fetchGlobalAILogsHTTP(ctx context.Context, apiKey, logURL string) ([]global
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
 	if err != nil {
 		return nil, err

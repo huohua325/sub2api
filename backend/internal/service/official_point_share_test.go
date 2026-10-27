@@ -106,7 +106,7 @@ func TestParseOfficialPointBudget(t *testing.T) {
 	require.Equal(t, "101/2", got.RatString())
 	normalized, err := NormalizeOfficialPointBudget(OfficialPointBudget{OpenAI: "50"})
 	require.NoError(t, err)
-	require.Equal(t, "80", normalized.Grok)
+	require.Equal(t, "30", normalized.Grok)
 }
 
 func TestPointsFromParentsKeepsStoppedAccountWindow(t *testing.T) {

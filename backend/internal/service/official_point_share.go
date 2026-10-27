@@ -18,12 +18,17 @@ type OfficialPointResult struct {
 	Points  *string
 	Percent *int
 	Reset   *time.Time
-	// OfficialResets are the readable parent windows for this purpose.
-	// The student countdown follows them only when they agree.
+	// OfficialResets is retained for legacy store adapters. Personal ledger
+	// countdowns use Reset and never derive a cycle from these parent clocks.
 	OfficialResets []time.Time
 	// Blocked is true only when this window's points are at least the per-person cap.
 	// A card can already read 100% while Blocked is still false.
-	Blocked bool
+	Blocked     bool
+	PeriodStart *time.Time
+	Pending     *string
+	DataStatus  string
+	UpdatedAt   *time.Time
+	ResetReason string
 }
 
 // OfficialPointsForPurpose sums already-rounded points from each parent of one

@@ -44,10 +44,12 @@ export function parsePointCap(raw: string): string | null {
 
 export function purposeStatus(wallet: UsageMonitorWallet | undefined): PurposeStatus {
   if (!wallet) return 'ok'
+  if (wallet.blocked) return 'over'
+  if (wallet.data_status === 'error' || wallet.data_status === 'partial' || wallet.data_status === 'pending') return 'missing'
   if (wallet.purpose === 'experiment') {
     const used = readDecimal(wallet.effective_used_amount)
     const limit = readDecimal(wallet.limit_amount)
-    if (used != null && limit != null && limit > 0 && used >= limit) return 'over'
+    if (used != null && limit != null && limit >= 0 && used >= limit) return 'over'
     if (wallet.student_percent != null && wallet.student_percent >= 80) return 'near'
     return 'ok'
   }
@@ -182,32 +184,9 @@ export interface RechargeCountdown {
   seconds: number
 }
 
-const officialResetGapMs = 5 * 60 * 1000
-
-export function purposeResetAt(parents: UsageMonitorParent[], purpose: string, walletReset: string | null | undefined): string | null {
-  if (purpose === 'experiment') {
-    const text = (walletReset || '').trim()
-    return text || null
-  }
-  let earliest: number | null = null
-  let latest = 0
-  let chosen: string | null = null
-  let count = 0
-  for (const parent of parents) {
-    if (parent.purpose !== purpose || parent.official_used_percent == null || !parent.official_reset_at) continue
-    const time = Date.parse(parent.official_reset_at)
-    if (Number.isNaN(time)) continue
-    count += 1
-    if (earliest === null || time < earliest) {
-      earliest = time
-      chosen = parent.official_reset_at
-    }
-    if (time > latest) latest = time
-  }
-  // Codex already had an overall recharge, so one remaining account still
-  // carries that shared reset. Grok has not, so one period end stays personal.
-  const minimum = purpose === 'openai' ? 1 : 2
-  if (count >= minimum && earliest !== null && latest - earliest <= officialResetGapMs) return chosen
+export function purposeResetAt(_parents: UsageMonitorParent[], _purpose: string, walletReset: string | null | undefined): string | null {
+  // The server already applies confirmed exceptional events to the personal
+  // period. Matching parent clocks alone must never replace that decision.
   const personal = (walletReset || '').trim()
   return personal || null
 }

@@ -273,6 +273,7 @@ func (s *OpenAIQuotaService) CachePostResetSnapshot(ctx context.Context, account
 		updates = make(map[string]any)
 	}
 	updates[openaiQuotaCreditsKey] = openAICreditsSnapshot{Credits: usage.Credits, FetchedAt: usage.FetchedAt}
+	updates["codex_local_reset_at"] = time.Now().UTC().Format(time.RFC3339)
 	return s.cacheResetCreditsSnapshot(
 		ctx,
 		accountID,

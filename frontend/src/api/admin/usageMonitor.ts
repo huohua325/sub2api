@@ -65,6 +65,9 @@ export interface UsageMonitorWallet {
   official?: string | null
   request_counts?: UsageMonitorRequestCount[] | null
   ledger_unrolled?: boolean
+  blocked?: boolean
+  pending_points?: string | null
+  data_status?: string
 }
 
 export interface UsageMonitorUser {
@@ -133,6 +136,26 @@ export function usageMonitorErrorText(error: unknown): string {
 
 export async function getUsageMonitor(): Promise<UsageMonitorView> {
   const { data } = await apiClient.get<UsageMonitorView>('/admin/usage-monitor')
+  return data
+}
+
+export interface CodingQuotaReset {
+  id: string
+  effective_at: string
+  detected_at: string
+  status: 'candidate' | 'confirmed'
+  source: string
+  note: string
+  evidence: string
+}
+
+export async function listCodexResets(): Promise<CodingQuotaReset[]> {
+  const { data } = await apiClient.get<{ items: CodingQuotaReset[] }>('/admin/usage-monitor/codex-resets')
+  return data.items
+}
+
+export async function confirmCodexReset(body: { id: string; effective_at: string; note: string; confirm: true }): Promise<CodingQuotaReset> {
+  const { data } = await apiClient.post<CodingQuotaReset>('/admin/usage-monitor/codex-resets', body)
   return data
 }
 

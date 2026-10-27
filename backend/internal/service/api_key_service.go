@@ -363,7 +363,7 @@ func (s *APIKeyService) PurposeBlocks(ctx context.Context, userID int64, group *
 	}
 	rows, err := s.purposeAllowances.List(ctx, userID)
 	if err != nil {
-		return false, true
+		return true, true
 	}
 	now := time.Now()
 	for _, row := range rows {

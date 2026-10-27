@@ -114,6 +114,9 @@ type UsageMonitorWallet struct {
 	Official            *string                     `json:"official,omitempty"`
 	RequestCounts       *[]UsageMonitorRequestCount `json:"request_counts,omitempty"`
 	LedgerUnrolled      bool                        `json:"ledger_unrolled,omitempty"`
+	Blocked             bool                        `json:"blocked"`
+	PendingPoints       *string                     `json:"pending_points,omitempty"`
+	DataStatus          string                      `json:"data_status,omitempty"`
 }
 
 // UsageMonitorRequestCount is one platform's experiment requests this Beijing month.
@@ -142,6 +145,7 @@ type UsageMonitorParentRow struct {
 	GrokUpdatedAt          *string
 	GrokFetchedAt          *string
 	Schedulable            bool
+	CodexLocalResetAt      *string
 }
 
 // UsageMonitorStamp is the latest stamped usage row for one parent.
@@ -424,7 +428,6 @@ func assembleMonitorParent(row UsageMonitorParentRow, decision windowDecision, s
 	windowStart := start
 	parent.WindowStart = &windowStart
 
-	visibleText := make([]string, 0, len(usage.Users))
 	hiddenText := make([]string, 0, len(usage.Users))
 	allText := make([]string, 0, len(usage.Users))
 	visible := make([]UsageMonitorWindowUserCost, 0, len(usage.Users))
@@ -432,7 +435,6 @@ func assembleMonitorParent(row UsageMonitorParentRow, decision windowDecision, s
 		allText = append(allText, userCost.ActualCost)
 		if _, ok := liveIDs[userCost.UserID]; ok {
 			visible = append(visible, userCost)
-			visibleText = append(visibleText, userCost.ActualCost)
 			continue
 		}
 		hiddenText = append(hiddenText, userCost.ActualCost)
@@ -570,6 +572,8 @@ func monitorWallet(row UsageMonitorUserRow, counts []UsageMonitorRequestCount, n
 		WindowStart:         row.WindowStart,
 		ResetsAt:            resets,
 		LedgerUnrolled:      expired && effective != row.UsedAmount,
+		Blocked:             limit.Sign() >= 0 && used.Cmp(limit) >= 0,
+		DataStatus:          "current",
 	}
 	if row.Purpose == PurposeExperiment {
 		none := usageMonitorOfficialNone

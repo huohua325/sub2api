@@ -194,15 +194,21 @@ func stampGrokOfficial(log *UsageLog, meter *Account, now time.Time, tracker *of
 
 func readCodexOfficial(extra map[string]any, headers http.Header, now time.Time) (*float64, *time.Time, *time.Time, string) {
 	if headers != nil {
+		observedAt := now
+		// Reset-after seconds belong to the response-header observation, not
+		// the later streaming completion or asynchronous billing time.
+		if stamped, err := http.ParseTime(headers.Get("Date")); err == nil && !stamped.After(now.Add(2*time.Minute)) && now.Sub(stamped) < 24*time.Hour {
+			observedAt = stamped
+		}
 		if snapshot := ParseCodexRateLimitHeaders(headers); snapshot != nil {
 			if normalized := snapshot.Normalize(); normalized != nil && normalized.Used7dPercent != nil {
 				var reset *time.Time
-				if text := codexResetAtRFC3339(now, normalized.Reset7dSeconds); text != nil {
+				if text := codexResetAtRFC3339(observedAt, normalized.Reset7dSeconds); text != nil {
 					if parsed, err := time.Parse(time.RFC3339, *text); err == nil {
 						reset = &parsed
 					}
 				}
-				observed := now
+				observed := observedAt
 				return normalized.Used7dPercent, reset, &observed, "codex_7d"
 			}
 		}

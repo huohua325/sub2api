@@ -36,6 +36,7 @@
           :error="capError"
           @save="saveCaps"
         />
+        <CodexResetPanel @changed="reload" />
         <PurposeWalletTable
           :users="users"
           :parents="parents"
@@ -85,6 +86,7 @@ import { formatDateTime } from '@/utils/format'
 import UsageMonitorParents from '@/components/admin/usage/UsageMonitorParents.vue'
 import UsageMonitorAttention from '@/components/admin/usage/UsageMonitorAttention.vue'
 import UsageMonitorCaps from '@/components/admin/usage/UsageMonitorCaps.vue'
+import CodexResetPanel from '@/components/admin/usage/CodexResetPanel.vue'
 import UsageMonitorRecent from '@/components/admin/usage/UsageMonitorRecent.vue'
 import PurposeWalletTable from '@/components/admin/usage/PurposeWalletTable.vue'
 import PurposeAdjustmentList from '@/components/admin/usage/PurposeAdjustmentList.vue'
@@ -127,14 +129,14 @@ const adjustPurpose = ref('openai')
 const recent = ref<AdminUsageLog[]>([])
 const recentError = ref('')
 const capOpenai = ref('50')
-const capGrok = ref('80')
-const capSwitch = ref(true)
+const capGrok = ref('30')
 const capSaving = ref(false)
 const capStatus = ref('')
 const capError = ref('')
 const capsReady = ref(false)
 const capsLoaded = ref(false)
 const nowTick = ref(Date.now())
+let clockOffset = 0
 let auditToken = 0
 let recentToken = 0
 let monitorToken = 0
@@ -186,7 +188,7 @@ function budgetFrom(purpose: string): string {
   for (const parent of parents.value) {
     if (parent.purpose === purpose && parent.point_budget) return parent.point_budget
   }
-  return purpose === 'grok' ? '80' : '50'
+  return purpose === 'grok' ? '30' : '50'
 }
 
 function seedCapsFromMonitor() {
@@ -202,10 +204,7 @@ async function loadCaps() {
     const budget = settings.official_point_budget
     if (!budget) return
     capOpenai.value = budget.openai || '50'
-    capGrok.value = budget.grok || '80'
-    if (typeof settings.official_point_student_percent === 'boolean') {
-      capSwitch.value = settings.official_point_student_percent
-    }
+    capGrok.value = budget.grok || '30'
     capsReady.value = true
     capError.value = ''
   } catch (error) {
@@ -226,7 +225,6 @@ async function saveCaps(next: { openai: string; grok: string }) {
         openai: next.openai,
         grok: next.grok,
       },
-      official_point_student_percent: capSwitch.value,
     })
     capOpenai.value = updated.official_point_budget?.openai || next.openai
     capGrok.value = updated.official_point_budget?.grok || next.grok
@@ -250,6 +248,7 @@ function scheduleFlashClear() {
 
 async function loadMonitor(quiet = false) {
   const token = ++monitorToken
+  const requestStartedAt = Date.now()
   if (quiet) refreshing.value = true
   else {
     loading.value = true
@@ -260,6 +259,10 @@ async function loadMonitor(quiet = false) {
   try {
     const next = await getUsageMonitor()
     if (token !== monitorToken) return
+    const receivedAt = Date.now()
+    const generatedAt = Date.parse(next.generated_at)
+    clockOffset = Number.isFinite(generatedAt) ? generatedAt - (requestStartedAt + receivedAt) / 2 : 0
+    nowTick.value = receivedAt + clockOffset
     changedKeys.value = changedMonitorKeys(monitor.value, next)
     monitor.value = next
     seedCapsFromMonitor()
@@ -397,7 +400,7 @@ onMounted(async () => {
   auditUserId.value = highlightUserId.value
   document.addEventListener('visibilitychange', onVisible)
   liveTimer = window.setInterval(() => { void refreshQuiet() }, USAGE_MONITOR_LIVE_MS)
-  clockTimer = window.setInterval(() => { nowTick.value = Date.now() }, 1000)
+  clockTimer = window.setInterval(() => { if (!document.hidden) nowTick.value = Date.now() + clockOffset }, 1000)
   await Promise.all([loadMonitor(false), loadAudits(), loadRecent(), loadCaps()])
   await scrollToUser(highlightUserId.value)
 })

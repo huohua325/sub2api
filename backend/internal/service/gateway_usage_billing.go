@@ -300,6 +300,13 @@ func buildUsageBillingCommand(requestID string, usageLog *UsageLog, p *postUsage
 		RequestPayloadHash: strings.TrimSpace(p.RequestPayloadHash),
 	}
 	if usageLog != nil {
+		cmd.StartedAt = usageLog.QuotaStartedAt
+		if cmd.StartedAt.IsZero() {
+			cmd.StartedAt = usageLog.CreatedAt
+			if usageLog.DurationMs != nil {
+				cmd.StartedAt = cmd.StartedAt.Add(-time.Duration(*usageLog.DurationMs) * time.Millisecond)
+			}
+		}
 		cmd.Model = usageLog.Model
 		cmd.BillingType = usageLog.BillingType
 		cmd.InputTokens = usageLog.InputTokens
@@ -325,6 +332,20 @@ func buildUsageBillingCommand(requestID string, usageLog *UsageLog, p *postUsage
 		cmd.Normalize()
 		return cmd
 	}
+	cmd.CodingQuota = codingChargeForUsage(usageLog, p)
+	cmd.ExperimentPending = p.Cost.GlobalAIChargePending
+	cmd.ExperimentUpstreamRequestID = p.Cost.GlobalAIRequestID
+	if cmd.ExperimentPending {
+		cmd.ExperimentEffects = &ExperimentBillingEffects{
+			KeyQuota:          p.APIKey.Quota > 0 && p.APIKeyService != nil,
+			KeyRateLimits:     p.APIKey.HasRateLimits() && p.APIKeyService != nil,
+			AccountQuota:      p.Account.SupportsAccountQuota() && p.Account.HasAnyQuotaLimit(),
+			AccountMultiplier: p.AccountRateMultiplier,
+		}
+		if p.IsSubscriptionBill && p.Subscription != nil {
+			cmd.ExperimentEffects.SubscriptionID = &p.Subscription.ID
+		}
+	}
 
 	// Record subscription / balance cost using ActualCost so the group (and any
 	// user-specific) rate multiplier consumes subscription quota at the expected
@@ -332,14 +353,14 @@ func buildUsageBillingCommand(requestID string, usageLog *UsageLog, p *postUsage
 	// on "> 0" still correctly skip free subscriptions (RateMultiplier == 0).
 	// A classified group spends its own wallet. Subscription groups still record
 	// subscription usage, and they do not spend the shared balance.
-	if p.Cost.ActualCost > 0 && requestHasPurposeWallet(p) {
+	if requestHasPurposeWallet(p) {
 		cmd.Purpose = PurposeOfGroup(p.APIKey.Group.Platform, p.APIKey.Group.UsageKind)
 		cmd.PurposeCost = p.Cost.ActualCost
 	}
 	if p.IsSubscriptionBill && p.Subscription != nil && p.Cost.TotalCost > 0 {
 		cmd.SubscriptionID = &p.Subscription.ID
 		cmd.SubscriptionCost = p.Cost.ActualCost
-	} else if p.Cost.ActualCost > 0 && cmd.PurposeCost == 0 {
+	} else if p.Cost.ActualCost > 0 && cmd.Purpose == "" {
 		cmd.BalanceCost = p.Cost.ActualCost
 	}
 
@@ -849,6 +870,10 @@ func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsage
 	accountRateMultiplier := account.BillingRateMultiplier()
 	usageLog := s.buildRecordUsageLog(ctx, input, result, apiKey, user, account, subscription,
 		requestedModel, multiplier, imageMultiplier, accountRateMultiplier, billingType, cacheTTLOverridden, cost)
+	usageLog.QuotaStartedAt = input.PricingAt
+	if usageLog.QuotaStartedAt.IsZero() {
+		usageLog.QuotaStartedAt = usageLog.CreatedAt.Add(-result.Duration)
+	}
 
 	// 计算账号统计定价费用（使用最终上游模型匹配自定义规则）。纯存储费不是一次模型请求，
 	// 账号统计成本回落 total_cost（官方存储价）。

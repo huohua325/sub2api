@@ -9891,7 +9891,7 @@ const purposeAllowancePeriodOptions = computed<SelectOption[]>(() => [
   { value: 'month', label: t('admin.settings.defaults.purposeMonth') },
 ])
 
-const officialPointBudget = reactive({ openai: '50', grok: '80' })
+const officialPointBudget = reactive({ openai: '50', grok: '30' })
 const officialPointStudentPercent = ref(false)
 const officialPointSaving = ref(false)
 
@@ -11329,7 +11329,7 @@ async function loadSettings() {
     form.default_platform_quotas = normalizePlatformQuotasMap(settings.default_platform_quotas);
     form.purpose_allowance_policy = normalizePurposeAllowancePolicy(settings.purpose_allowance_policy);
     officialPointBudget.openai = settings.official_point_budget?.openai || '50'
-    officialPointBudget.grok = settings.official_point_budget?.grok || '80'
+    officialPointBudget.grok = settings.official_point_budget?.grok || '30'
     officialPointStudentPercent.value = !!settings.official_point_student_percent
     form.platform_quota_week_mode = settings.platform_quota_week_mode === 'monday' ? 'monday' : 'registration';
     form.account_scheduling_thresholds = normalizeAccountSchedulingThresholdsMap(

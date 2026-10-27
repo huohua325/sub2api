@@ -141,3 +141,53 @@ func purposeAdjustmentQuery(c *gin.Context) (service.PurposeAdjustmentQuery, err
 	}
 	return query, nil
 }
+
+type codingResetManager interface {
+	ListCodingResets(context.Context) ([]service.CodingQuotaReset, error)
+	ConfirmCodingReset(context.Context, service.CodingQuotaReset, int64) (service.CodingQuotaReset, error)
+}
+
+// ListCodingResets includes evidence candidates as well as confirmed events.
+func (h *UsageMonitorHandler) ListCodingResets(c *gin.Context) {
+	manager, ok := h.svc.(codingResetManager)
+	if !ok {
+		response.ErrorFrom(c, infraerrors.ServiceUnavailable("QUOTA_LEDGER_UNAVAILABLE", "quota ledger unavailable"))
+		return
+	}
+	items, err := manager.ListCodingResets(c.Request.Context())
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, map[string]any{"items": items})
+}
+
+// ConfirmCodingReset replenishes Codex only, with an idempotent event id.
+func (h *UsageMonitorHandler) ConfirmCodingReset(c *gin.Context) {
+	manager, ok := h.svc.(codingResetManager)
+	if !ok {
+		response.ErrorFrom(c, infraerrors.ServiceUnavailable("QUOTA_LEDGER_UNAVAILABLE", "quota ledger unavailable"))
+		return
+	}
+	subject, ok := middleware.GetAuthSubjectFromContext(c)
+	if !ok {
+		response.ErrorFrom(c, infraerrors.Unauthorized("RESET_ACTOR_REQUIRED", "authentication required"))
+		return
+	}
+	var body struct {
+		ID          string    `json:"id"`
+		EffectiveAt time.Time `json:"effective_at"`
+		Note        string    `json:"note"`
+		Confirm     bool      `json:"confirm"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil || !body.Confirm {
+		response.ErrorFrom(c, infraerrors.BadRequest("INVALID_RESET_EVENT", "explicit confirmation and valid event data are required"))
+		return
+	}
+	out, err := manager.ConfirmCodingReset(c.Request.Context(), service.CodingQuotaReset{ID: body.ID, EffectiveAt: body.EffectiveAt, Note: body.Note}, subject.UserID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, out)
+}

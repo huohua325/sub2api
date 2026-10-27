@@ -29,7 +29,7 @@
             </span>
           </p>
           <p class="text-xs text-gray-500 dark:text-gray-400">
-            {{ meter.asPoints || hideMoney ? (meter.percent >= 100 ? t('dashboard.codexQuota.exhausted') : t('dashboard.purpose.used')) : t('dashboard.purpose.yuan') }}
+            {{ meter.asPoints || hideMoney ? (meter.blocked ? t('dashboard.codexQuota.exhausted') : t('dashboard.purpose.used')) : t('dashboard.purpose.yuan') }}
           </p>
           <div v-if="!meter.missing" class="mt-2 h-1 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-dark-700">
             <div
@@ -43,7 +43,7 @@
             class="mt-1 text-[10px] tabular-nums text-gray-400"
             :title="formatResetTime(meter.resetsAt)"
           >
-            {{ resetCountdownLabel(meter.resetsAt) }}
+            {{ resetCountdownLabel(meter.resetsAt, meter.clockOffset) }}
           </p>
         </div>
       </div>
@@ -484,6 +484,8 @@ const purposeMeters = computed(() => {
       percent,
       asPoints,
       missing,
+      blocked: row?.blocked ?? (!missing && limit >= 0 && used >= limit),
+      clockOffset: row?.clock_offset_ms ?? 0,
       quietAmount: props.hideMoney && id === 'experiment' && row?.used_amount != null && row?.limit_amount != null
         ? `${formatAmount(used)} / ${formatAmount(limit)}`
         : '',
@@ -564,6 +566,7 @@ const nowMs = ref(Date.now())
 let resetCountdownTimer: ReturnType<typeof setInterval> | null = null
 onMounted(() => {
   resetCountdownTimer = setInterval(() => {
+    if (document.hidden) return
     nowMs.value = Date.now()
   }, 30_000)
 })
@@ -571,11 +574,12 @@ onUnmounted(() => {
   if (resetCountdownTimer) clearInterval(resetCountdownTimer)
 })
 
-function resetCountdownLabel(iso: string | null | undefined): string {
+function resetCountdownLabel(iso: string | null | undefined, clockOffset = 0): string {
   if (!iso) return ''
   const end = new Date(iso).getTime()
   if (Number.isNaN(end)) return ''
-  const remaining = end - nowMs.value
+  const remaining = end - nowMs.value - clockOffset
+  if (remaining <= 0) return t('dashboard.ruler.awaitingReset')
   if (remaining <= 60_000) return t('dashboard.platformQuota.resetSoon')
   const totalMinutes = Math.floor(remaining / 60_000)
   const days = Math.floor(totalMinutes / 1440)

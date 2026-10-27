@@ -217,6 +217,8 @@ type UsageLog struct {
 	OfficialWindowReset      *bool
 	OfficialObservedAt       *time.Time
 	OfficialSource           *string
+	// QuotaStartedAt is request time, not the async billing worker's clock.
+	QuotaStartedAt time.Time
 
 	CreatedAt time.Time
 

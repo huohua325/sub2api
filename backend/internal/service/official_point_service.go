@@ -17,17 +17,20 @@ type OfficialPointStore interface {
 	SumOfficialWindowCost(ctx context.Context, userID int64, windows []UsageMonitorWindowQuery, resetGap time.Duration) ([]OfficialWindowCost, error)
 }
 
-// OfficialPointService turns official subscription points into a student percent.
-// Codex is read from the stored snapshot. Grok may call ProbeBilling, which does
-// not send a model request.
+// OfficialPointService reads personal point ledgers and meters upstream changes
+// in the background. Authentication and dashboard reads perform no upstream I/O.
 type OfficialPointService struct {
-	settings *SettingService
-	store    OfficialPointStore
-	grok     *GrokQuotaService
-	now      func() time.Time
+	settings   *SettingService
+	store      OfficialPointStore
+	grok       *GrokQuotaService
+	codexQuota *OpenAIQuotaService
+	now        func() time.Time
 
-	mu     sync.Mutex
-	probed map[int64]time.Time
+	mu           sync.Mutex
+	probed       map[int64]time.Time
+	workerMu     sync.Mutex
+	workerCancel context.CancelFunc
+	workerDone   chan struct{}
 }
 
 func NewOfficialPointService(settings *SettingService, store OfficialPointStore, grok *GrokQuotaService) *OfficialPointService {
@@ -41,7 +44,9 @@ func NewOfficialPointService(settings *SettingService, store OfficialPointStore,
 }
 
 func (s *OfficialPointService) Enabled(ctx context.Context) bool {
-	return s != nil && s.settings != nil && s.settings.OfficialPointStudentPercentEnabled(ctx)
+	// Coding groups always use personal point ledgers. The retired switch no
+	// longer enables a non-accumulating yuan-wallet fallback.
+	return s != nil
 }
 
 func (s *OfficialPointService) Budget(ctx context.Context) OfficialPointBudget {
@@ -57,9 +62,9 @@ func (s *OfficialPointService) PrepareParents(ctx context.Context, rows []UsageM
 	if s == nil {
 		return rows
 	}
-	now := s.now()
-	if s.now == nil {
-		now = time.Now()
+	now := time.Now()
+	if s.now != nil {
+		now = s.now()
 	}
 	out := append([]UsageMonitorParentRow(nil), rows...)
 	for i := range out {
@@ -139,13 +144,19 @@ func snapshotString(value any) *string {
 // CardsForUser returns one Codex result and one Grok result. Several parent
 // accounts of the same platform are added into that one person total. A parent
 // that is no longer scheduled still counts while its official window is open.
+// It may refresh a stale Grok billing snapshot. Student page reads use
+// CardsForUserStored so a dashboard refresh does not probe upstream.
 func (s *OfficialPointService) CardsForUser(ctx context.Context, userID int64) map[string]OfficialPointResult {
 	return s.pointsForUser(ctx, userID, true)
 }
 
+// CardsForUserStored reads the durable personal ledger in production.
+func (s *OfficialPointService) CardsForUserStored(ctx context.Context, userID int64) map[string]OfficialPointResult {
+	return s.pointsForUser(ctx, userID, false)
+}
+
 // Blocks reports whether this person's summed Codex or Grok points have reached
-// the per-person cap. checked is false when the switch is off. A missing
-// reading does not block. This path does not call ProbeBilling.
+// the per-person cap. A ledger failure blocks instead of granting free usage.
 func (s *OfficialPointService) Blocks(ctx context.Context, userID int64, purpose string) (blocked bool, checked bool) {
 	if s == nil || s.store == nil {
 		return false, false
@@ -154,9 +165,6 @@ func (s *OfficialPointService) Blocks(ctx context.Context, userID int64, purpose
 		return false, false
 	}
 	card := s.pointsForUser(ctx, userID, false)[purpose]
-	if card.Points == nil {
-		return false, true
-	}
 	return card.Blocked, true
 }
 
@@ -168,6 +176,20 @@ func (s *OfficialPointService) pointsForUser(ctx context.Context, userID int64, 
 	now := time.Now()
 	if s.now != nil {
 		now = s.now()
+	}
+	if ledger, ok := s.store.(CodingQuotaLedger); ok {
+		for _, purpose := range []string{PurposeOpenAI, PurposeGrok} {
+			out[purpose] = OfficialPointResult{Blocked: true, DataStatus: "error"}
+		}
+		readings, err := ledger.ReadCodingQuotas(ctx, []int64{userID}, now)
+		if err != nil {
+			return out
+		}
+		budget := s.Budget(ctx)
+		for _, reading := range readings {
+			out[reading.Purpose] = codingQuotaResult(reading, budget.ForPurpose(reading.Purpose))
+		}
+		return out
 	}
 	rows, err := s.store.ListOfficialParents(ctx)
 	if err != nil {
@@ -256,6 +278,52 @@ func (s *OfficialPointService) ApplyMonitor(ctx context.Context, view *UsageMoni
 	budget := DefaultOfficialPointBudget()
 	if s.settings != nil {
 		budget = s.settings.GetOfficialPointBudget(ctx)
+	}
+	if ledger, ok := s.store.(CodingQuotaLedger); ok {
+		ids := make([]int64, 0, len(view.Users))
+		for _, user := range view.Users {
+			ids = append(ids, user.ID)
+		}
+		readings, err := ledger.ReadCodingQuotas(ctx, ids, view.GeneratedAt)
+		byUser := map[int64]map[string]OfficialPointResult{}
+		for _, reading := range readings {
+			if byUser[reading.UserID] == nil {
+				byUser[reading.UserID] = map[string]OfficialPointResult{}
+			}
+			byUser[reading.UserID][reading.Purpose] = codingQuotaResult(reading, budget.ForPurpose(reading.Purpose))
+		}
+		for i := range view.Parents {
+			text := budget.ForPurpose(view.Parents[i].Purpose)
+			if text != "" {
+				view.Parents[i].PointBudget = &text
+			}
+		}
+		for i := range view.Users {
+			for j := range view.Users[i].Wallets {
+				wallet := &view.Users[i].Wallets[j]
+				if wallet.Purpose != PurposeOpenAI && wallet.Purpose != PurposeGrok {
+					continue
+				}
+				card := byUser[view.Users[i].ID][wallet.Purpose]
+				wallet.StudentPercent, wallet.OfficialPoints = card.Percent, card.Points
+				wallet.PointBudget = stringPtr(budget.ForPurpose(wallet.Purpose))
+				wallet.Blocked, wallet.PendingPoints, wallet.DataStatus = card.Blocked, card.Pending, card.DataStatus
+				if err != nil {
+					wallet.DataStatus = "error"
+					wallet.Blocked = true
+				}
+				wallet.ManualPoints = "0"
+				wallet.Period = "week"
+				if card.PeriodStart != nil {
+					wallet.WindowStart = *card.PeriodStart
+				}
+				if card.Reset != nil {
+					wallet.ResetsAt = *card.Reset
+				}
+				wallet.PointsObservedAt = card.UpdatedAt
+			}
+		}
+		return
 	}
 	for i := range view.Parents {
 		text := budget.ForPurpose(view.Parents[i].Purpose)

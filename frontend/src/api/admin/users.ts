@@ -369,12 +369,22 @@ export interface PurposeAllowanceItem {
   display_percent?: number | null
   point_used?: string
   point_limit?: string
-  reset_scope?: 'shared' | 'personal' | 'month'
+  reset_scope?: 'shared' | 'personal' | 'month' | 'week'
+  blocked?: boolean
+  unit?: 'points' | 'yuan'
+  pending_points?: string | null
+  data_status?: 'current' | 'estimated' | 'pending' | 'partial' | 'error'
+  period_start?: string
+  reset_reason?: 'personal_week' | 'platform_reset'
+  server_now?: string
+  updated_at?: string
+  clock_offset_ms?: number
 }
 
 export interface PlatformQuotasResponse {
   platform_quotas: PlatformQuotaItem[]
   purpose_allowances?: PurposeAllowanceItem[]
+  server_now?: string
 }
 
 /**

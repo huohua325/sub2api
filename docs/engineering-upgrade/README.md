@@ -6,6 +6,14 @@
 
 浅色光谱设计系统实现见 [DESIGN-SYSTEM.md](DESIGN-SYSTEM.md)，视觉、业务与性能验收见 [DESIGN-ACCEPTANCE.md](DESIGN-ACCEPTANCE.md)。
 
+当前学员额度公式、重置时钟及已确认问题见 [QUOTA-AUDIT.md](QUOTA-AUDIT.md)。
+
+个人独立周期、Codex 50/Grok 30 点及全体异常重置的改造分析见 [QUOTA-REDESIGN.md](QUOTA-REDESIGN.md)。
+
+工作区实现、迁移步骤、测试记录和计量边界见 [QUOTA-IMPLEMENTATION.md](QUOTA-IMPLEMENTATION.md)。
+
+当前线上版本及历次同步检查见 [DEPLOYMENT-2026-10-27.md](DEPLOYMENT-2026-10-27.md)。下一轮学员接入流程与额度可信度设计见 [CONNECTION-AND-QUOTA-PLAN.md](CONNECTION-AND-QUOTA-PLAN.md)。
+
 ## 本地位置与使用
 
 ```text

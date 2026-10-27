@@ -87,7 +87,7 @@ func (h *UserHandler) GetMyPlatformQuotas(c *gin.Context) {
 	for _, r := range records {
 		out = append(out, quotaview.LazyZeroQuotaForResponse(r, now, false))
 	}
-	payload := map[string]any{"platform_quotas": out}
+	payload := map[string]any{"platform_quotas": out, "server_now": now}
 	if h.purposeAllowances != nil {
 		rows, err := h.purposeAllowances.List(c.Request.Context(), subject.UserID)
 		if err != nil {
@@ -102,11 +102,11 @@ func (h *UserHandler) GetMyPlatformQuotas(c *gin.Context) {
 		// wallet stays in storage, but it is not the number students see.
 		var cards map[string]service.OfficialPointResult
 		if h.officialPoints != nil {
-			cards = h.officialPoints.CardsForUser(c.Request.Context(), subject.UserID)
+			cards = h.officialPoints.CardsForUserStored(c.Request.Context(), subject.UserID)
 		}
 		for _, row := range rows {
 			used, resetsAt := service.EffectivePurposeUsage(row, nowUsage)
-			item := map[string]any{"purpose": row.Purpose}
+			item := map[string]any{"purpose": row.Purpose, "server_now": nowUsage}
 			// Experiment yuan is shown to every role. Codex and Grok yuan stays
 			// in storage and is not the number students see.
 			if showYuan || cards == nil || row.Purpose == service.PurposeExperiment {
@@ -120,17 +120,37 @@ func (h *UserHandler) GetMyPlatformQuotas(c *gin.Context) {
 			} else if row.Purpose == service.PurposeExperiment {
 				percent := service.StudentFacingPercent(floatRat(used), floatRat(row.LimitAmount))
 				item["display_percent"] = percent
+				item["blocked"] = row.LimitAmount >= 0 && used >= row.LimitAmount
+				item["unit"] = "yuan"
+				item["data_status"] = "current"
+				if h.officialPoints != nil {
+					state, stateErr := h.officialPoints.ExperimentState(c.Request.Context(), subject.UserID, nowUsage)
+					item["data_status"] = state
+					if stateErr != nil {
+						item["blocked"] = true
+					}
+				}
+				item["reset_scope"] = service.AllowancePeriod(row.Purpose, row.Period)
 				if !resetsAt.IsZero() {
 					item["resets_at"] = resetsAt
 				}
-			} else if card, ok := cards[row.Purpose]; ok && card.Percent != nil {
-				item["display_percent"] = *card.Percent
-				// Codex keeps the official reset from the overall recharge.
-				// Grok keeps each person's 7 days from registration.
-				reset := service.StudentCodingReset(row.Purpose, resetsAt, card.OfficialResets)
-				if !reset.IsZero() {
-					item["resets_at"] = reset
+			} else if card, ok := cards[row.Purpose]; ok {
+				item["display_percent"] = card.Percent
+				item["blocked"] = card.Blocked
+				item["unit"] = "points"
+				item["data_status"] = card.DataStatus
+				item["pending_points"] = card.Pending
+				item["period_start"] = card.PeriodStart
+				item["updated_at"] = card.UpdatedAt
+				item["reset_reason"] = card.ResetReason
+				if card.Points != nil {
+					item["point_used"] = *card.Points
 				}
+				item["point_limit"] = h.officialPoints.Budget(c.Request.Context()).ForPurpose(row.Purpose)
+				if card.Reset != nil {
+					item["resets_at"] = card.Reset
+				}
+				item["reset_scope"] = "personal"
 			} else {
 				item["display_percent"] = nil
 			}

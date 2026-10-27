@@ -708,6 +708,8 @@ func registerUsageRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	admin.GET("/usage-monitor", h.Admin.UsageMonitor.Get)
 	admin.POST("/usage-monitor/adjustments", h.Admin.UsageMonitor.Adjust)
 	admin.GET("/usage-monitor/adjustments", h.Admin.UsageMonitor.ListAdjustments)
+	admin.GET("/usage-monitor/codex-resets", h.Admin.UsageMonitor.ListCodingResets)
+	admin.POST("/usage-monitor/codex-resets", h.Admin.UsageMonitor.ConfirmCodingReset)
 	usage := admin.Group("/usage")
 	{
 		usage.GET("/weekly-export/weeks", h.Admin.WeeklyExport.Weeks)

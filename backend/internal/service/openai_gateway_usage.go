@@ -454,6 +454,10 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	usageLog.DurationMs = &durationMs
 	usageLog.FirstTokenMs = result.FirstTokenMs
 	usageLog.CreatedAt = time.Now()
+	usageLog.QuotaStartedAt = input.PricingAt
+	if usageLog.QuotaStartedAt.IsZero() {
+		usageLog.QuotaStartedAt = usageLog.CreatedAt.Add(-result.Duration)
+	}
 	// 设置渠道信息
 	usageLog.ChannelID = optionalInt64Ptr(input.ChannelID)
 	usageLog.ModelMappingChain = optionalTrimmedStringPtr(input.ModelMappingChain)

@@ -13,7 +13,7 @@
     ]"
   >
     <!-- Logo/Brand -->
-    <div class="sidebar-header" :class="{ 'sidebar-header-collapsed': sidebarCollapsed }">
+    <div class="sidebar-header" :class="{ 'sidebar-header-collapsed': sidebarCollapsed, 'sidebar-header-with-version': isAdmin && !sidebarCollapsed }">
       <button v-if="isNarrow" type="button" class="lab-drawer-close lab-theme-toggle" :aria-label="t('common.close')" @click="closeMobile"><Icon name="x" size="md" /></button>
       <!-- Custom Logo or Default Logo -->
       <router-link
@@ -29,7 +29,7 @@
           class="h-full w-full object-contain"
         />
       </router-link>
-      <div class="sidebar-brand" :class="{ 'sidebar-brand-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">
+      <div v-if="isAdmin" class="sidebar-brand" :class="{ 'sidebar-brand-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'" :inert="sidebarCollapsed || undefined">
         <VersionBadge :version="siteVersion" />
       </div>
     </div>
@@ -1010,6 +1010,14 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.sidebar-header-with-version {
+  height: auto;
+  flex-shrink: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
 .sidebar-logo {
   flex: 0 0 auto;
   height: 2.25rem;
@@ -1033,13 +1041,13 @@ onBeforeUnmount(() => {
 
 .sidebar-brand {
   min-width: 0;
-  flex: 1 1 auto;
-  white-space: nowrap;
+  width: 100%;
+  flex: 0 1 auto;
   transition:
     max-width 0.22s ease,
     opacity 0.14s ease,
     transform 0.14s ease;
-  max-width: 12rem;
+  max-width: 100%;
 }
 
 .sidebar-brand-collapsed {

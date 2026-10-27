@@ -1,6 +1,17 @@
 export default {
   usageMonitor: {
     title: 'Usage monitor',
+    resetTitle: 'Codex pool-wide exceptional reset',
+    resetHint: 'Normal account renewals and reset credits do not replenish student quotas. A single-account pool requires confirmation of a pool-wide event. Confirmation starts a new seven-day period.',
+    resetTime: 'Effective time (browser local time)',
+    resetNote: 'Evidence and explanation',
+    resetConfirm: 'Confirm pool-wide reset',
+    resetWarning: 'This replenishes affected students’ Codex quotas and starts seven days from the effective time. Grok and API experiments keep their own periods. Confirm this is a pool-wide exceptional reset.',
+    resetConfirmed: 'Confirmed',
+    resetCandidate: 'Anomaly awaiting confirmation',
+    resetRequired: 'Enter an effective time and evidence.',
+    resetFailed: 'Reset confirmation failed. Try again.',
+    resetLoadFailed: 'Could not read reset events.',
     description: 'See how close each person is to the cap, and change the caps here. Codex and Grok use points. API experiments use yuan.',
     reload: 'Reload',
     reloaded: 'Read again',

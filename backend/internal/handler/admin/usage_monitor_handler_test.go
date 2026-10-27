@@ -31,7 +31,7 @@ func TestPurposeAdjustUnconfirmedReturnsNumericCode(t *testing.T) {
 	require.NotEqual(t, "CONFIRMATION_REQUIRED", body["code"])
 }
 
-func TestPurposeAdjustExpiredSetUsedReturnsNumericCode(t *testing.T) {
+func TestPurposeAdjustRetiredSetUsedReturnsNumericCode(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	now := time.Now()
 	store := handlerAdjustStore{
@@ -44,14 +44,14 @@ func TestPurposeAdjustExpiredSetUsedReturnsNumericCode(t *testing.T) {
 	}
 	handler := NewUsageMonitorHandler(service.NewUsageMonitorService(store))
 	recorder := postAdjust(t, handler, `{"user_id":12,"purpose":"openai","action":"set_used","value":"1","confirm":true}`)
-	require.Equal(t, http.StatusConflict, recorder.Code)
+	require.Equal(t, http.StatusBadRequest, recorder.Code)
 	body := decodeBody(t, recorder)
-	require.Equal(t, float64(409), body["code"])
+	require.Equal(t, float64(400), body["code"])
 	_, isString := body["code"].(string)
 	require.False(t, isString)
-	require.Equal(t, "PURPOSE_WINDOW_EXPIRED", body["reason"])
-	require.Equal(t, "purpose window expired", body["message"])
-	require.NotEqual(t, "PURPOSE_WINDOW_EXPIRED", body["code"])
+	require.Equal(t, "PURPOSE_YUAN_RETIRED", body["reason"])
+	require.Equal(t, "only the experiment yuan cap can be changed", body["message"])
+	require.NotEqual(t, "PURPOSE_YUAN_RETIRED", body["code"])
 }
 
 func postAdjust(t *testing.T, handler *UsageMonitorHandler, body string) *httptest.ResponseRecorder {
@@ -82,12 +82,12 @@ func (s handlerAdjustStore) AdjustPurposeWallet(_ context.Context, cmd service.P
 	if !s.hasRow {
 		s.t.Fatal("adjust store called")
 	}
-	effect, err := service.PurposeAdjustmentEffect(s.row, cmd, "0")
+	_, err := service.PurposeAdjustmentEffect(s.row, cmd, "0")
 	if err != nil {
 		return service.PurposeWalletAdjustResult{}, err
 	}
 	s.t.Fatal("expired window wrote a wallet")
-	return service.PurposeWalletAdjustResult{Changed: effect.Changed, Row: s.row}, nil
+	return service.PurposeWalletAdjustResult{}, nil
 }
 
 func (handlerAdjustStore) ListPurposeAdjustments(context.Context, service.PurposeAdjustmentQuery) ([]service.PurposeAdjustmentAudit, error) {

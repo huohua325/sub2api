@@ -20,11 +20,13 @@
       </div>
     </div>
 
-    <div v-else-if="failed" class="quota-board-fail" role="alert">
+    <div v-else-if="failed && allowances == null" class="quota-board-fail" role="alert">
       <p>{{ t('dashboard.ruler.loadFailed') }}</p>
     </div>
 
-    <div v-else class="quota-board-grid">
+    <div v-else>
+      <p v-if="failed" class="quota-board-stale" role="status">{{ t('dashboard.ruler.stale') }}</p>
+      <div class="quota-board-grid">
       <article
         v-for="meter in meters"
         :key="meter.id"
@@ -39,17 +41,19 @@
         <p v-if="meter.missing" class="quota-meter-missing">{{ t('dashboard.ruler.missing') }}</p>
         <template v-else>
           <p class="quota-meter-percent">{{ meter.percent }}<span>%</span></p>
-          <p v-if="meter.amount" class="quota-meter-amount">{{ meter.amount }}</p>
+          <p class="quota-meter-amount" :aria-hidden="meter.amount ? undefined : true">{{ meter.amount }}</p>
           <div class="quota-meter-track" aria-hidden="true">
             <div class="quota-meter-fill" :class="meter.tone" :style="{ width: Math.max(meter.percent, meter.percent > 0 ? 2 : 0) + '%' }" />
           </div>
           <p v-if="meter.resetLine" class="quota-meter-reset">{{ meter.resetLine }}</p>
+          <p v-if="meter.pending" class="quota-meter-reset">{{ t('dashboard.ruler.pendingHint') }}</p>
           <p v-if="meter.exhausted" class="quota-meter-note">
             {{ t('dashboard.ruler.exhausted') }}
             <router-link to="/usage">{{ t('dashboard.ruler.viewUsage') }}</router-link>
           </p>
         </template>
       </article>
+      </div>
     </div>
 
     <footer v-if="!loading && keyCount === 0" class="quota-board-foot">
@@ -63,7 +67,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, shallowRef } from 'vue'
+import { computed, onMounted, onUnmounted, shallowRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { PurposeAllowanceItem } from '@/api/admin/users'
 
@@ -80,22 +84,38 @@ const emit = defineEmits<{ reload: [] }>()
 const { t } = useI18n()
 const nowMs = shallowRef(Date.now())
 let timer = 0
+const requestedResets = new Set<string>()
+function tick() { if (!document.hidden) nowMs.value = Date.now() }
 
 onMounted(() => {
-  timer = window.setInterval(() => {
-    nowMs.value = Date.now()
-  }, 60_000)
+  timer = window.setInterval(tick, 1000)
+  document.addEventListener('visibilitychange', tick)
 })
-onUnmounted(() => window.clearInterval(timer))
+onUnmounted(() => {
+  window.clearInterval(timer)
+  document.removeEventListener('visibilitychange', tick)
+})
+
+watch(() => (props.allowances ?? []).filter((row) => {
+  const end = Date.parse(row.resets_at ?? '')
+  return Number.isFinite(end) && end <= nowMs.value + (row.clock_offset_ms ?? 0)
+}).map((row) => `${row.purpose}:${row.resets_at}`).join('|'), (due) => {
+  const keys = due.split('|').filter(Boolean)
+  if (keys.some((key) => !requestedResets.has(key))) {
+    keys.forEach((key) => requestedResets.add(key))
+    emit('reload')
+  }
+})
 
 const meters = computed(() => {
   const built = purposeOrder.map((id) => {
     const row = (props.allowances ?? []).find((item) => item.purpose === id)
     const usesDisplay = row != null && Object.prototype.hasOwnProperty.call(row, 'display_percent')
-    const missing = !row || (usesDisplay && row.display_percent == null)
+    const missing = !row || (usesDisplay && row.display_percent == null) || row.data_status === 'error'
     const percent = missing ? 0 : (usesDisplay ? (row?.display_percent ?? 0) : ratioPercent(row))
-    const exhausted = !missing && percent >= 100
-    const near = !missing && percent >= 80 && percent < 100
+    const exhausted = row?.blocked ?? (!missing && rawExhausted(row))
+    const pending = row?.data_status === 'pending' || row?.data_status === 'partial'
+    const near = !missing && percent >= 80 && !exhausted
     return {
       id,
       title: t(`dashboard.purpose.${id}`),
@@ -105,11 +125,14 @@ const meters = computed(() => {
       resetLine: missing ? '' : resetLine(row),
       near,
       exhausted,
+      pending,
       tone: exhausted ? 'is-full' : near ? 'is-near' : missing ? 'is-missing' : 'is-ok',
       badge: missing
         ? t('admin.usageMonitor.noReading')
         : exhausted
           ? t('dashboard.ruler.full')
+          : pending || props.failed
+            ? t('dashboard.ruler.pending')
           : near
             ? t('dashboard.ruler.near')
             : t('dashboard.ruler.ready'),
@@ -138,19 +161,15 @@ function ratioPercent(row: PurposeAllowanceItem | undefined): number {
   return Math.min(100, Math.round((used / limit) * 100))
 }
 
+function rawExhausted(row: PurposeAllowanceItem | undefined): boolean {
+  if (!row) return false
+  if (row.point_used != null && row.point_limit != null) return Number(row.point_used) >= Number(row.point_limit)
+  return row.used_amount != null && row.limit_amount != null && row.limit_amount >= 0 && row.used_amount >= row.limit_amount
+}
+
 function amountLine(id: (typeof purposeOrder)[number], row: PurposeAllowanceItem | undefined): string {
-  if (!row) return ''
-  if (id === 'experiment' && row.used_amount != null && row.limit_amount != null) {
-    return `${formatNumber(row.used_amount)} / ${formatNumber(row.limit_amount)} ${t('dashboard.purpose.yuan')}`
-  }
-  if (row.point_used && row.point_limit) {
-    return `${formatNumber(row.point_used)} / ${formatNumber(row.point_limit)} ${t('dashboard.purpose.points')}`
-  }
-  if (row.used_amount != null && row.limit_amount != null) {
-    const unit = id === 'experiment' ? t('dashboard.purpose.yuan') : t('dashboard.purpose.points')
-    return `${formatNumber(row.used_amount)} / ${formatNumber(row.limit_amount)} ${unit}`
-  }
-  return ''
+  if (id !== 'experiment' || row?.used_amount == null || row.limit_amount == null) return ''
+  return `${formatNumber(row.used_amount)} / ${formatNumber(row.limit_amount)} ${t('dashboard.purpose.yuan')}`
 }
 
 function formatNumber(value: number | string): string {
@@ -162,7 +181,7 @@ function formatNumber(value: number | string): string {
 function resetLine(row: PurposeAllowanceItem | undefined): string {
   if (!row) return ''
   const scope = scopeLabel(row.reset_scope)
-  const time = countdown(row.resets_at)
+  const time = countdown(row.resets_at, row.clock_offset_ms ?? 0)
   if (scope && time) return `${scope} · ${time}`
   return scope || time
 }
@@ -171,14 +190,16 @@ function scopeLabel(scope: PurposeAllowanceItem['reset_scope']): string {
   if (scope === 'shared') return t('dashboard.ruler.sharedWindow')
   if (scope === 'personal') return t('dashboard.ruler.personalWindow')
   if (scope === 'month') return t('dashboard.ruler.monthWindow')
+  if (scope === 'week') return t('dashboard.ruler.personalWindow')
   return ''
 }
 
-function countdown(iso: string | undefined): string {
+function countdown(iso: string | undefined, offset: number): string {
   if (!iso) return ''
   const end = new Date(iso).getTime()
   if (Number.isNaN(end)) return ''
-  const remaining = end - nowMs.value
+  const remaining = end - (nowMs.value + offset)
+  if (remaining <= 0) return t('dashboard.ruler.awaitingReset')
   if (remaining <= 60_000) return t('dashboard.platformQuota.resetSoon')
   const totalMinutes = Math.floor(remaining / 60_000)
   const days = Math.floor(totalMinutes / 1440)
@@ -225,6 +246,7 @@ function countdown(iso: string | undefined): string {
 .quota-meter-note a { margin-left: 6px; text-decoration: underline; text-underline-offset: 3px; }
 .quota-meter-missing { padding: 38px 0; color: rgb(var(--color-muted)); font-size: 14px; }
 .quota-board-fail { padding: 36px 28px; color: rgb(var(--color-danger)); font-size: 14px; }
+.quota-board-stale { padding: 12px 28px 0; color: rgb(var(--color-warning)); font-size: 12px; }
 .quota-board-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 20px; padding: 16px 28px; border-top: 1px solid rgb(var(--color-line) / .6); background: rgb(var(--color-page) / .55); }
 .quota-board-action { display: inline-flex; min-height: 28px; align-items: center; color: rgb(var(--color-brand)); font-size: 12px; font-weight: 500; }
 .quota-board-action:hover { text-decoration: underline; text-underline-offset: 4px; }

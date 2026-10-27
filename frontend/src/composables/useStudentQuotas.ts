@@ -13,15 +13,19 @@ export function useStudentQuotas() {
 
   async function load(quiet = false) {
     const id = ++requestId
+    const startedAt = Date.now()
     if (!quiet && allowances.value == null) loading.value = true
     try {
       const data = await getMyPlatformQuotas()
       if (id !== requestId) return
-      allowances.value = data.purpose_allowances ?? []
+      const receivedAt = Date.now()
+      const serverNow = Date.parse(data.server_now ?? '')
+      const offset = Number.isFinite(serverNow) ? serverNow - (startedAt + receivedAt) / 2 : 0
+      allowances.value = (data.purpose_allowances ?? []).map((row) => ({ ...row, clock_offset_ms: offset }))
       failed.value = false
     } catch {
       if (id !== requestId) return
-      if (allowances.value == null) failed.value = true
+      failed.value = true
     } finally {
       if (id === requestId) loading.value = false
     }

@@ -146,6 +146,7 @@ const AppLayoutStub = {
 const TablePageLayoutStub = {
   template: `
     <div>
+      <slot name="header" />
       <slot name="filters" />
       <slot name="actions" />
       <slot name="table" />

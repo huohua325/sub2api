@@ -48,7 +48,8 @@ func (r *UsageMonitorRepository) ListOfficialParents(ctx context.Context) ([]ser
 		       a.extra#>>'{grok_billing_snapshot,weekly_updated_at}',
 		       a.extra#>>'{grok_billing_snapshot,updated_at}',
 		       a.extra#>>'{grok_billing_snapshot,fetched_at}',
-		       a.schedulable
+		       a.schedulable,
+		       a.extra->>'codex_local_reset_at'
 		FROM accounts a
 		WHERE a.deleted_at IS NULL
 		  AND a.parent_account_id IS NULL
@@ -58,7 +59,7 @@ func (r *UsageMonitorRepository) ListOfficialParents(ctx context.Context) ([]ser
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	out := make([]service.UsageMonitorParentRow, 0)
 	for rows.Next() {
 		var row service.UsageMonitorParentRow
@@ -70,7 +71,7 @@ func (r *UsageMonitorRepository) ListOfficialParents(ctx context.Context) ([]ser
 			&codexUsed, &codexReset, &codexUpdated, &codexMinutes, &codexAfter,
 			&grokPercent, &grokStart, &grokEnd, &grokType, &grokPlan,
 			&grokWeekly, &grokUpdated, &grokFetched,
-			&row.Schedulable,
+			&row.Schedulable, &row.CodexLocalResetAt,
 		); err != nil {
 			return nil, err
 		}
@@ -106,7 +107,7 @@ func (r *UsageMonitorRepository) ListStampedParentIDs(ctx context.Context, since
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	out := make([]int64, 0)
 	for rows.Next() {
 		var id int64
@@ -143,7 +144,7 @@ func (r *UsageMonitorRepository) ListLatestStamps(ctx context.Context, accountID
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	out := make([]service.UsageMonitorStamp, 0)
 	for rows.Next() {
 		var stamp service.UsageMonitorStamp
@@ -254,7 +255,7 @@ func (r *UsageMonitorRepository) ListWindowUsage(ctx context.Context, windows []
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	byParent := map[int64]*service.UsageMonitorWindowUsage{}
 	order := make([]int64, 0)
 	for rows.Next() {
@@ -329,7 +330,7 @@ func (r *UsageMonitorRepository) SumOfficialWindowCost(ctx context.Context, user
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	out := make([]service.OfficialWindowCost, 0, len(windows))
 	for rows.Next() {
 		var row service.OfficialWindowCost
@@ -369,7 +370,7 @@ func (r *UsageMonitorRepository) ListLiveUsers(ctx context.Context) ([]service.U
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	out := make([]service.UsageMonitorUserRow, 0)
 	for rows.Next() {
 		var row service.UsageMonitorUserRow
@@ -417,7 +418,7 @@ func (r *UsageMonitorRepository) ListExperimentGroupIDs(ctx context.Context) ([]
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	out := make([]int64, 0)
 	for rows.Next() {
 		var id int64
@@ -449,7 +450,7 @@ func (r *UsageMonitorRepository) ListExperimentRequestCounts(ctx context.Context
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	out := make([]service.UsageMonitorExperimentCount, 0)
 	for rows.Next() {
 		var count service.UsageMonitorExperimentCount

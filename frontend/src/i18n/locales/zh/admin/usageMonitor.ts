@@ -1,6 +1,17 @@
 export default {
   usageMonitor: {
     title: '用量监控',
+    resetTitle: 'Codex 全体异常重置',
+    resetHint: '单账号普通换期或用卡不恢复学员额度。单账号场景需确认发生了全体异常重置；确认后从生效时间起重新计算七天。',
+    resetTime: '生效时间（浏览器本地时间）',
+    resetNote: '确认依据与说明',
+    resetConfirm: '确认全体重置',
+    resetWarning: '将恢复受影响学员的 Codex 额度，并从生效时间重新计算七天。Grok 和 API 实验保持各自周期。请确认这是全体异常重置。',
+    resetConfirmed: '已确认',
+    resetCandidate: '待确认的异常信号',
+    resetRequired: '请填写生效时间和确认依据。',
+    resetFailed: '重置确认失败，请重试。',
+    resetLoadFailed: '重置事件读取失败。',
     description: '看每个人离上限还有多远，并在这里改每人上限。Codex 和 Grok 按点数，API 实验按元。',
     reload: '重新读取',
     reloaded: '已重新读取',
