@@ -120,6 +120,11 @@ func TestCodingQuotaIncrementConservesPoints(t *testing.T) {
 func TestCodingQuotaRoundedPercentDoesNotBlock(t *testing.T) {
 	reading := CodingQuotaReading{Used: "49.8", Pending: "0", End: time.Now().Add(time.Hour)}
 	card := codingQuotaResult(reading, "50")
+	require.Nil(t, card.UpdatedAt, "reading the page must not manufacture ledger freshness")
+	updatedAt := time.Now().Add(-time.Minute)
+	reading.UpdatedAt = updatedAt
+	card = codingQuotaResult(reading, "50")
+	require.Equal(t, updatedAt, *card.UpdatedAt)
 	require.Equal(t, 100, *card.Percent)
 	require.False(t, card.Blocked)
 	reading.Pending = "0.2"

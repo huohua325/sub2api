@@ -34,7 +34,7 @@ WITH anchors AS (
 )
 SELECT w.id,w.purpose,w.start,w.start+INTERVAL '168 hours',w.reason,
  COALESCE(q.used,0)::text,COALESCE(q.pending,0)::text,COALESCE(q.pending_count,0),
- COALESCE(q.unmetered_count,0),COALESCE(q.imported,FALSE),COALESCE(q.updated_at,$2)
+ COALESCE(q.unmetered_count,0),COALESCE(q.imported,FALSE),q.updated_at
 FROM windows w LEFT JOIN LATERAL(
  SELECT SUM(points) AS used,SUM(estimated_points) FILTER(WHERE state IN('pending','unmetered')) AS pending,
  COUNT(*) FILTER(WHERE state='pending') AS pending_count,COUNT(*) FILTER(WHERE state='unmetered') AS unmetered_count,
@@ -49,9 +49,13 @@ FROM windows w LEFT JOIN LATERAL(
 	out := make([]service.CodingQuotaReading, 0, len(users)*2)
 	for rows.Next() {
 		var v service.CodingQuotaReading
+		var updatedAt sql.NullTime
 		if err := rows.Scan(&v.UserID, &v.Purpose, &v.Start, &v.End, &v.ResetReason, &v.Used, &v.Pending,
-			&v.PendingCount, &v.UnmeteredCount, &v.Imported, &v.UpdatedAt); err != nil {
+			&v.PendingCount, &v.UnmeteredCount, &v.Imported, &updatedAt); err != nil {
 			return nil, err
+		}
+		if updatedAt.Valid {
+			v.UpdatedAt = updatedAt.Time
 		}
 		out = append(out, v)
 	}

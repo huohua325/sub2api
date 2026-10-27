@@ -9,25 +9,32 @@ export function useStudentQuotas() {
   const loading = shallowRef(true)
   const failed = shallowRef(false)
   let timer = 0
-  let requestId = 0
+  let disposed = false
+  let inFlight: Promise<void> | null = null
 
-  async function load(quiet = false) {
-    const id = ++requestId
+  function load(quiet = false): Promise<void> {
+    if (disposed) return Promise.resolve()
+    if (inFlight) return inFlight
+    inFlight = read(quiet).finally(() => { inFlight = null })
+    return inFlight
+  }
+
+  async function read(quiet: boolean) {
     const startedAt = Date.now()
     if (!quiet && allowances.value == null) loading.value = true
     try {
       const data = await getMyPlatformQuotas()
-      if (id !== requestId) return
+      if (disposed) return
       const receivedAt = Date.now()
       const serverNow = Date.parse(data.server_now ?? '')
       const offset = Number.isFinite(serverNow) ? serverNow - (startedAt + receivedAt) / 2 : 0
-      allowances.value = (data.purpose_allowances ?? []).map((row) => ({ ...row, clock_offset_ms: offset }))
+      allowances.value = (data.purpose_allowances ?? []).map((row) => ({ ...row, clock_offset_ms: offset, read_at: new Date(receivedAt + offset).toISOString() }))
       failed.value = false
     } catch {
-      if (id !== requestId) return
+      if (disposed) return
       failed.value = true
     } finally {
-      if (id === requestId) loading.value = false
+      if (!disposed) loading.value = false
     }
   }
 
@@ -60,7 +67,7 @@ export function useStudentQuotas() {
   })
 
   onUnmounted(() => {
-    requestId += 1
+    disposed = true
     stopPoll()
     document.removeEventListener('visibilitychange', onVisibility)
   })

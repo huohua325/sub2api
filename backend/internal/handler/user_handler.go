@@ -118,6 +118,14 @@ func (h *UserHandler) GetMyPlatformQuotas(c *gin.Context) {
 					item["resets_at"] = resetsAt
 				}
 			} else if row.Purpose == service.PurposeExperiment {
+				period := service.AllowancePeriod(row.Purpose, row.Period)
+				start := row.WindowStart
+				if service.PurposeWindowExpired(period, start, nowUsage) {
+					start = service.RenewedPurposeWindow(period, start, nowUsage)
+				}
+				if !start.IsZero() {
+					item["period_start"] = start
+				}
 				percent := service.StudentFacingPercent(floatRat(used), floatRat(row.LimitAmount))
 				item["display_percent"] = percent
 				item["blocked"] = row.LimitAmount >= 0 && used >= row.LimitAmount
@@ -141,7 +149,9 @@ func (h *UserHandler) GetMyPlatformQuotas(c *gin.Context) {
 				item["data_status"] = card.DataStatus
 				item["pending_points"] = card.Pending
 				item["period_start"] = card.PeriodStart
-				item["updated_at"] = card.UpdatedAt
+				if card.UpdatedAt != nil && !card.UpdatedAt.IsZero() {
+					item["updated_at"] = card.UpdatedAt
+				}
 				item["reset_reason"] = card.ResetReason
 				if card.Points != nil {
 					item["point_used"] = *card.Points

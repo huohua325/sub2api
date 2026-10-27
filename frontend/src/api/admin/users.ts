@@ -362,6 +362,8 @@ export interface PlatformQuotaUpdateItem {
 }
 
 export interface PurposeAllowanceItem {
+  /** Server-corrected page read time, not settlement freshness. */
+  read_at?: string
   purpose: 'openai' | 'grok' | 'experiment'
   limit_amount?: number
   used_amount?: number

@@ -92,6 +92,18 @@ func quotaUsed(t *testing.T, r *UsageMonitorRepository, user int64, at time.Time
 	return service.CodingQuotaReading{}
 }
 
+func TestCodingQuotaDBEmptyLedgerHasNoInventedUpdateTime(t *testing.T) {
+	db, r, base := quotaTestDB(t, "")
+	_, err := db.Exec(`DELETE FROM coding_quota_requests`)
+	require.NoError(t, err)
+	readings, err := r.ReadCodingQuotas(context.Background(), []int64{1, 2}, base.Add(time.Hour))
+	require.NoError(t, err)
+	require.NotEmpty(t, readings)
+	for _, reading := range readings {
+		require.True(t, reading.UpdatedAt.IsZero(), "page reads must not invent ledger freshness")
+	}
+}
+
 func TestCodingQuotaDBMultiUserMultiAccount(t *testing.T) {
 	db, r, base := quotaTestDB(t, "")
 	ctx := context.Background()

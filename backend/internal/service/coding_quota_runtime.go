@@ -92,8 +92,12 @@ func codingQuotaResult(v CodingQuotaReading, budget string) OfficialPointResult 
 	if v.UnmeteredCount > 0 {
 		status = "partial"
 	}
+	var updatedAt *time.Time
+	if !v.UpdatedAt.IsZero() {
+		updatedAt = &v.UpdatedAt
+	}
 	return OfficialPointResult{Points: &text, Percent: &percent, Blocked: used.Cmp(limit) >= 0, Reset: &v.End,
-		PeriodStart: &v.Start, Pending: &v.Pending, DataStatus: status, UpdatedAt: &v.UpdatedAt, ResetReason: v.ResetReason}
+		PeriodStart: &v.Start, Pending: &v.Pending, DataStatus: status, UpdatedAt: updatedAt, ResetReason: v.ResetReason}
 }
 
 // Start runs bounded background metering. Neither authentication nor dashboard

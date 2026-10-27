@@ -40,6 +40,7 @@
         </div>
         <p v-if="meter.missing" class="quota-meter-missing">{{ t('dashboard.ruler.missing') }}</p>
         <template v-else>
+          <p class="quota-meter-used">{{ t('dashboard.ruler.usedLabel') }}</p>
           <p class="quota-meter-percent">{{ meter.percent }}<span>%</span></p>
           <p class="quota-meter-amount" :aria-hidden="meter.amount ? undefined : true">{{ meter.amount }}</p>
           <div class="quota-meter-track" aria-hidden="true">
@@ -47,11 +48,23 @@
           </div>
           <p v-if="meter.resetLine" class="quota-meter-reset">{{ meter.resetLine }}</p>
           <p v-if="meter.pending" class="quota-meter-reset">{{ t('dashboard.ruler.pendingHint') }}</p>
-          <p v-if="meter.exhausted" class="quota-meter-note">
-            {{ t('dashboard.ruler.exhausted') }}
-            <router-link to="/usage">{{ t('dashboard.ruler.viewUsage') }}</router-link>
-          </p>
         </template>
+        <p v-if="meter.exhausted" class="quota-meter-note">
+          {{ t('dashboard.ruler.exhausted') }}
+          <router-link to="/usage">{{ t('dashboard.ruler.viewUsage') }}</router-link>
+        </p>
+        <details class="quota-meter-details">
+          <summary>{{ t('dashboard.ruler.details') }}</summary>
+          <dl>
+            <dt>{{ t('dashboard.ruler.periodStart') }}</dt><dd>{{ absoluteTime(meter.row?.period_start) }}</dd>
+            <dt>{{ t('dashboard.ruler.resetTime') }}</dt><dd>{{ absoluteTime(meter.row?.resets_at) }}</dd>
+            <dt>{{ t('dashboard.ruler.dataState') }}</dt><dd>{{ meter.dataState }}</dd>
+            <dt>{{ t('dashboard.ruler.ledgerUpdated') }}</dt><dd>{{ absoluteTime(meter.row?.updated_at) }}</dd>
+            <dt>{{ t('dashboard.ruler.pageRead') }}</dt><dd>{{ absoluteTime(meter.row?.read_at) }}</dd>
+          </dl>
+          <p v-if="meter.row?.reset_reason === 'platform_reset'">{{ t('dashboard.ruler.platformReset') }}</p>
+          <p>{{ t(meter.id === 'experiment' ? 'dashboard.ruler.monthExplanation' : 'dashboard.ruler.weekExplanation') }}</p>
+        </details>
       </article>
       </div>
     </div>
@@ -105,19 +118,22 @@ watch(() => (props.allowances ?? []).filter((row) => {
     keys.forEach((key) => requestedResets.add(key))
     emit('reload')
   }
-})
+}, { immediate: true })
 
 const meters = computed(() => {
   const built = purposeOrder.map((id) => {
     const row = (props.allowances ?? []).find((item) => item.purpose === id)
     const usesDisplay = row != null && Object.prototype.hasOwnProperty.call(row, 'display_percent')
     const missing = !row || (usesDisplay && row.display_percent == null) || row.data_status === 'error'
-    const percent = missing ? 0 : (usesDisplay ? (row?.display_percent ?? 0) : ratioPercent(row))
+    const rawPercent = usesDisplay ? (row?.display_percent ?? 0) : ratioPercent(row)
+    const percent = missing || !Number.isFinite(rawPercent) ? 0 : Math.min(100, Math.max(0, rawPercent))
     const exhausted = row?.blocked ?? (!missing && rawExhausted(row))
     const pending = row?.data_status === 'pending' || row?.data_status === 'partial'
     const near = !missing && percent >= 80 && !exhausted
     return {
       id,
+      row,
+      dataState: missing ? t('dashboard.ruler.missing') : props.failed ? t('dashboard.ruler.stale') : t(`dashboard.ruler.states.${row?.data_status ?? 'current'}`),
       title: t(`dashboard.purpose.${id}`),
       missing,
       percent,
@@ -131,6 +147,8 @@ const meters = computed(() => {
         ? t('admin.usageMonitor.noReading')
         : exhausted
           ? t('dashboard.ruler.full')
+          : row?.data_status === 'estimated'
+            ? t('dashboard.ruler.states.estimated')
           : pending || props.failed
             ? t('dashboard.ruler.pending')
           : near
@@ -159,6 +177,15 @@ function ratioPercent(row: PurposeAllowanceItem | undefined): number {
   const used = row?.used_amount ?? 0
   if (limit <= 0) return 0
   return Math.min(100, Math.round((used / limit) * 100))
+}
+
+function absoluteTime(value: string | undefined): string {
+  const timestamp = Date.parse(value ?? '')
+  if (!Number.isFinite(timestamp) || timestamp <= 0) return t('dashboard.ruler.unknownTime')
+  return new Intl.DateTimeFormat('zh-CN', {
+    timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+  }).format(timestamp) + ' UTC+8'
 }
 
 function rawExhausted(row: PurposeAllowanceItem | undefined): boolean {
@@ -234,7 +261,13 @@ function countdown(iso: string | undefined, offset: number): string {
 .quota-badge.is-near { color: rgb(var(--color-warning)); background: rgb(var(--color-warning) / .08); }
 .quota-badge.is-full { color: rgb(var(--color-danger)); background: rgb(var(--color-danger) / .08); }
 .quota-badge.is-missing { color: rgb(var(--color-muted)); background: rgb(var(--color-line) / .3); }
-.quota-meter-percent { font-size: clamp(40px, 4vw, 56px); line-height: 1.35; margin-top: 24px; font-weight: 500; letter-spacing: -.07em; font-variant-numeric: tabular-nums; color: rgb(var(--color-ink)); }
+.quota-meter-used { margin-top: 20px; font-size: 12px; color: rgb(var(--color-muted)); }
+.quota-meter-details { margin-top: 8px; font-size: 11px; line-height: 1.8; color: rgb(var(--color-muted)); }
+.quota-meter-details summary { display: flex; align-items: center; min-height: 44px; color: rgb(var(--color-brand)); cursor: pointer; }
+.quota-meter-details dt { margin-top: 8px; font-weight: 600; }
+.quota-meter-details dd { overflow-wrap: anywhere; }
+.quota-meter-details p { margin-top: 12px; }
+.quota-meter-percent { font-size: clamp(40px, 4vw, 56px); line-height: 1.35; margin-top: 2px; font-weight: 500; letter-spacing: -.07em; font-variant-numeric: tabular-nums; color: rgb(var(--color-ink)); }
 .quota-meter-percent span { font-size: 20px; margin-left: 6px; letter-spacing: -.02em; color: rgb(var(--color-muted)); }
 .quota-meter-amount { min-height: 22px; margin-top: 4px; font-size: 12px; font-variant-numeric: tabular-nums; color: rgb(var(--color-muted)); }
 .quota-meter-track { overflow: hidden; margin-top: 22px; height: 8px; border-radius: 99px; background: repeating-linear-gradient(90deg, rgb(var(--color-line) / .5) 0, rgb(var(--color-line) / .5) calc(10% - 3px), transparent calc(10% - 3px), transparent 10%); }
