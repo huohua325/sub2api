@@ -1,6 +1,6 @@
 # MILE Lab 线上同步记录 · 2026-10-27
 
-当前线上版本为 `0.2.18-mile.20261027.connect1`，18:09 完成切换。下方保留历次发布记录，最新记录见文末。
+当前线上版本为 `0.2.18-mile.20261027.grok1`，20:28 完成切换。下方保留历次发布记录，最新记录见文末。
 
 ## 部署结果
 
@@ -90,3 +90,16 @@
 - 运行程序版本与提交、18 个公网资源校验一致；三个容器健康，Caddy 与 MemSlides 正常；仍为 307 个迁移，无待执行或校验冲突。
 - 公网静态资源配合模拟业务响应，Chromium 40 项检查通过，无页面异常；没有生产账号写入或收费调用。部署后个人周期与计量只读核对正常。
 - 自动化、浏览器结果、Firefox 驱动限制及计量边界详见 [接入与额度验收](CONNECTION-AND-QUOTA-ACCEPTANCE.md)。
+
+## 20:28 恢复 Grok 简版配置
+
+按用户要求恢复原首页与指引的 32 行 `config.toml`：单个 `grok-4.7`、直接填写 `api_key`、一个 `models_base_url`，恢复原有 `supports_reasoning_effort = true`、`supports_backend_search = false`、插件市场、自动更新、`yolo = true` 等设置。配置模板与原提交逐字核对一致，仅将地址和密钥插值保留为正确的 TOML 转义。首页、开始使用和真实接入面板统一使用此模板，不再要求额外环境变量。默认密钥遮罩、显隐、复制与下载保留。
+
+- 版本：`0.2.18-mile.20261027.grok1`；源码：`40e80eb16cd4de0bcdf01c64d385a3a2e284321b`。
+- 发布目录：`/opt/sub2api/releases/mile-20261027-grok1`。
+- SHA256：`07b6d75f2d7f7964dcc00b7fdee02b02fae786086a9a6beba105cdafe3472d0b`。
+- 切换前备份：`/opt/sub2api/backups/before-mile-20261027T122815Z`；数据库备份 3,209,558 字节，`pg_restore --list` 检查通过，未进行完整恢复演练。
+- 77 项相关前端测试、国际化检查、类型检查、全量只读 lint 与生产构建通过。Chromium、WebKit 各 45 项本地模拟业务检查通过；使用公网资源的 Chromium 45 项复验通过，无页面异常。
+- 公网 18 个静态资源与本地构建校验一致；健康、登录、公开配置接口均 200。三个容器 healthy，Caddy 和 MemSlides active，中继健康检查正常。
+- 本轮没有修改后端逻辑或迁移，也没有实际调用模型、探测模型权限或写入生产 Key。已下载的客户端配置不会自动替换，需要用户重新复制或下载并重启客户端。
+- 复核文件：`output/releases/mile-20261027-grok1/`；截图：`output/playwright/connection-quota/*grok-config*`。含凭证的私密备份仅保留在服务器。
