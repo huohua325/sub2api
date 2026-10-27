@@ -2027,7 +2027,7 @@ describe("admin SettingsView platform quota matrix", () => {
     getProviders.mockResolvedValue({ data: [] });
   });
 
-  it("从 baseSettings 加载默认平台配额数据并在 Users tab 渲染 6 平台行", async () => {
+  it("在 Users tab 展示 Codex、Grok 与 API 实验用途额度", async () => {
     const wrapper = mountView();
     await flushPromises();
     await openUsersTab(wrapper);
@@ -2035,12 +2035,9 @@ describe("admin SettingsView platform quota matrix", () => {
     expect(getSettings).toHaveBeenCalled();
 
     const html = wrapper.html();
-    // 表格行的平台字段：font-mono 渲染纯英文 platform key
-    expect(html).toContain("anthropic");
-    expect(html).toContain("openai");
-    expect(html).toContain("gemini");
-    expect(html).toContain("antigravity");
-    expect(html).toContain("typesafe");
+    expect(html).toContain("Codex");
+    expect(html).toContain("Grok");
+    expect(html).toContain("admin.settings.defaults.experimentQuota");
   });
 
   it("保存时 updateSettings payload 应包含嵌套 default_platform_quotas 对象（含全 6 平台）", async () => {
@@ -2101,7 +2098,7 @@ describe("admin SettingsView platform quota matrix", () => {
     expect(quotas["typesafe"]).toEqual({ daily: null, weekly: null, monthly: null });
   });
 
-  it("空输入（v-model.number 产出 \"\"）在提交时清洗为 null 而非空字符串", async () => {
+  it("修改用途额度时保留旧平台配额，不清空已保存的限额", async () => {
     // 模拟后端返回带有 anthropic daily 值的配额
     getSettings.mockResolvedValueOnce({
       ...baseSettingsResponse,
@@ -2117,24 +2114,20 @@ describe("admin SettingsView platform quota matrix", () => {
     await flushPromises();
     await openUsersTab(wrapper);
 
-    // 找到 anthropic daily 输入框并清空（模拟用户删除值）
-    const inputs = wrapper.findAll('input[type="number"]');
-    const anthropicDailyInput = inputs.find((i) => {
-      const parent = i.element.closest("tr");
-      return parent?.textContent?.includes("anthropic");
-    });
-
-    if (anthropicDailyInput) {
-      // 设置为空字符串，模拟 v-model.number 在清空时产出 ""
-      await anthropicDailyInput.setValue("");
-    }
+    const experimentSection = wrapper.findAll("label").find(label =>
+      label.text() === "admin.settings.defaults.experimentQuota"
+    )!.element.parentElement!;
+    const input = wrapper.findAll('input[type="number"]').find(item =>
+      experimentSection.contains(item.element)
+    )!;
+    await input.setValue("25");
 
     await wrapper.find("form").trigger("submit.prevent");
     await flushPromises();
 
     const payload = updateSettings.mock.calls.at(-1)![0] as Record<string, unknown>;
     const quotas = payload["default_platform_quotas"] as Record<string, Record<string, unknown>>;
-    // 不管输入是什么，提交值应为 null（而非 "" 或 NaN）
-    expect(quotas["anthropic"]?.["daily"]).toBe(null);
+    expect(quotas["anthropic"]?.["daily"]).toBe(10);
+    expect(payload["purpose_allowance_policy"]).toMatchObject({ experiment: { limit: 25 } });
   });
 });

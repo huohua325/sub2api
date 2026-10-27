@@ -78,13 +78,13 @@ func TestClassifyUpstreamTransportError(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			got := classifyUpstreamTransportError(tc.err).Persistent
 			if got != tc.persistent {
-				t.Fatalf("classifyUpstreamTransportError(%q).Persistent = %v, want %v", errString(tc.err), got, tc.persistent)
+				t.Fatalf("classifyUpstreamTransportError(%q).Persistent = %v, want %v", transportTestErrorString(tc.err), got, tc.persistent)
 			}
 		})
 	}
 }
 
-func errString(err error) string {
+func transportTestErrorString(err error) string {
 	if err == nil {
 		return "<nil>"
 	}

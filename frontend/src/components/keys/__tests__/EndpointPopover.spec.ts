@@ -47,7 +47,7 @@ describe('EndpointPopover', () => {
 
     expect(wrapper.text()).toContain('自定义说明')
     expect(wrapper.text()).toContain('点击可复制此端点')
-    expect(wrapper.find('[role="button"]').attributes('title')).toBeUndefined()
+    expect(wrapper.find('[role="button"]').attributes('title')).toBe('https://default.example.com/v1')
     expect(wrapper.find('[title="自定义说明"]').exists()).toBe(false)
   })
 

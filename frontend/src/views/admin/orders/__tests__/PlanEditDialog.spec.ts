@@ -5,7 +5,8 @@ import { mount } from '@vue/test-utils'
 import PlanEditDialog from '../PlanEditDialog.vue'
 import type { AdminGroup } from '@/types'
 
-vi.mock('vue-i18n', () => ({
+vi.mock('vue-i18n', async () => ({
+  ...await vi.importActual<typeof import('vue-i18n')>('vue-i18n'),
   useI18n: () => ({
     t: (key: string, params?: Record<string, unknown>) => {
       if (key === 'payment.admin.subscriptionCnyPayPreview') return `preview ${params?.amount}`
@@ -22,7 +23,8 @@ vi.mock('@/stores/app', () => ({
   }),
 }))
 
-vi.mock('@/api/admin/payment', () => ({
+vi.mock('@/api/admin/payment', async () => ({
+  ...await vi.importActual<typeof import('@/api/admin/payment')>('@/api/admin/payment'),
   adminPaymentAPI: {
     createPlan: vi.fn(),
     updatePlan: vi.fn(),

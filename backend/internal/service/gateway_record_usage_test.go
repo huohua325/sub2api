@@ -480,6 +480,8 @@ func TestGatewayServiceRecordUsage_DeepSeekAccountStatsUsesRequestPricingAtAndUp
 				usageRepo := &openAIRecordUsageLogRepoStub{inserted: true}
 				userRepo := &openAIRecordUsageUserRepoStub{}
 				svc := newGatewayRecordUsageServiceForTest(usageRepo, userRepo, &openAIRecordUsageSubRepoStub{})
+				billingRepo := &openAIRecordUsageBillingRepoStub{}
+				svc.usageBillingRepo = billingRepo
 				groupID := int64(905)
 				svc.channelService = newTestChannelServiceForStats(t, &Channel{ID: 1, Status: StatusActive}, groupID, PlatformDeepseek)
 				svc.resolver = NewModelPricingResolver(svc.channelService, svc.billingService)
@@ -513,8 +515,12 @@ func TestGatewayServiceRecordUsage_DeepSeekAccountStatsUsesRequestPricingAtAndUp
 				customerTotal := 1000*inputPrice + 500*outputPrice + 1000*cachePrice
 				require.InDelta(t, customerTotal, log.TotalCost, 1e-12)
 				require.InDelta(t, customerTotal*0.8, log.ActualCost, 1e-12)
-				require.Equal(t, 1, userRepo.deductCalls)
-				require.InDelta(t, customerTotal*0.8, userRepo.lastAmount, 1e-12)
+				require.Zero(t, userRepo.deductCalls)
+				require.Equal(t, 1, billingRepo.calls)
+				require.NotNil(t, billingRepo.lastCmd)
+				require.Equal(t, PurposeExperiment, billingRepo.lastCmd.Purpose)
+				require.InDelta(t, customerTotal*0.8, billingRepo.lastCmd.PurposeCost, 1e-12)
+				require.Zero(t, billingRepo.lastCmd.BalanceCost)
 				require.NotNil(t, log.AccountStatsCost)
 				require.InDelta(t, model.offPeakCost*slot.multiplier, *log.AccountStatsCost, 1e-12,
 					"account cost must use the upstream model and historical PricingAt")
