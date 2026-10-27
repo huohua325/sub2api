@@ -9,9 +9,11 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"testing/fstest"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/service"
+	"github.com/Wei-Shaw/sub2api/migrations"
 	"github.com/google/uuid"
 	_ "github.com/lib/pq"
 	"github.com/stretchr/testify/require"
@@ -205,6 +207,57 @@ func TestCodingQuotaDBHistoricalResetRestoresExhaustionAfterPersonalRollover(t *
 	var count int
 	require.NoError(t, db.QueryRow(`SELECT count(*) FROM coding_quota_requests`).Scan(&count))
 	require.Equal(t, 5, count, "confirmation must preserve every charge")
+}
+
+func TestCodingQuotaDBUpgradeAndRestartPreserveConfirmedReset(t *testing.T) {
+	db, r, base := quotaTestDB(t, "")
+	ctx := context.Background()
+	effective := base.Add(2 * time.Hour)
+	now := base.Add(4 * time.Hour)
+	_, err := db.Exec(`INSERT INTO coding_quota_requests(request_id,api_key_id,user_id,purpose,started_at,completed_at,weight,points,state)
+ VALUES('exhausted',1,1,'openai',$1,$1,1,51,'settled'),
+ ('other-user',2,2,'openai',$1,$1,1,7,'settled'),
+ ('grok',1,1,'grok',$1,$1,1,12,'settled')`, base.Add(3*time.Hour))
+	require.NoError(t, err)
+	event, err := r.ConfirmCodingReset(ctx, service.CodingQuotaReset{
+		ID: "confirmed:preserve-across-upgrades", EffectiveAt: effective, Note: "owner confirmed global reset",
+	}, 1)
+	require.NoError(t, err)
+	before, err := r.ReadCodingQuotas(ctx, []int64{1, 2}, now)
+	require.NoError(t, err)
+	var anchorsBefore string
+	require.NoError(t, db.QueryRow(`SELECT json_agg(a ORDER BY user_id,purpose)::text FROM user_purpose_allowances a`).Scan(&anchorsBefore))
+
+	// Run the real additive migration through the startup runner, then replay
+	// startup with a new DB connection and new repository/service instances.
+	const name = "248_group_image_count_billing.sql"
+	content, err := migrations.FS.ReadFile(name)
+	require.NoError(t, err)
+	upgrade := fstest.MapFS{name: &fstest.MapFile{Data: content}}
+	require.NoError(t, applyMigrationsFS(ctx, db, upgrade))
+	var schema string
+	require.NoError(t, db.QueryRow(`SELECT current_schema()`).Scan(&schema))
+	reopened, err := sql.Open("postgres", os.Getenv("SUB2API_QUOTA_TEST_DSN")+" search_path="+schema)
+	require.NoError(t, err)
+	defer func() { require.NoError(t, reopened.Close()) }()
+	require.NoError(t, applyMigrationsFS(ctx, reopened, upgrade))
+	fresh := NewUsageMonitorRepository(reopened)
+	events, err := fresh.ListCodingResets(ctx)
+	require.NoError(t, err)
+	require.Equal(t, []service.CodingQuotaReset{event}, events)
+	after, err := fresh.ReadCodingQuotas(ctx, []int64{1, 2}, now)
+	require.NoError(t, err)
+	require.Equal(t, before, after, "upgrade must preserve both purposes and both users at the same reference time")
+	var anchorsAfter string
+	require.NoError(t, reopened.QueryRow(`SELECT json_agg(a ORDER BY user_id,purpose)::text FROM user_purpose_allowances a`).Scan(&anchorsAfter))
+	require.Equal(t, anchorsBefore, anchorsAfter)
+	points := service.NewOfficialPointService(nil, fresh, nil)
+	blocked, checked := points.Blocks(ctx, 1, service.PurposeOpenAI)
+	require.True(t, checked)
+	require.True(t, blocked, "a new process must continue blocking an exhausted user")
+	var applications int
+	require.NoError(t, reopened.QueryRow(`SELECT count(*) FROM schema_migrations WHERE filename=$1`, name).Scan(&applications))
+	require.Equal(t, 1, applications, "startup replay must not run the migration twice")
 }
 
 func TestCodingQuotaDBWholePoolDetection(t *testing.T) {

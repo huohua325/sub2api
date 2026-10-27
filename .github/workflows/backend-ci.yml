@@ -43,6 +43,38 @@ jobs:
         working-directory: backend
         run: make test-integration
 
+  quota-persistence:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: quota_ci
+          POSTGRES_PASSWORD: quota_ci_only
+          POSTGRES_DB: quota_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U quota_ci -d quota_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      SUB2API_QUOTA_TEST_DSN: host=127.0.0.1 port=5432 user=quota_ci password=quota_ci_only dbname=quota_ci sslmode=disable
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          check-latest: false
+          cache: true
+          cache-dependency-path: backend/go.sum
+      - name: Verify quota rules survive upgrades and restarts
+        working-directory: backend
+        run: |
+          test -n "$SUB2API_QUOTA_TEST_DSN"
+          go test -p 2 -race ./internal/repository -run '^TestCodingQuotaDB' -count=1
+
   frontend:
     runs-on: ubuntu-latest
     steps:
