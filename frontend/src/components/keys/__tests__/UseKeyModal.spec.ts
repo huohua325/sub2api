@@ -189,41 +189,23 @@ describe('UseKeyModal', () => {
     expect(grokTab).toBeDefined()
 
     const allCode = wrapper.findAll('pre code').map((code) => code.text()).join('\n')
-    expect(allCode).toContain('GROK_MODELS_BASE_URL')
-    expect(allCode).toContain('XAI_API_KEY')
-    expect(allCode).toContain('[model."grok-4.5"]')
-    expect(allCode).toContain('[model."grok-build-0.1"]')
-    expect(allCode).toContain('[model."grok-4.20-multi-agent-0309"]')
-    expect(allCode).toContain('[model."grok-4.3"]')
-    expect(allCode).toContain('default = "grok-4.5"')
+    expect(wrapper.findAll('pre code')).toHaveLength(1)
+    expect(allCode).toContain('[model."grok-4.7"]')
+    expect(allCode).toContain('default = "grok-4.7"')
     expect(allCode).toContain('models_base_url = "https://example.com/v1"')
-    expect(allCode).toContain('models_list_url = "https://example.com/v1/models"')
-    expect(allCode).toContain('xai_api_base_url = "https://example.com/v1"')
-    expect(allCode).toContain('cli_chat_proxy_base_url = "https://example.com/v1"')
-    expect(allCode).toContain('preferred_method = "api_key"')
-    expect(allCode).toContain('image_description = "grok-4.5"')
-    expect(allCode).toContain('auto_compact_threshold_percent = 80')
-    expect(allCode).toContain('image_gen = true')
-    expect(allCode).toContain('video_gen = true')
-    expect(allCode).toContain('image_gen_model_override = "grok-imagine-image-quality"')
-    expect(allCode).toContain('image_edit_model_override = "grok-imagine-edit"')
-    expect(allCode).toContain('env_key = "XAI_API_KEY"')
-    expect(allCode).toContain('Keep api_backend = "responses" on every model entry.')
-    expect(allCode).toContain('grok-imagine-image')
-    expect(allCode).toContain('grok-imagine-edit')
-    expect(allCode).toMatch(/\[model\."grok-4\.5"\][\s\S]*?context_window = 500000/)
-    expect(allCode).toMatch(/\[model\."grok-build-0\.1"\][\s\S]*?context_window = 256000/)
-    // Prefer env_key; hardcode api_key only as commented alternative
-    expect(allCode).not.toMatch(/^api_key = "sk-grok-test"$/m)
-
-    const modelBlocks = allCode
-      .split(/(?=^\[model\.)/m)
-      .filter((block) => block.startsWith('[model."'))
-    expect(modelBlocks.length).toBeGreaterThanOrEqual(4)
-    for (const block of modelBlocks) {
-      if (block.includes('# [model.')) continue
-      expect(block).toContain('api_backend = "responses"')
-    }
+    expect(allCode).toContain('api_backend = "responses"')
+    expect(allCode).toContain('supports_reasoning_effort = true')
+    expect(allCode).toContain('supports_backend_search = false')
+    expect(allCode).not.toContain('sk-grok-test')
+    expect(allCode).not.toContain('XAI_API_KEY')
+    expect(allCode).not.toContain('image_gen = true')
+    await wrapper.get('[data-testid="download-config-0"]').trigger('click')
+    const [blob, filename] = saveAsMock.mock.calls.at(-1)!
+    expect(filename).toBe('config.toml')
+    expect(await readBlobAsText(blob)).toContain('api_key = "sk-grok-test"')
+    await wrapper.get('[data-testid="reveal-connection-key"]').trigger('click')
+    expect(wrapper.find('pre code').text()).toContain('api_key = "sk-grok-test"')
+    await wrapper.get('[data-testid="reveal-connection-key"]').trigger('click')
 
     const windowsTab = wrapper.findAll('button').find(
       (button) => button.text().trim() === 'Windows'

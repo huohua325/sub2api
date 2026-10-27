@@ -6,7 +6,7 @@ interface ParsedConfig {
   model_providers: { OpenAI: { base_url: string; wire_api: string; experimental_bearer_token?: string } }
   model_catalog_json?: string
   endpoints: { models_base_url: string }
-  model: Record<string, { api_backend: string; env_key: string }>
+  model: Record<string, { api_backend: string; api_key: string; supports_reasoning_effort: boolean; supports_backend_search: boolean }>
   models: { default: string }
 }
 
@@ -50,13 +50,21 @@ describe('connection configurations', () => {
     }
   })
 
-  it.each(['unix', 'powershell', 'cmd'])('generates a Grok environment and valid compatible config for %s', (shell) => {
-    const files = generateGrokFiles({ baseUrl: 'https://example.test/prefix/v1/', apiKey: 'sk-fixture', shell })
-    const config = parseToml(files[1]!.content)
+  it.each(['unix', 'powershell', 'cmd', 'windows'])('restores the single-file Grok setup with escaped credentials for %s', (shell) => {
+    const apiKey = 'sk-"\\\t\n$special'
+    const files = generateGrokFiles({ baseUrl: 'https://example.test/prefix/v1/', apiKey, shell })
+    expect(files).toHaveLength(1)
+    expect(files[0]!.path).toBe(shell === 'unix' ? '~/.grok/config.toml' : '%userprofile%\\.grok\\config.toml')
+    const config = parseToml(files[0]!.content)
     expect(config.endpoints.models_base_url).toBe('https://example.test/prefix/v1')
-    expect(config.model[config.models.default].api_backend).toBe('responses')
-    expect(config.model[config.models.default].env_key).toBe('XAI_API_KEY')
-    expect(files[0]!.content).toContain('sk-fixture')
-    expect(files[1]!.content).not.toContain('sk-fixture')
+    expect(config.models.default).toBe('grok-4.7')
+    expect(Object.keys(config.model)).toEqual(['grok-4.7'])
+    const model = config.model[config.models.default]
+    expect(model.api_backend).toBe('responses')
+    expect(model.api_key).toBe(apiKey)
+    expect(model.supports_reasoning_effort).toBe(true)
+    expect(model.supports_backend_search).toBe(false)
+    expect(files[0]!.content).not.toContain('XAI_API_KEY')
+    expect(files[0]!.content).not.toContain('[features]')
   })
 })

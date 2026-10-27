@@ -107,9 +107,7 @@
             :copied="copiedId === 'grok-config'"
             @copy="copyText(grokConfig, 'grok-config')"
           />
-          <p class="mt-4 max-w-[40rem] text-sm leading-6 text-gray-600 dark:text-gray-300">{{ t('guide.manual.grok.envKey') }}</p>
           <h4 class="mt-8 text-sm font-semibold text-gray-900 dark:text-white">{{ t('guide.manual.fieldsTitle') }}</h4>
-          <GuideFile class="mt-3" filename="Terminal" :code="grokEnvironment" :copy-label="t('common.copy')" :copied-label="t('common.copied')" :copied="copiedId === 'grok-env'" @copy="copyText(grokEnvironment, 'grok-env')" />
           <GuideFields :items="grokFields" />
           <p class="mt-4 max-w-[40rem] text-sm leading-6 text-gray-600 dark:text-gray-300">{{ t('guide.manual.grok.effort') }}</p>
           <p class="mt-3 max-w-[40rem] text-sm leading-6 text-gray-600 dark:text-gray-300">{{ t('guide.manual.grok.search') }}</p>
@@ -275,8 +273,7 @@ const codexFiles = computed(() => generateCodexFiles({ baseUrl: apiV1.value, api
 const codexConfig = computed(() => codexFiles.value[0]!.content)
 const authJson = computed(() => codexFiles.value[1]!.content)
 const grokFiles = computed(() => generateGrokFiles({ baseUrl: apiV1.value, apiKey: keyPlaceholder.value }))
-const grokConfig = computed(() => grokFiles.value[1]!.content)
-const grokEnvironment = computed(() => grokFiles.value[0]!.content)
+const grokConfig = computed(() => grokFiles.value[0]!.content)
 
 const toc = computed(() => [
   { id: 'guide-prep', title: t('guide.manual.prep.title') },
@@ -299,10 +296,15 @@ const grokFieldNames = [
   ['models_base_url', 'models_base_url'],
   ['model', 'model'],
   ['name_description', 'name / description'],
-  ['api_key', 'env_key / XAI_API_KEY'],
+  ['api_key', 'api_key'],
   ['api_backend', 'api_backend'],
   ['context_window', 'context_window'],
+  ['supports_reasoning_effort', 'supports_reasoning_effort'],
   ['supports_backend_search', 'supports_backend_search'],
+  ['installer', 'installer'],
+  ['auto_update', 'auto_update'],
+  ['yolo', 'yolo'],
+  ['marketplace', 'marketplace'],
 ] as const
 
 const codexFields = computed(() => codexFieldNames.map((name) => ({

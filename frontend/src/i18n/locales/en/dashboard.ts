@@ -282,17 +282,17 @@ export default {
       },
       grok: {
         description:
-          'Configure Grok CLI, Claude Code, Codex, or OpenCode to send requests through your MILE Lab Grok group. Text models use Responses; image/video use Imagine model IDs on media endpoints.',
+          'Fill in your Key and save config.toml to use Grok Build through your MILE Lab Grok group. Expand the section below for other clients.',
         claudeDescription: 'Configure Claude Code to send Messages API traffic through your MILE Lab Grok group.',
         codexDescription: 'Configure Codex to send Responses API traffic through your MILE Lab Grok group.',
         configTomlHint:
-          'Official path: ~/.grok/config.toml (or $GROK_HOME). Fill [endpoints] (models_base_url / models_list_url / xai_api_base_url / cli_chat_proxy_base_url), [auth] preferred_method=api_key, [models], [session], and [features] image/video overrides. Prefer env_key over api_key; every text model needs api_backend=responses. Back up before merge, then run grok inspect.',
+          'Save as ~/.grok/config.toml (or under $GROK_HOME). The template includes this Key: copy or download it to use. Merge existing configuration without duplicate sections, then run grok inspect.',
         codexConfigTomlHint:
           'Official Codex: wire_api = "responses" only; prefer env_key over experimental_bearer_token; supports_websockets = false for non-OpenAI gateways (MILE Lab can still accept client WS and bridge to HTTP/SSE). Back up ~/.codex/config.toml before merge.',
         note:
-          'Export GROK_MODELS_BASE_URL and XAI_API_KEY, save the full config.toml (endpoints/auth/models/session/features) as ~/.grok/config.toml, run grok inspect, then /model grok-4.5 (or grok-build-0.1 for coding).',
+          'Save config.toml as ~/.grok/config.toml, run grok inspect, then start grok. This template needs no extra environment variables.',
         noteWindows:
-          'Set GROK_MODELS_BASE_URL and XAI_API_KEY, save the full config.toml as %USERPROFILE%\\.grok\\config.toml, run grok inspect, then /model grok-4.5 (or grok-build-0.1 for coding).',
+          'Save config.toml as %USERPROFILE%\\.grok\\config.toml, run grok inspect, then start grok. This template needs no extra environment variables.',
         claudeNote:
           'Choose one method: terminal env for this session, or ~/.claude/settings.json for persistence. Do not commit files that contain your API key.',
         codexNote:

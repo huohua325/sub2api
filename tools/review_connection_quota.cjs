@@ -130,7 +130,7 @@ async (page) => {
   }
   result.measurements.push({ name: 'warm-dialog-automation-ms', samples: timings })
 
-  for (const [purpose, groupName, expected] of [['codex', 'Codex / Research', 'auth.json'], ['grok_build', 'Grok Build / Research', 'XAI_API_KEY'], ['experiment', 'API / Messages', '/messages']]) {
+  for (const [purpose, groupName, expected] of [['codex', 'Codex / Research', 'auth.json'], ['grok_build', 'Grok Build / Research', '[model."grok-4.7"]'], ['experiment', 'API / Messages', '/messages']]) {
     failList = false
     await settle(`/keys?purpose=${purpose}&create=1`)
     await p.locator('[data-tour="key-form-name"]').fill(`New ${purpose}`)
@@ -143,6 +143,16 @@ async (page) => {
     await p.getByTestId('connection-key').waitFor()
     check(`created-${purpose}`, creates === before + 1 && (await dialog.innerText()).includes(expected))
     check(`created-${purpose}-masked`, !(await dialog.innerText()).includes(`sk-synthetic-review-${100 + creates}`))
+    if (purpose === 'grok_build') {
+      check('grok-single-file', await dialog.locator('pre code').count() === 1)
+      check('grok-no-env-step', !(await dialog.innerText()).includes('XAI_API_KEY'))
+      const grokDownload = p.waitForEvent('download')
+      await p.getByTestId('download-config-0').click()
+      check('grok-config-download', (await grokDownload).suggestedFilename() === 'config.toml')
+      await shot('grok-config', 1440)
+      await shot('grok-config', 375)
+      await resize(1440)
+    }
     await p.keyboard.press('Escape')
     await dialog.waitFor({ state: 'hidden' })
     check(`created-${purpose}-focus`, await p.locator('[data-tour="keys-create-btn"]').evaluate((el) => el === document.activeElement))

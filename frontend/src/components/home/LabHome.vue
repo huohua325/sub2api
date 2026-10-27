@@ -59,7 +59,7 @@
               <details><summary>{{ t('design.configuration') }}<Icon name="chevronDown" size="sm" /></summary>
                 <div class="lab-home-config">
                   <div class="lab-home-config-bar"><span>config.toml</span><button class="btn btn-secondary btn-sm" @click="copyBlock('grok', grokConfig)">{{ copyLabel('grok', t('home.sheet.copyConfig')) }}</button></div>
-                  <pre translate="no">{{ grokEnvironment }}</pre><pre translate="no">{{ grokConfig }}</pre>
+                  <pre translate="no">{{ grokConfig }}</pre>
                   <p class="lab-home-location" translate="no">%USERPROFILE%\.grok\config.toml · ~/.grok/config.toml</p>
                 </div>
               </details>
@@ -122,8 +122,7 @@ const codexFiles = computed(() => generateCodexFiles({ baseUrl: apiV1.value, api
 const codexConfig = computed(() => codexFiles.value[0]!.content)
 const authJson = computed(() => codexFiles.value[1]!.content)
 const grokFiles = computed(() => generateGrokFiles({ baseUrl: apiV1.value, apiKey: keyPlaceholder.value }))
-const grokConfig = computed(() => grokFiles.value[1]!.content)
-const grokEnvironment = computed(() => grokFiles.value[0]!.content)
+const grokConfig = computed(() => grokFiles.value[0]!.content)
 
 const copiedId = shallowRef('')
 let copiedTimer = 0

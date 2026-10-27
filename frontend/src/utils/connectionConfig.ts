@@ -1,7 +1,7 @@
 import { buildCodexModelCatalogUrl } from '@/api/codex'
 
 export const DEFAULT_CODEX_MODEL = 'gpt-5.5'
-export const DEFAULT_GROK_MODEL = 'grok-4.5'
+export const DEFAULT_GROK_MODEL = 'grok-4.7'
 export interface ConnectionFile { path: string; content: string; hint?: string }
 export interface ConnectionOptions { baseUrl: string; apiKey: string; shell?: string }
 export interface CodexConnectionOptions extends ConnectionOptions {
@@ -96,147 +96,48 @@ ${catalogMode === 'remote' ? 'api_key_model_discovery = true\n' : ''}goals = tru
 }
 
 
+/** Restore the original single-file Grok Build setup shared by every entry point. */
 export function generateGrokFiles(options: ConnectionOptions): ConnectionFile[] {
-  const { apiKey } = options
+  const { apiKey, shell = 'unix' } = options
   const baseUrl = connectionApiBase(options.baseUrl)
-  // Prefer unix/cmd/powershell when shell tabs are shown; fall back to windows tab.
-  const shell = options.shell ?? 'unix'
-  const isWindowsPath = shell === 'windows' || shell === 'cmd' || shell === 'powershell'
-  const configDir = isWindowsPath ? '%userprofile%\\.grok' : '~/.grok'
+  const isWindows = ['windows', 'cmd', 'powershell'].includes(shell)
+  const configDir = isWindows ? '%userprofile%\\.grok' : '~/.grok'
+  const configContent = `[models]
+default = "grok-4.7"
+web_search = "grok-4.7"
 
-  let envPath: string
-  let envContent: string
-  switch (shell) {
-    case 'cmd':
-      envPath = 'Command Prompt'
-      envContent = `set GROK_MODELS_BASE_URL=${escapeShellValue(baseUrl, shell)}
-set XAI_API_KEY=${escapeShellValue(apiKey, shell)}`
-      break
-    case 'powershell':
-    case 'windows':
-      envPath = 'PowerShell'
-      envContent = `$env:GROK_MODELS_BASE_URL="${escapeShellValue(baseUrl, shell)}"
-$env:XAI_API_KEY="${escapeShellValue(apiKey, shell)}"`
-      break
-    default:
-      envPath = 'Terminal'
-      envContent = `export GROK_MODELS_BASE_URL="${escapeShellValue(baseUrl, shell)}"
-export XAI_API_KEY="${escapeShellValue(apiKey, shell)}"`
-  }
-
-  // Shape follows Grok Build user guide (~/.grok/docs + custom-models) and production-ready MILE Lab setups.
-  // Text models only (Responses). Image/video: Imagine model IDs on media endpoints / feature overrides.
-  // Credential order: api_key field → env_key → signed-in session → XAI_API_KEY global fallback.
-  const modelsListUrl = `${baseUrl.replace(/\/+$/, '')}/models`
-  const configContent = `# Grok Build CLI → MILE Lab Grok group (API key auth).
-# Docs: ~/.grok/docs/user-guide/05-configuration.md + 11-custom-models.md
-# Verify after save: grok inspect
-#
-# IMPORTANT: api_backend must be "responses" for MILE Lab Grok (POST /v1/responses).
-# If omitted, Grok Build defaults to chat_completions (/v1/chat/completions).
-# Keep api_backend = "responses" on every model entry.
-#
-# Prefer env_key over hardcoding api_key (never commit secrets).
-# Also export GROK_MODELS_BASE_URL + XAI_API_KEY in the shell block above.
-
-# Global inference / catalog endpoints (same role as env GROK_MODELS_BASE_URL).
-# When models_base_url is set, Grok uses API-key Bearer auth (no grok login required).
 [endpoints]
-models_base_url = "${escapeTomlBasicString(baseUrl)}"              # inference base; model list defaults to {base}/models
-models_list_url = "${escapeTomlBasicString(modelsListUrl)}"        # optional override (env: GROK_MODELS_LIST_URL)
-xai_api_base_url = "${escapeTomlBasicString(baseUrl)}"             # public xAI API base override for gateway routing
-cli_chat_proxy_base_url = "${escapeTomlBasicString(baseUrl)}"      # CLI chat-proxy base (env: GROK_CLI_CHAT_PROXY_BASE_URL)
+models_base_url = "${escapeTomlBasicString(baseUrl)}"
 
-# Prefer API key when using a custom gateway (matches MILE Lab).
-# Requires XAI_API_KEY env or per-model env_key / api_key.
-[auth]
-preferred_method = "api_key"
-
-[model."grok-4.5"]
-model = "grok-4.5"                          # id sent to the API
-name = "Grok 4.5"                           # shown in /model picker
-description = "Grok 4.5 via MILE Lab (Responses)"
-# base_url inherits from [endpoints].models_base_url; override only if needed:
-# base_url = "${escapeTomlBasicString(baseUrl)}"
-env_key = "XAI_API_KEY"                     # supplied by the shell environment
-api_backend = "responses"                   # chat_completions | responses | messages
-context_window = 500000                     # drives auto-compaction timing
-# Optional sampling (global defaults can live under [models] instead):
-# temperature = 0.7
-# top_p = 0.95
-# max_completion_tokens = 8192
-# Server-side (backend) web_search tools — only if your gateway exposes them:
-supports_backend_search = true
-
-[model."grok-build-0.1"]
-model = "grok-build-0.1"
-name = "Grok Build"
-description = "Coding / agent sessions (xAI recommends grok-build* for coding)"
-env_key = "XAI_API_KEY"
+[model."grok-4.7"]
+model = "grok-4.7"
+name = "Grok 4.7"
+description = "Grok 4.7 via MILE"
+api_key = "${escapeTomlBasicString(apiKey)}"
 api_backend = "responses"
-context_window = 256000
-supports_backend_search = true
+context_window = 500000
+supports_reasoning_effort = true
+supports_backend_search = false
 
-# Text multi-agent / client web_search sub-agent (NOT Imagine image/video).
-[model."grok-4.20-multi-agent-0309"]
-model = "grok-4.20-multi-agent-0309"
-name = "Grok 4.20 Multi Agent (text / web_search)"
-description = "Text multi-agent; use for web_search sub-agent, not image/video"
-env_key = "XAI_API_KEY"
-api_backend = "responses"
-context_window = 1000000
-supports_backend_search = true
+[marketplace]
+default_skills_installs_purged = true
+official_marketplace_auto_installed = true
 
-[model."grok-4.3"]
-model = "grok-4.3"
-name = "Grok 4.3"
-env_key = "XAI_API_KEY"
-api_backend = "responses"
-context_window = 1000000
-supports_backend_search = true
+[[marketplace.sources]]
+name = "xAI Official"
+git = "https://github.com/xai-org/plugin-marketplace.git"
 
-# Optional short alias for /model grok:
-# [model."grok"]
-# model = "grok-4.5"
-# name = "Grok"
-# env_key = "XAI_API_KEY"
-# api_backend = "responses"
-# context_window = 1000000
-# supports_backend_search = true
+[cli]
+auto_update = true
+installer = "internal"
 
-[models]
-# xAI recommends grok-build* for coding/agent sessions; use grok-4.5 for general chat.
-default = "grok-4.5"
-web_search = "grok-4.5"                     # client-side web_search tool model (must exist as [model.*])
-image_description = "grok-4.5"              # vision/describe-image helper model
-# Optional environment-wide sampling defaults (per-model values win):
-# temperature = 0.7
-# top_p = 0.95
-# max_completion_tokens = 8192
-# max_retries = 8
+[ui]
+yolo = true
+compact_mode = false`
 
-[session]
-auto_compact_threshold_percent = 80         # auto-compact at this % of context_window (default 85)
-
-# Imagine tools: model IDs go to MILE Lab media endpoints (not the text [model.*] catalog).
-# Enable only if the Grok group allows image/video generation.
-[features]
-image_gen = true
-video_gen = true
-image_gen_model_override = "grok-imagine-image-quality"   # or grok-imagine-image
-image_edit_model_override = "grok-imagine-edit"
-# Optional feature flags (defaults shown in docs):
-# telemetry = false
-# remote_fetch = true                         # set false for air-gapped / pure-gateway catalogs
-# lsp_tools = false`
-
-  return [
-    { path: envPath, content: envContent },
-    {
-      path: joinConfigPath(configDir, 'config.toml', isWindowsPath),
-      content: configContent,
-      hint: 'keys.useKeyModal.grok.configTomlHint'
-    }
-  ]
+  return [{
+    path: joinConfigPath(configDir, 'config.toml', isWindows),
+    content: configContent,
+    hint: 'keys.useKeyModal.grok.configTomlHint'
+  }]
 }
-
