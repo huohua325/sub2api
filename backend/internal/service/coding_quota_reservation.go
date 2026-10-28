@@ -98,4 +98,5 @@ type CodingBillingStore interface {
 type CodingAsyncStore interface {
 	StoreCodingAsyncJob(context.Context, string, int64, int64, GrokVideoPendingBilling) error
 	LoadCodingAsyncJob(context.Context, string, int64, int64) (*GrokVideoPendingBilling, error)
+	CodingAsyncJobHasBilling(context.Context, string, int64, int64) (bool, error)
 }

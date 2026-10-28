@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	middleware2 "github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
@@ -118,4 +119,16 @@ func jsonPathString(t *testing.T, raw json.RawMessage, keys ...string) string {
 	result, ok := current.(string)
 	require.True(t, ok)
 	return result
+}
+
+func TestLiveCodingEnforceCannotBypassAdmissionViaWebRTC(t *testing.T) {
+	t.Setenv("SUB2API_CODING_QUOTA_OPENAI_MODE", "enforce")
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest("POST", "/v1/live", bytes.NewBufferString(`{"sdp":"v=0","session":{"model":"gpt-live"}}`))
+	c.Set(string(middleware2.ContextKeyAPIKey), &service.APIKey{ID: 1, UserID: 1, Group: &service.Group{Platform: service.PlatformOpenAI, UsageKind: service.UsageKindCoding, AllowLive: true}})
+	c.Set(string(middleware2.ContextKeyUser), middleware2.AuthSubject{UserID: 1, Concurrency: 1})
+	(&OpenAIGatewayHandler{}).Live(c)
+	require.Equal(t, http.StatusServiceUnavailable, recorder.Code)
+	require.Contains(t, recorder.Body.String(), "CODING_QUOTA_UNAVAILABLE")
 }

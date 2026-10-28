@@ -2,9 +2,13 @@ package service
 
 import (
 	"context"
+	"github.com/Wei-Shaw/sub2api/internal/config"
 	coderws "github.com/coder/websocket"
 	"github.com/gin-gonic/gin"
+	"io"
+	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -154,7 +158,7 @@ func TestCodingReservationRealtimeIdleAndPerTurn(t *testing.T) {
 
 func TestCodingReservationMediaAndEmbeddingsCannotBypassAdmission(t *testing.T) {
 	t.Setenv("SUB2API_CODING_QUOTA_OPENAI_MODE", "enforce")
-	for _, endpoint := range []string{"images", "embeddings"} {
+	for _, endpoint := range []string{"images", "embeddings", "alpha-search"} {
 		t.Run(endpoint, func(t *testing.T) {
 			store := &codingRuntimeStore{reserveError: ErrCodingQuotaBusy}
 			svc := &OpenAIGatewayService{codingPoints: NewOfficialPointService(nil, store, nil)}
@@ -164,9 +168,12 @@ func TestCodingReservationMediaAndEmbeddingsCannotBypassAdmission(t *testing.T) 
 			c.Set("api_key", &APIKey{ID: 1, UserID: 1, Group: &Group{Platform: PlatformOpenAI, UsageKind: UsageKindCoding}})
 			a := &Account{ID: 10, Type: AccountTypeAPIKey}
 			var err error
-			if endpoint == "images" {
+			switch endpoint {
+			case "images":
 				_, err = svc.ForwardImages(c.Request.Context(), c, a, []byte(`{"model":"gpt-image-1"}`), &OpenAIImagesRequest{Model: "gpt-image-1"}, "")
-			} else {
+			case "alpha-search":
+				_, err = svc.ForwardAlphaSearch(c.Request.Context(), c, a, []byte(`{"model":"gpt-5"}`))
+			default:
 				_, err = svc.ForwardEmbeddings(c.Request.Context(), c, a, []byte(`{"model":"text-embedding-3-small"}`), "")
 			}
 			require.ErrorIs(t, err, ErrCodingQuotaBusy)
@@ -212,4 +219,89 @@ func TestCodingReservationRealtimeRejectsOverlappingExplicitTurns(t *testing.T) 
 	session.End()
 	require.NoError(t, session.BeginEvent(context.Background(), "response.create"))
 	require.Len(t, store.inputs, 2)
+}
+
+func TestCodingReservationForgedUpgradeHeaderCannotBypass(t *testing.T) {
+	t.Setenv("SUB2API_CODING_QUOTA_OPENAI_MODE", "enforce")
+	store := &codingRuntimeStore{reserveError: ErrCodingQuotaBusy}
+	svc := &OpenAIGatewayService{codingPoints: NewOfficialPointService(nil, store, nil)}
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest("POST", "/v1/responses", nil)
+	c.Request.Header.Set("Upgrade", "websocket")
+	c.Set("api_key", &APIKey{ID: 1, UserID: 1, Group: &Group{Platform: PlatformOpenAI, UsageKind: UsageKindCoding}})
+	_, err := svc.PrepareCodingRequest(c.Request.Context(), c, &Account{ID: 10}, []byte(`{"model":"gpt-5"}`))
+	require.ErrorIs(t, err, ErrCodingQuotaBusy)
+}
+func TestCodingReservationCodexStrippedCapIsUnknown(t *testing.T) {
+	billing := NewBillingService(&config.Config{}, nil)
+	billing.fallbackPrices["gpt-5"] = &ModelPricing{InputPricePerToken: 1e-6, OutputPricePerToken: 2e-6}
+	body := []byte(`{"model":"gpt-5","max_output_tokens":1}`)
+	_, known := codingRawEstimate(billing, &Account{Platform: PlatformOpenAI, Type: AccountTypeAPIKey}, body)
+	require.NotEmpty(t, known, "control must be priceable")
+	_, unknown := codingRawEstimate(billing, &Account{Platform: PlatformOpenAI, Type: AccountTypeOAuth}, body)
+	require.Empty(t, unknown, "Codex deletes output caps before sending")
+}
+func TestCodingReservationVoiceRequestCarriesHandleToActualTransport(t *testing.T) {
+	store := &codingRuntimeStore{}
+	up := &httpUpstreamRecorder{resp: &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": []string{"audio/wav"}}, Body: io.NopCloser(strings.NewReader("audio"))}}
+	svc := &OpenAIGatewayService{cfg: &config.Config{}, codingPoints: NewOfficialPointService(nil, store, nil), httpUpstream: up}
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest("POST", "/v1/tts", nil)
+	c.Set("api_key", &APIKey{ID: 1, UserID: 1, Group: &Group{Platform: PlatformGrok, UsageKind: UsageKindCoding}})
+	defer FinishCodingRequest(c)
+	_, _ = svc.ForwardGrokVoice(c.Request.Context(), c, &Account{ID: 10, Platform: PlatformGrok, Type: AccountTypeAPIKey, Credentials: map[string]any{"api_key": "test"}}, "tts", []byte(`{"text":"hi"}`), "application/json")
+	require.NotNil(t, up.lastReq)
+	require.NotNil(t, CodingReservationFromContext(up.lastReq.Context()))
+}
+
+type codingVideoClaimStore struct {
+	codingRuntimeStore
+	handed bool
+}
+
+func (s *codingVideoClaimStore) StoreCodingAsyncJob(context.Context, string, int64, int64, GrokVideoPendingBilling) error {
+	return nil
+}
+func (s *codingVideoClaimStore) LoadCodingAsyncJob(context.Context, string, int64, int64) (*GrokVideoPendingBilling, error) {
+	return &GrokVideoPendingBilling{CodingReservationID: "durable-video"}, nil
+}
+func (s *codingVideoClaimStore) CodingAsyncJobHasBilling(context.Context, string, int64, int64) (bool, error) {
+	return s.handed, nil
+}
+
+type codingStaleVideoClaim struct{ GatewayCache }
+
+func (codingStaleVideoClaim) ClaimGrokVideoBilled(context.Context, string, time.Duration) (bool, error) {
+	return false, nil
+}
+func TestCodingReservationVideoStaleRedisClaimCannotHideMissingHandoff(t *testing.T) {
+	store := &codingVideoClaimStore{}
+	svc := &OpenAIGatewayService{codingPoints: NewOfficialPointService(nil, store, nil), cache: codingStaleVideoClaim{}}
+	claimed, err := svc.ClaimGrokVideoBilling(context.Background(), "job", 1, 1)
+	require.NoError(t, err)
+	require.True(t, claimed, "a stale Redis claim cannot suppress a missing durable bill")
+	store.handed = true
+	claimed, err = svc.ClaimGrokVideoBilling(context.Background(), "job", 1, 1)
+	require.NoError(t, err)
+	require.False(t, claimed, "existing durable command remains authoritative")
+}
+
+func TestCodingReservationSendStorageFailureIs503WithoutFailover(t *testing.T) {
+	for _, kind := range []string{"openai", "generic"} {
+		t.Run(kind, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+			c.Request = httptest.NewRequest("POST", "/v1/responses", nil)
+			account := &Account{ID: 10, Platform: PlatformOpenAI}
+			var err error
+			if kind == "openai" {
+				err = (&OpenAIGatewayService{}).handleOpenAIUpstreamTransportError(c.Request.Context(), c, account, ErrCodingQuotaUnavailable, false)
+			} else {
+				err = (&GatewayService{}).handleUpstreamTransportError(c.Request.Context(), c, account, ErrCodingQuotaUnavailable, OpsUpstreamErrorEvent{})
+			}
+			require.ErrorIs(t, err, ErrCodingQuotaUnavailable)
+			require.Equal(t, http.StatusServiceUnavailable, w.Code)
+			require.Contains(t, w.Body.String(), "CODING_QUOTA_UNAVAILABLE")
+		})
+	}
 }

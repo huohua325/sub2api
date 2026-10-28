@@ -38,6 +38,12 @@ func (h *OpenAIGatewayHandler) Live(c *gin.Context) {
 		h.errorResponse(c, http.StatusForbidden, "permission_error", "Live is not enabled for this group")
 		return
 	}
+	// WebRTC media bypasses this proxy and upstream Live has no metered billing.
+	// Do not silently bypass coding admission when enforcement is enabled.
+	if service.PurposeOfGroup(apiKey.Group.Platform, apiKey.Group.UsageKind) == service.PurposeOpenAI && service.CodingControlMode(service.PurposeOpenAI) == "enforce" {
+		service.WriteCodingQuotaError(c, service.ErrCodingQuotaUnavailable)
+		return
+	}
 	request, err := parseLiveCallRequest(c)
 	if err != nil {
 		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", err.Error())

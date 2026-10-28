@@ -525,6 +525,20 @@ func (s *OpenAIGatewayService) ClaimGrokVideoBilling(
 	requestID string,
 	userID, apiKeyID int64,
 ) (bool, error) {
+	// Coding completion uses the durable command as its claim. Redis can outlive
+	// a crashed poll that never persisted billing and must not suppress recovery.
+	if s != nil && s.codingPoints != nil {
+		if store, ok := s.codingPoints.store.(CodingAsyncStore); ok {
+			job, err := store.LoadCodingAsyncJob(ctx, requestID, userID, apiKeyID)
+			if err != nil {
+				return false, err
+			}
+			if job != nil && job.CodingReservationID != "" {
+				handed, err := store.CodingAsyncJobHasBilling(ctx, requestID, userID, apiKeyID)
+				return !handed, err
+			}
+		}
+	}
 	if s == nil || s.cache == nil {
 		return false, fmt.Errorf("grok video billing claim cache is unavailable")
 	}

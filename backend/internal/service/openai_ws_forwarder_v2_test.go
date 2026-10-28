@@ -81,7 +81,13 @@ func TestForwardOpenAIWSV2_KeepsOutboundAndObservedServiceTiersSeparate(t *testi
 				`{"model":"gpt-5.5","stream":%t,"service_tier":%q,"input":[{"type":"input_text","text":"hi"}]}`,
 				tc.stream, tc.requestTier,
 			))
-			result, err := svc.Forward(context.Background(), c, account, body)
+			store := &codingRuntimeStore{}
+			points := NewOfficialPointService(nil, store, nil)
+			hold, holdErr := points.BeginCodingReservation(context.Background(), CodingReservationInput{UserID: 1, APIKeyID: 1, AccountID: account.ID, Purpose: PurposeOpenAI})
+			require.NoError(t, holdErr)
+			defer hold.Finish()
+			result, err := svc.Forward(WithCodingReservation(context.Background(), hold), c, account, body)
+			require.Positive(t, store.sent, "HTTP-to-WS transport must mark upstream send")
 			require.NoError(t, err)
 			require.NotNil(t, result)
 			require.True(t, result.OpenAIWSMode, "must take HTTP POST → forwardOpenAIWSV2, not HTTP fallback")

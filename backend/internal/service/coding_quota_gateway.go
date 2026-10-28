@@ -32,6 +32,10 @@ func codingRawEstimate(billing *BillingService, account *Account, body []byte) (
 	if account != nil {
 		model = account.GetMappedModel(model)
 	}
+	// Codex removes client output caps; they cannot bound the actual generation.
+	if account != nil && account.IsOpenAIOAuthLike() {
+		return model, ""
+	}
 	// Unknown payloads (including media) remain explicitly unknown, never free.
 	if billing == nil || !billing.HasIdentifiedTokenPricing(model) || !gjson.ValidBytes(body) {
 		return model, ""
@@ -70,7 +74,7 @@ func prepareCodingRequest(ctx context.Context, c *gin.Context, points *OfficialP
 	if points == nil || c == nil || account == nil {
 		return ctx, nil
 	}
-	if strings.EqualFold(c.GetHeader("Upgrade"), "websocket") {
+	if c.Request != nil && c.Request.Method == http.MethodGet && strings.EqualFold(c.GetHeader("Upgrade"), "websocket") {
 		return ctx, nil
 	}
 

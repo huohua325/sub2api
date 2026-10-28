@@ -94,6 +94,17 @@ func TestCodingQuotaDBAsyncMediaEvidenceSurvivesCacheLoss(t *testing.T) {
 	other, err := r.LoadCodingAsyncJob(ctx, "job-1", 2, 2)
 	require.NoError(t, err)
 	require.Nil(t, other)
+	has, err := r.CodingAsyncJobHasBilling(ctx, "job-1", 1, 1)
+	require.NoError(t, err)
+	require.False(t, has)
+	cmd := &service.UsageBillingCommand{RequestID: "video-completed", APIKeyID: 1, UserID: 1, AccountID: 10, CodingQuota: &service.CodingQuotaCharge{AccountID: 10, Purpose: "openai", Weight: "1", StartedAt: in.StartedAt, CompletedAt: in.Now}}
+	require.NoError(t, r.EnqueueCodingBilling(ctx, in.ID, cmd))
+	has, err = r.CodingAsyncJobHasBilling(ctx, "job-1", 1, 1)
+	require.NoError(t, err)
+	require.True(t, has)
+	has, err = r.CodingAsyncJobHasBilling(ctx, "job-1", 2, 2)
+	require.NoError(t, err)
+	require.False(t, has)
 	v.VideoDurationSeconds = 30
 	require.Error(t, r.StoreCodingAsyncJob(ctx, "job-1", 1, 1, v))
 }

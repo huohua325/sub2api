@@ -66,6 +66,9 @@ func (r *UsageMonitorRepository) ReserveCodingQuota(ctx context.Context, in serv
 	if err = lockCodingPerson(ctx, tx, in.UserID, in.Purpose); err != nil {
 		return out, err
 	}
+	if err = recoverCodingPerson(ctx, tx, in.Now, in.UserID, in.Purpose); err != nil {
+		return out, err
+	}
 	var oldUser, oldKey int64
 	var oldPurpose, oldState string
 	err = tx.QueryRowContext(ctx, `SELECT user_id,api_key_id,purpose,state FROM coding_quota_reservations WHERE id=$1`, in.ID).Scan(&oldUser, &oldKey, &oldPurpose, &oldState)
@@ -77,9 +80,6 @@ func (r *UsageMonitorRepository) ReserveCodingQuota(ctx context.Context, in serv
 	}
 	if err == nil && oldState != "reserved" && oldState != "sent" {
 		return out, fmt.Errorf("reservation is already %s", oldState)
-	}
-	if err = recoverCodingPerson(ctx, tx, in.Now, in.UserID, in.Purpose); err != nil {
-		return out, err
 	}
 	readings, err := readCodingQuotas(ctx, tx, []int64{in.UserID}, in.StartedAt)
 	if err != nil {
@@ -104,11 +104,12 @@ func (r *UsageMonitorRepository) ReserveCodingQuota(ctx context.Context, in serv
 		return out, err
 	}
 	var reserved string
-	var active, unknown int
+	var active, unknown, unresolved int
 	err = tx.QueryRowContext(ctx, `SELECT COALESCE(SUM(estimated_points) FILTER(WHERE started_at>=$3 AND started_at<$4),0)::text,
  COUNT(*) FILTER(WHERE state IN('reserved','sent','handoff')),
+ COUNT(*) FILTER(WHERE (state='unresolved' OR NOT reliable OR estimated_points IS NULL) AND started_at>=$3 AND started_at<$4),
  COUNT(*) FILTER(WHERE state='unresolved' AND started_at>=$3 AND started_at<$4)
- FROM coding_quota_reservations WHERE user_id=$1 AND purpose=$2 AND id<>$5 AND state IN('reserved','sent','handoff','unresolved')`, in.UserID, in.Purpose, reading.Start, reading.End, in.ID).Scan(&reserved, &active, &unknown)
+ FROM coding_quota_reservations WHERE user_id=$1 AND purpose=$2 AND id<>$5 AND state IN('reserved','sent','handoff','unresolved')`, in.UserID, in.Purpose, reading.Start, reading.End, in.ID).Scan(&reserved, &active, &unknown, &unresolved)
 	if err != nil {
 		return out, err
 	}
@@ -142,7 +143,7 @@ func (r *UsageMonitorRepository) ReserveCodingQuota(ctx context.Context, in serv
 			reason = "estimated_capacity"
 		}
 	}
-	if unknown > 0 {
+	if unresolved > 0 {
 		reason = "unresolved_request"
 	}
 	if used.GreaterThanOrEqual(limit) {
@@ -189,7 +190,7 @@ func (r *UsageMonitorRepository) ReserveCodingQuota(ctx context.Context, in serv
 
 func recoverCodingPerson(ctx context.Context, tx *sql.Tx, now time.Time, user int64, purpose string) error {
 	_, err := tx.ExecContext(ctx, `WITH changed AS(UPDATE coding_quota_reservations SET state=CASE WHEN state='reserved' THEN 'released' ELSE 'unresolved' END,
- reason='lease_expired',updated_at=$1 WHERE user_id=$2 AND purpose=$3 AND state IN('reserved','sent') AND expires_at<=$1 RETURNING id,state)
+ reason='lease_expired',updated_at=$1 WHERE user_id=$2 AND purpose=$3 AND state IN('reserved','sent','handoff') AND expires_at<=$1 RETURNING id,state)
  INSERT INTO coding_quota_reservation_events(reservation_id,state,reason,created_at) SELECT id,state,'lease_expired',$1 FROM changed`, now, user, purpose)
 	return err
 }
@@ -207,6 +208,15 @@ func (r *UsageMonitorRepository) transitionReservation(ctx context.Context, id, 
 	}
 	if err = lockCodingPerson(ctx, tx, user, purpose); err != nil {
 		return err
+	}
+	if target == "sent" {
+		var valid bool
+		if err = tx.QueryRowContext(ctx, `SELECT state IN('reserved','sent') AND expires_at>$2 FROM coding_quota_reservations WHERE id=$1 FOR UPDATE`, id, now).Scan(&valid); err != nil {
+			return err
+		}
+		if !valid {
+			return fmt.Errorf("%w: reservation lease lost", service.ErrCodingQuotaUnavailable)
+		}
 	}
 	_, err = tx.ExecContext(ctx, `WITH changed AS(UPDATE coding_quota_reservations SET state=$2,heartbeat_at=$3,expires_at=$3::timestamptz+INTERVAL '120 seconds',updated_at=$3
  WHERE id=$1 AND ((state IN('reserved','sent') AND $2 IN('sent','released','unresolved')) OR (state='unresolved' AND $2='released')) AND state<>$2 RETURNING id,state)
@@ -227,11 +237,18 @@ func (r *UsageMonitorRepository) FinishCodingReservation(ctx context.Context, id
 	return r.transitionReservation(ctx, id, state, now)
 }
 func (r *UsageMonitorRepository) RenewCodingReservation(ctx context.Context, id string, now time.Time) error {
-	_, err := r.db.ExecContext(ctx, `UPDATE coding_quota_reservations SET heartbeat_at=$2,expires_at=$2::timestamptz+INTERVAL '120 seconds' WHERE id=$1 AND state IN('reserved','sent')`, id, now)
+	result, err := r.db.ExecContext(ctx, `UPDATE coding_quota_reservations SET heartbeat_at=$2,expires_at=$2::timestamptz+INTERVAL '120 seconds' WHERE id=$1 AND state IN('reserved','sent') AND expires_at>$2`, id, now)
+	if err != nil {
+		return err
+	}
+	n, err := result.RowsAffected()
+	if err == nil && n != 1 {
+		return fmt.Errorf("%w: reservation lease lost", service.ErrCodingQuotaUnavailable)
+	}
 	return err
 }
 func (r *UsageMonitorRepository) RecoverCodingReservations(ctx context.Context, now time.Time) error {
-	rows, err := r.db.QueryContext(ctx, `SELECT DISTINCT user_id,purpose FROM coding_quota_reservations WHERE state IN('reserved','sent') AND expires_at<=$1 LIMIT 512`, now)
+	rows, err := r.db.QueryContext(ctx, `SELECT DISTINCT user_id,purpose FROM coding_quota_reservations WHERE state IN('reserved','sent','handoff') AND expires_at<=$1 LIMIT 512`, now)
 	if err != nil {
 		return err
 	}

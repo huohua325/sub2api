@@ -328,6 +328,12 @@ func (s *OpenAIGatewayService) forwardOpenAIWSV2(
 		}
 	}
 
+	if err := CodingReservationFromContext(ctx).MarkSent(ctx); err != nil {
+		if c != nil && !c.Writer.Written() {
+			WriteCodingQuotaError(c, err)
+		}
+		return nil, err
+	}
 	if err := s.performOpenAIWSGeneratePrewarm(
 		ctx,
 		lease,

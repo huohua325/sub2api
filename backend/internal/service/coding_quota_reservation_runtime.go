@@ -92,9 +92,6 @@ func (h *CodingReservationHandle) MarkSent(ctx context.Context) error {
 	if h.closed {
 		return fmt.Errorf("%w: reservation closed", ErrCodingQuotaUnavailable)
 	}
-	if h.sent {
-		return nil
-	}
 	if err := h.store.MarkCodingReservationSent(ctx, h.ID, time.Now().UTC()); err != nil {
 		if h.mode == "shadow" {
 			h.sent = true

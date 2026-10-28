@@ -40,3 +40,10 @@ func (r *UsageMonitorRepository) LoadCodingAsyncJob(ctx context.Context, job str
 	err = json.Unmarshal(raw, &v)
 	return &v, err
 }
+
+// CodingAsyncJobHasBilling checks durable ownership, including already applied bills.
+func (r *UsageMonitorRepository) CodingAsyncJobHasBilling(ctx context.Context, job string, user, key int64) (bool, error) {
+	var exists bool
+	err := r.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM coding_quota_async_jobs j JOIN coding_quota_billing_tasks t ON t.reservation_id=j.reservation_id AND t.api_key_id=j.api_key_id WHERE j.job_id=$1 AND j.user_id=$2 AND j.api_key_id=$3)`, job, user, key).Scan(&exists)
+	return exists, err
+}
