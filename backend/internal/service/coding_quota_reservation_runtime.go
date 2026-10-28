@@ -15,12 +15,14 @@ type codingReservationContextKey struct{}
 // CodingReservationHandle belongs to a logical request, including internal retries.
 // Finishing a sent request without a durable bill preserves an unresolved record.
 type CodingReservationHandle struct {
-	ID     string
-	store  CodingReservationStore
-	mu     sync.Mutex
-	sent   bool
-	closed bool
-	stop   chan struct{}
+	ID         string
+	mode       string
+	store      CodingReservationStore
+	mu         sync.Mutex
+	sent       bool
+	closed     bool
+	stop       chan struct{}
+	companions []string
 }
 
 func WithCodingReservation(ctx context.Context, h *CodingReservationHandle) context.Context {
@@ -58,7 +60,7 @@ func (s *OfficialPointService) BeginCodingReservation(ctx context.Context, in Co
 	if _, err := store.ReserveCodingQuota(ctx, in); err != nil {
 		return nil, err
 	}
-	h := &CodingReservationHandle{ID: in.ID, store: store, stop: make(chan struct{})}
+	h := &CodingReservationHandle{ID: in.ID, mode: in.Mode, store: store, stop: make(chan struct{})}
 	go h.heartbeat()
 	return h, nil
 }
@@ -94,6 +96,11 @@ func (h *CodingReservationHandle) MarkSent(ctx context.Context) error {
 		return nil
 	}
 	if err := h.store.MarkCodingReservationSent(ctx, h.ID, time.Now().UTC()); err != nil {
+		if h.mode == "shadow" {
+			h.sent = true
+			slog.Error("coding_reservation_shadow_send_record_failed", "reservation", h.ID, "error", err)
+			return nil
+		}
 		return fmt.Errorf("%w: %v", ErrCodingQuotaUnavailable, err)
 	}
 	h.sent = true
@@ -128,6 +135,9 @@ func (h *CodingReservationHandle) Handoff(ctx context.Context, cmd *UsageBilling
 		return fmt.Errorf("%w: billing handoff store missing", ErrCodingQuotaUnavailable)
 	}
 	cmd.CodingReservationID = h.ID
+	h.mu.Lock()
+	cmd.CodingReservationIDs = append([]string(nil), h.companions...)
+	h.mu.Unlock()
 	return store.EnqueueCodingBilling(ctx, h.ID, cmd)
 }
 

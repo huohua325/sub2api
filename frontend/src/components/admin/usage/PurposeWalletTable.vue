@@ -55,6 +55,7 @@
                       {{ t('admin.usageMonitor.requests') }}
                       <span v-for="count in walletOf(user, purpose)?.request_counts || []" :key="count.platform" class="ml-2">{{ count.platform }} {{ count.count }}</span>
                     </p>
+                  <CodingQuotaDiagnostics v-if="walletOf(user, purpose)?.coding_control" :user-id="user.id" :purpose="purpose" :summary="walletOf(user, purpose)!.coding_control!" />
                   </template>
                   <p v-else class="text-gray-400">{{ t('admin.usageMonitor.noWallet') }}</p>
                   <button v-if="purpose === 'experiment'" type="button" class="btn btn-secondary btn-sm mt-2" :data-testid="`adjust-${user.id}-${purpose}`" @click="emit('adjust', user, purpose)">
@@ -85,6 +86,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import CodingQuotaDiagnostics from './CodingQuotaDiagnostics.vue'
 import { useI18n } from 'vue-i18n'
 import type { UsageMonitorParent, UsageMonitorUser, UsageMonitorWallet } from '@/api/admin/usageMonitor'
 import { formatDateTime } from '@/utils/format'

@@ -27,12 +27,22 @@ function mountRuler(allowances: PurposeAllowanceItem[] | null, extra: { loading?
 }
 
 describe('StudentQuotaRuler', () => {
+ it.each(['processing','settling','busy','verifying','unavailable'])('shows %s without points or false exhaustion', (activity_status) => {
+  const wrapper=mountRuler([{purpose:'openai',display_percent:100,blocked:false,point_used:'7.12345678',activity_status} as PurposeAllowanceItem])
+  const card=wrapper.get('[data-testid="openai-purpose-card"]')
+  expect(card.text()).toContain(`codingQuota.student.${activity_status}`)
+  expect(card.text()).not.toContain('dashboard.ruler.exhausted')
+  expect(card.text()).not.toContain('7.12345678')
+  wrapper.unmount()
+ })
+
   it.each(['current', 'estimated', 'pending', 'partial', 'error'] as const)('explains %s separately from exhaustion without exposing points', (data_status) => {
     const wrapper = mountRuler([{ purpose: 'openai', display_percent: 100, blocked: true, point_used: '50.1234', data_status,
       period_start: '2026-10-21T08:00:00Z', resets_at: '2026-10-28T08:00:00Z', reset_reason: 'platform_reset',
     }])
     const card = wrapper.get('[data-testid="openai-purpose-card"]')
-    expect(card.text()).toContain('dashboard.ruler.exhausted')
+    if (data_status === 'error') expect(card.text()).not.toContain('dashboard.ruler.exhausted')
+    else expect(card.text()).toContain('dashboard.ruler.exhausted')
     expect(card.text()).toContain(data_status === 'error' ? 'dashboard.ruler.missing' : `dashboard.ruler.states.${data_status}`)
     expect(card.get('details').text()).toContain('2026/10/28 16:00:00 UTC+8')
     expect(card.get('details').text()).toContain('dashboard.ruler.unknownTime')

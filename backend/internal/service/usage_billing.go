@@ -46,7 +46,8 @@ type UsageBillingCommand struct {
 	Purpose                     string
 	PurposeCost                 float64
 	CodingQuota                 *CodingQuotaCharge
-	CodingReservationID         string // Internal correlation only; deliberately excluded from billing fingerprint.
+	CodingReservationID         string   // Internal correlation only; deliberately excluded from billing fingerprint.
+	CodingReservationIDs        []string // Additional native voice turns sharing one existing aggregate bill.
 	StartedAt                   time.Time
 	ExperimentPending           bool
 	ExperimentUpstreamRequestID string

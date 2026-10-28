@@ -99,6 +99,7 @@ type UsageMonitorUser struct {
 
 // UsageMonitorWallet is one purpose ledger. Amounts are numeric text.
 type UsageMonitorWallet struct {
+	CodingControl       *CodingReservationSummary   `json:"coding_control,omitempty"`
 	Purpose             string                      `json:"purpose"`
 	LimitAmount         string                      `json:"limit_amount"`
 	StoredUsedAmount    string                      `json:"stored_used_amount"`

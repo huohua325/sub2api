@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"log/slog"
 	"sync"
 	"time"
@@ -88,4 +90,21 @@ func (s *OpenAIGatewayService) codingWSTurnHooks(ctx context.Context, key *APIKe
 		return nil, noop, err
 	}
 	return &hooks, cleanup, nil
+}
+
+func codingWSAdmissionErrorFrame(err error) []byte {
+	code := ""
+	switch {
+	case errors.Is(err, ErrCodingQuotaBusy):
+		code = "CODING_QUOTA_BUSY"
+	case errors.Is(err, ErrCodingQuotaExhausted):
+		code = "PURPOSE_QUOTA_EXHAUSTED"
+	case errors.Is(err, ErrCodingQuotaUnavailable):
+		code = "CODING_QUOTA_UNAVAILABLE"
+	}
+	if code == "" {
+		return nil
+	}
+	frame, _ := json.Marshal(map[string]any{"type": "error", "error": map[string]any{"type": code, "code": code, "message": "Quota capacity unavailable for this turn; retry later"}})
+	return frame
 }

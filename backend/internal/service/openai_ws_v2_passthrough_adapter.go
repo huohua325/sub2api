@@ -52,24 +52,32 @@ func (c *openAIWSPolicyEnforcingFrameConn) ReadFrame(ctx context.Context) (coder
 	if c == nil || c.inner == nil {
 		return coderws.MessageText, nil, errOpenAIWSConnClosed
 	}
-	msgType, payload, err := c.inner.ReadFrame(ctx)
-	if err != nil {
-		return msgType, payload, err
-	}
-	if c.filter == nil {
-		return msgType, payload, nil
-	}
-	updated, blocked, filterErr := c.filter(msgType, payload)
-	if filterErr != nil {
-		return msgType, payload, filterErr
-	}
-	if blocked != nil {
-		if c.onBlock != nil {
-			c.onBlock(blocked)
+	for {
+		msgType, payload, err := c.inner.ReadFrame(ctx)
+		if err != nil {
+			return msgType, payload, err
 		}
-		return msgType, nil, NewOpenAIWSClientCloseError(coderws.StatusPolicyViolation, blocked.Message, blocked)
+		if c.filter == nil {
+			return msgType, payload, nil
+		}
+		updated, blocked, filterErr := c.filter(msgType, payload)
+		if filterErr != nil {
+			if frame := codingWSAdmissionErrorFrame(filterErr); frame != nil {
+				if err := c.inner.WriteFrame(ctx, coderws.MessageText, frame); err != nil {
+					return msgType, nil, err
+				}
+				continue
+			}
+			return msgType, payload, filterErr
+		}
+		if blocked != nil {
+			if c.onBlock != nil {
+				c.onBlock(blocked)
+			}
+			return msgType, nil, NewOpenAIWSClientCloseError(coderws.StatusPolicyViolation, blocked.Message, blocked)
+		}
+		return msgType, updated, nil
 	}
-	return msgType, updated, nil
 }
 
 func (c *openAIWSPolicyEnforcingFrameConn) WriteFrame(ctx context.Context, msgType coderws.MessageType, payload []byte) error {

@@ -152,7 +152,11 @@ func (s *OfficialPointService) CardsForUser(ctx context.Context, userID int64) m
 
 // CardsForUserStored reads the durable personal ledger in production.
 func (s *OfficialPointService) CardsForUserStored(ctx context.Context, userID int64) map[string]OfficialPointResult {
-	return s.pointsForUser(ctx, userID, false)
+	cards := s.pointsForUser(ctx, userID, false)
+	if s != nil {
+		s.applyCodingActivities(ctx, userID, time.Now().UTC(), cards)
+	}
+	return cards
 }
 
 // Blocks reports whether this person's summed Codex or Grok points have reached
@@ -165,6 +169,9 @@ func (s *OfficialPointService) Blocks(ctx context.Context, userID int64, purpose
 		return false, false
 	}
 	card := s.pointsForUser(ctx, userID, false)[purpose]
+	if card.DataStatus == "error" && CodingControlMode(purpose) == "enforce" {
+		return false, true
+	} // Selected-parent admission returns the authoritative 503.
 	return card.Blocked, true
 }
 
@@ -298,6 +305,18 @@ func (s *OfficialPointService) ApplyMonitor(ctx context.Context, view *UsageMoni
 				view.Parents[i].PointBudget = &text
 			}
 		}
+		summaries := map[int64]map[string]CodingReservationSummary{}
+		if store, ok := s.store.(CodingSummaryStore); ok {
+			rows, summaryErr := store.ReadCodingReservationSummaries(ctx, ids, view.GeneratedAt)
+			if summaryErr == nil {
+				for _, v := range rows {
+					if summaries[v.UserID] == nil {
+						summaries[v.UserID] = map[string]CodingReservationSummary{}
+					}
+					summaries[v.UserID][v.Purpose] = v
+				}
+			}
+		}
 		for i := range view.Users {
 			for j := range view.Users[i].Wallets {
 				wallet := &view.Users[i].Wallets[j]
@@ -305,6 +324,9 @@ func (s *OfficialPointService) ApplyMonitor(ctx context.Context, view *UsageMoni
 					continue
 				}
 				card := byUser[view.Users[i].ID][wallet.Purpose]
+				if summary, ok := summaries[view.Users[i].ID][wallet.Purpose]; ok {
+					wallet.CodingControl = &summary
+				}
 				wallet.StudentPercent, wallet.OfficialPoints = card.Percent, card.Points
 				wallet.PointBudget = stringPtr(budget.ForPurpose(wallet.Purpose))
 				wallet.Blocked, wallet.PendingPoints, wallet.DataStatus = card.Blocked, card.Pending, card.DataStatus

@@ -525,6 +525,30 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 		return payload, nil
 	}
 
+	// A rejected turn emits a protocol error and leaves the session alive.
+	retryCodingAdmission := func(turn int, admissionErr error) (openAIWSClientPayload, error) {
+		for {
+			frame := codingWSAdmissionErrorFrame(admissionErr)
+			if frame == nil {
+				return openAIWSClientPayload{}, admissionErr
+			}
+			if err := writeClientMessage(frame); err != nil {
+				return openAIWSClientPayload{}, err
+			}
+			raw, err := readClientMessage()
+			if err != nil {
+				return openAIWSClientPayload{}, err
+			}
+			next, err := parseClientPayload(turn, raw)
+			if err != nil {
+				return next, err
+			}
+			admissionErr = hooks.BeforeRequest(turn, next.rawForHash, next.originalModel)
+			if admissionErr == nil {
+				return next, nil
+			}
+		}
+	}
 	firstPayload, err := parseClientPayload(1, firstClientMessage)
 	if err != nil {
 		return err
@@ -595,7 +619,11 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 		for turn := 1; ; turn++ {
 			if turn > 1 && hooks != nil && hooks.BeforeRequest != nil {
 				if err := hooks.BeforeRequest(turn, currentBridgePayload.rawForHash, currentBridgePayload.originalModel); err != nil {
-					return err
+					next, retryErr := retryCodingAdmission(turn, err)
+					if retryErr != nil {
+						return retryErr
+					}
+					currentBridgePayload = next
 				}
 			}
 			if hooks != nil && hooks.BeforeTurn != nil {
@@ -1473,7 +1501,18 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 	for {
 		if turn > 1 && !skipBeforeTurn && hooks != nil && hooks.BeforeRequest != nil {
 			if err := hooks.BeforeRequest(turn, currentClientPayload, currentOriginalModel); err != nil {
-				return err
+				next, retryErr := retryCodingAdmission(turn, err)
+				if retryErr != nil {
+					return retryErr
+				}
+				currentPayload = next.payloadRaw
+				currentClientPayload = next.rawForHash
+				currentOriginalModel = next.originalModel
+				currentImageBillingModel = next.imageBillingModel
+				currentImageSizeTier = next.imageSizeTier
+				currentImageInputSize = next.imageInputSize
+				currentPayloadBytes = next.payloadBytes
+				currentRequestedReasoningEffort = next.requestedReasoningEffort
 			}
 		}
 		if !skipBeforeTurn && hooks != nil && hooks.BeforeTurn != nil {

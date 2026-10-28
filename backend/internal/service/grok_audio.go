@@ -142,7 +142,10 @@ func (s *OpenAIGatewayService) ProxyGrokRealtime(ctx context.Context, c *gin.Con
 	return s.ProxyGrokRealtimeConn(ctx, c, client, upstream)
 }
 
-type GrokRealtimeUpstream struct{ conn openAIWSClientConn }
+type GrokRealtimeUpstream struct {
+	conn   openAIWSClientConn
+	coding *codingRealtimeSession
+}
 
 // GrokRealtimeDialError preserves an HTTP status returned before WebSocket
 // upgrade so handlers can apply the normal Grok account policy.
@@ -207,6 +210,7 @@ func (s *OpenAIGatewayService) ProxyGrokRealtimeConn(ctx context.Context, c *gin
 		return false, fmt.Errorf("realtime connection is required")
 	}
 	conn := upstream.conn
+	defer upstream.coding.Close()
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -220,6 +224,12 @@ func (s *OpenAIGatewayService) ProxyGrokRealtimeConn(ctx context.Context, c *gin
 			if readErr != nil {
 				errCh <- readErr
 				return
+			}
+			if gjson.GetBytes(msg, "type").String() == "response.created" {
+				upstream.coding.MarkExecuting()
+			}
+			if gjson.GetBytes(msg, "type").String() == "response.done" {
+				upstream.coding.End()
 			}
 			if grokRealtimeEventHasAudio(msg) {
 				audioObserved.Store(true)
@@ -242,13 +252,25 @@ func (s *OpenAIGatewayService) ProxyGrokRealtimeConn(ctx context.Context, c *gin
 			if kind != coderws.MessageText && kind != coderws.MessageBinary {
 				continue
 			}
-			if grokRealtimeEventHasAudio(msg) {
-				audioObserved.Store(true)
-			}
+
 			var raw json.RawMessage
 			if unmarshalErr := json.Unmarshal(msg, &raw); unmarshalErr != nil {
 				errCh <- fmt.Errorf("invalid realtime event: %w", unmarshalErr)
 				return
+			}
+			eventType := gjson.GetBytes(msg, "type").String()
+			if grokRealtimeEventHasAudio(msg) || eventType == "response.create" || eventType == "input_audio_buffer.commit" || eventType == "conversation.item.create" {
+				if err := upstream.coding.BeginEvent(ctx, eventType); err != nil {
+					errorFrame := codingWSAdmissionErrorFrame(err)
+					if errorFrame == nil {
+						errorFrame = codingWSAdmissionErrorFrame(ErrCodingQuotaUnavailable)
+					}
+					_ = client.Write(ctx, coderws.MessageText, errorFrame)
+					continue
+				}
+			}
+			if grokRealtimeEventHasAudio(msg) {
+				audioObserved.Store(true)
 			}
 			if writeErr := conn.WriteJSON(ctx, raw); writeErr != nil {
 				errCh <- writeErr

@@ -1,3 +1,4 @@
+import codingQuota from './codingQuota'
 import adminAccessKeys from './adminAccessKeys'
 import landing from './landing'
 import common from './common'
@@ -10,6 +11,7 @@ import misc from './misc'
 import design from './design'
 
 export default {
+  codingQuota,
   adminAccessKeys,
   ...landing,
   ...common,

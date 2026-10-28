@@ -15,9 +15,10 @@ type OfficialPointInput struct {
 
 // OfficialPointResult is one user's points on one subscription after same-platform parents are summed.
 type OfficialPointResult struct {
-	Points  *string
-	Percent *int
-	Reset   *time.Time
+	ActivityStatus string
+	Points         *string
+	Percent        *int
+	Reset          *time.Time
 	// OfficialResets is retained for legacy store adapters. Personal ledger
 	// countdowns use Reset and never derive a cycle from these parent clocks.
 	OfficialResets []time.Time

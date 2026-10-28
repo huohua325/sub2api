@@ -141,19 +141,27 @@ func (h *OpenAIGatewayHandler) GrokRealtime(c *gin.Context) {
 	}
 	defer func() { _ = conn.CloseNow() }()
 
+	h.gatewayService.BindGrokRealtimeCoding(upstream, apiKey, selection.Account, model)
 	started := time.Now()
 	audioObserved, proxyErr := h.gatewayService.ProxyGrokRealtimeConn(c.Request.Context(), c, conn, upstream)
 	elapsed := time.Since(started)
+	result, closeWithError := grokRealtimeCompletion(model, elapsed, audioObserved, proxyErr)
 	if proxyErr != nil {
 		reqLog.Info("grok_realtime.proxy_failed", zap.Error(proxyErr))
-		if !isExpectedGrokRealtimeClose(proxyErr) {
-			_ = conn.Close(coderws.StatusInternalError, "upstream realtime websocket failed")
-			return
-		}
 	}
-	if result := grokRealtimeBillingResult(model, elapsed, audioObserved); result != nil {
+	if closeWithError {
+		_ = conn.Close(coderws.StatusInternalError, "upstream realtime websocket failed")
+	}
+	if result != nil {
+		result.CodingReservation = upstream.CodingBillingHandle()
 		h.recordGrokVoiceUsage(c, apiKey, selection.Account, subscription, "realtime", nil, result)
 	}
+
+}
+
+// Preserve observed partial consumption even when a later frame fails.
+func grokRealtimeCompletion(model string, elapsed time.Duration, audioObserved bool, proxyErr error) (*service.OpenAIForwardResult, bool) {
+	return grokRealtimeBillingResult(model, elapsed, audioObserved), proxyErr != nil && !isExpectedGrokRealtimeClose(proxyErr)
 }
 
 func grokRealtimeBillingResult(model string, elapsed time.Duration, audioObserved bool) *service.OpenAIForwardResult {
@@ -344,7 +352,11 @@ func (h *OpenAIGatewayHandler) recordGrokVoiceUsage(
 		model = endpoint
 	}
 
-	h.submitMandatoryUsageRecordTask(c.Request.Context(), func(ctx context.Context) {
+	parent := c.Request.Context()
+	if result.CodingReservation != nil {
+		parent = service.WithCodingReservation(parent, result.CodingReservation)
+	}
+	h.submitMandatoryUsageRecordTask(parent, func(ctx context.Context) {
 		if err := h.gatewayService.RecordUsage(ctx, &service.OpenAIRecordUsageInput{
 			Result:             result,
 			APIKey:             apiKey,

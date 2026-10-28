@@ -24,25 +24,46 @@ type CodingReservationInput struct {
 
 // CodingReservation exposes safe diagnostics, never request bodies or keys.
 type CodingReservation struct {
-	ID              string     `json:"id"`
-	UserID          int64      `json:"user_id"`
-	APIKeyID        int64      `json:"-"`
-	AccountID       int64      `json:"account_id"`
-	Purpose         string     `json:"purpose"`
-	Model           string     `json:"model"`
-	Mode            string     `json:"mode"`
-	State           string     `json:"state"`
-	AdmissionMode   string     `json:"admission_mode"`
-	Reason          string     `json:"reason"`
-	EstimatedPoints string     `json:"estimated_points"`
-	Rate            string     `json:"rate"`
-	SampleCount     int        `json:"sample_count"`
-	Reliable        bool       `json:"reliable"`
-	WouldAllow      bool       `json:"would_allow"`
-	StartedAt       time.Time  `json:"started_at"`
-	UpdatedAt       time.Time  `json:"updated_at"`
-	ObservedAt      *time.Time `json:"observed_at"`
-	WindowEnd       *time.Time `json:"window_end"`
+	Billing         []CodingBillingDiagnostic `json:"billing,omitempty"`
+	Events          []CodingReservationEvent  `json:"events,omitempty"`
+	ID              string                    `json:"id"`
+	UserID          int64                     `json:"user_id"`
+	APIKeyID        int64                     `json:"-"`
+	AccountID       int64                     `json:"account_id"`
+	Purpose         string                    `json:"purpose"`
+	Model           string                    `json:"model"`
+	Mode            string                    `json:"mode"`
+	State           string                    `json:"state"`
+	AdmissionMode   string                    `json:"admission_mode"`
+	Reason          string                    `json:"reason"`
+	EstimatedPoints string                    `json:"estimated_points"`
+	Rate            string                    `json:"rate"`
+	SampleCount     int                       `json:"sample_count"`
+	Reliable        bool                      `json:"reliable"`
+	WouldAllow      bool                      `json:"would_allow"`
+	StartedAt       time.Time                 `json:"started_at"`
+	UpdatedAt       time.Time                 `json:"updated_at"`
+	ObservedAt      *time.Time                `json:"observed_at"`
+	WindowEnd       *time.Time                `json:"window_end"`
+}
+
+type CodingBillingDiagnostic struct {
+	RequestID   string     `json:"request_id"`
+	State       string     `json:"state"`
+	Attempts    int        `json:"attempts"`
+	LastError   string     `json:"last_error"`
+	LedgerID    *int64     `json:"ledger_id"`
+	LedgerState string     `json:"ledger_state"`
+	Points      string     `json:"points"`
+	Correction  string     `json:"correction"`
+	AuditEvent  string     `json:"audit_event"`
+	StartedAt   *time.Time `json:"started_at"`
+}
+
+type CodingReservationEvent struct {
+	State     string    `json:"state"`
+	Reason    string    `json:"reason"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 // CodingReservationQuery defines bounded administrator-only cursor pagination.

@@ -49,6 +49,7 @@
           <p v-if="meter.resetLine" class="quota-meter-reset">{{ meter.resetLine }}</p>
           <p v-if="meter.pending" class="quota-meter-reset">{{ t('dashboard.ruler.pendingHint') }}</p>
         </template>
+        <p v-if="meter.row?.activity_status && meter.row.activity_status !== 'ready'" class="quota-meter-reset" role="status">{{ t(`codingQuota.student.${meter.row.activity_status}`) }}</p>
         <p v-if="meter.exhausted" class="quota-meter-note">
           {{ t('dashboard.ruler.exhausted') }}
           <router-link to="/usage">{{ t('dashboard.ruler.viewUsage') }}</router-link>
@@ -127,7 +128,7 @@ const meters = computed(() => {
     const missing = !row || (usesDisplay && row.display_percent == null) || row.data_status === 'error'
     const rawPercent = usesDisplay ? (row?.display_percent ?? 0) : ratioPercent(row)
     const percent = missing || !Number.isFinite(rawPercent) ? 0 : Math.min(100, Math.max(0, rawPercent))
-    const exhausted = row?.blocked ?? (!missing && rawExhausted(row))
+    const exhausted = !missing && (row?.blocked ?? rawExhausted(row))
     const pending = row?.data_status === 'pending' || row?.data_status === 'partial'
     const near = !missing && percent >= 80 && !exhausted
     return {

@@ -362,6 +362,7 @@ export interface PlatformQuotaUpdateItem {
 }
 
 export interface PurposeAllowanceItem {
+ activity_status?: 'ready' | 'processing' | 'settling' | 'busy' | 'verifying' | 'unavailable'
   /** Server-corrected page read time, not settlement freshness. */
   read_at?: string
   purpose: 'openai' | 'grok' | 'experiment'

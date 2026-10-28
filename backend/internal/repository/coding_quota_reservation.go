@@ -10,16 +10,26 @@ import (
 	"strings"
 	"time"
 
+	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/shopspring/decimal"
 )
 
 func lockCodingPerson(ctx context.Context, tx *sql.Tx, user int64, purpose string) error {
-	_, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1,0))`, fmt.Sprintf("coding-person:%d:%s", user, purpose))
+	_, err := tx.ExecContext(ctx, `SELECT set_config('jit','off',true),pg_advisory_xact_lock(hashtextextended($1,0))`, fmt.Sprintf("coding-person:%d:%s", user, purpose))
 	return err
 }
 
 const reservationJSON = `to_jsonb(r)-'api_key_id'||jsonb_build_object('estimated_points',r.estimated_points::text,'rate',r.rate::text)`
+
+const reservationDetailJSON = reservationJSON + `||jsonb_build_object(
+ 'billing',COALESCE((SELECT jsonb_agg(jsonb_build_object('request_id',t.request_id,'state',t.state,'attempts',t.attempts,'last_error',t.last_error,
+ 'ledger_id',q.id,'ledger_state',COALESCE(q.state,''),'points',COALESCE(q.points::text,''),'correction',COALESCE(c.delta::text,'0'),
+ 'audit_event',COALESCE(c.reconciliation_id,''),'started_at',q.started_at) ORDER BY t.id)
+ FROM coding_quota_billing_tasks t LEFT JOIN coding_quota_requests q ON q.request_id=t.request_id AND q.api_key_id=t.api_key_id
+ LEFT JOIN coding_quota_corrections c ON c.request_row_id=q.id WHERE t.reservation_id=r.id),'[]'::jsonb),
+ 'events',COALESCE((SELECT jsonb_agg(jsonb_build_object('state',e.state,'reason',e.reason,'created_at',e.created_at) ORDER BY e.id)
+ FROM coding_quota_reservation_events e WHERE e.reservation_id=r.id),'[]'::jsonb))`
 
 func reservationRow(ctx context.Context, tx *sql.Tx, id string) (service.CodingReservation, error) {
 	var raw []byte
@@ -71,7 +81,7 @@ func (r *UsageMonitorRepository) ReserveCodingQuota(ctx context.Context, in serv
 	if err = recoverCodingPerson(ctx, tx, in.Now, in.UserID, in.Purpose); err != nil {
 		return out, err
 	}
-	readings, err := readCodingQuotas(ctx, tx, []int64{in.UserID}, in.Now)
+	readings, err := readCodingQuotas(ctx, tx, []int64{in.UserID}, in.StartedAt)
 	if err != nil {
 		return out, err
 	}
@@ -123,7 +133,7 @@ func (r *UsageMonitorRepository) ReserveCodingQuota(ctx context.Context, in serv
 	}
 	if reliable {
 		reserve, _ := decimal.NewFromString(reserved)
-		amount, _ := decimal.NewFromString(estimate.(string))
+		amount := weight.Mul(multiplier).Round(8)
 		if used.Add(pending).Add(reserve).Add(amount).LessThanOrEqual(limit) {
 			mode = "normal"
 			reason = "within_budget"
@@ -273,29 +283,29 @@ func (r *UsageMonitorRepository) ListCodingReservations(ctx context.Context, q s
 		q.Limit = 100
 	}
 	if q.Purpose != "" && q.Purpose != "openai" && q.Purpose != "grok" {
-		return out, fmt.Errorf("invalid purpose")
+		return out, infraerrors.BadRequest("INVALID_QUOTA_QUERY", "invalid purpose")
 	}
 	if q.State != "" && !strings.Contains("|reserved|sent|handoff|captured|released|unresolved|", "|"+q.State+"|") {
-		return out, fmt.Errorf("invalid state")
+		return out, infraerrors.BadRequest("INVALID_QUOTA_QUERY", "invalid state")
 	}
 	at := time.Now().Add(100 * 365 * 24 * time.Hour)
 	id := "~"
 	if q.Before != "" {
 		b, e := base64.RawURLEncoding.DecodeString(q.Before)
 		if e != nil {
-			return out, fmt.Errorf("invalid cursor")
+			return out, infraerrors.BadRequest("INVALID_QUOTA_QUERY", "invalid cursor")
 		}
 		parts := strings.SplitN(string(b), "|", 2)
 		if len(parts) != 2 {
-			return out, fmt.Errorf("invalid cursor")
+			return out, infraerrors.BadRequest("INVALID_QUOTA_QUERY", "invalid cursor")
 		}
 		at, e = time.Parse(time.RFC3339Nano, parts[0])
 		if e != nil {
-			return out, fmt.Errorf("invalid cursor")
+			return out, infraerrors.BadRequest("INVALID_QUOTA_QUERY", "invalid cursor")
 		}
 		id = parts[1]
 	}
-	rows, err := r.db.QueryContext(ctx, `SELECT `+reservationJSON+` FROM coding_quota_reservations r WHERE ($1::bigint=0 OR user_id=$1) AND ($2='' OR purpose=$2) AND ($3='' OR state=$3)
+	rows, err := r.db.QueryContext(ctx, `SELECT `+reservationDetailJSON+` FROM coding_quota_reservations r WHERE ($1::bigint=0 OR user_id=$1) AND ($2='' OR purpose=$2) AND ($3='' OR state=$3)
  AND (started_at,id)<($4,$5) ORDER BY started_at DESC,id DESC LIMIT $6`, q.UserID, q.Purpose, q.State, at, id, q.Limit+1)
 	if err != nil {
 		return out, err

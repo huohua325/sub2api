@@ -147,6 +147,7 @@ func (h *UserHandler) GetMyPlatformQuotas(c *gin.Context) {
 				item["blocked"] = card.Blocked
 				item["unit"] = "points"
 				item["data_status"] = card.DataStatus
+				item["activity_status"] = card.ActivityStatus
 				item["pending_points"] = card.Pending
 				item["period_start"] = card.PeriodStart
 				if card.UpdatedAt != nil && !card.UpdatedAt.IsZero() {

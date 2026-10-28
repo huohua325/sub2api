@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"sort"
 	"sync"
 	"testing"
 	"time"
@@ -139,4 +140,35 @@ func TestCodingQuotaDBReservationCannotReuseTerminalIdentity(t *testing.T) {
 	require.NoError(t, r.FinishCodingReservation(ctx, in.ID, true, in.Now))
 	_, err = r.ReserveCodingQuota(ctx, in)
 	require.Error(t, err)
+}
+
+func TestCodingQuotaDBReservationUsesOriginalStartAcrossBoundary(t *testing.T) {
+	db, r, base := quotaTestDB(t, "")
+	ctx := context.Background()
+	_, err := db.Exec(`UPDATE coding_quota_requests SET points=50 WHERE user_id=1 AND purpose='openai' AND state='imported'`)
+	require.NoError(t, err)
+	// Existing opening balance is imported only at migration; add a real opening entry.
+	_, err = db.Exec(`INSERT INTO coding_quota_requests(request_id,api_key_id,user_id,account_id,purpose,weight,points,state,started_at,completed_at) VALUES('opening',1,1,10,'openai',0,50,'imported',$1,$1)`, base)
+	require.NoError(t, err)
+	in := reservationInput(1, 10)
+	in.StartedAt = base.Add(7*24*time.Hour - time.Second)
+	in.Now = base.Add(7*24*time.Hour + time.Second)
+	_, err = r.ReserveCodingQuota(ctx, in)
+	require.ErrorIs(t, err, service.ErrCodingQuotaExhausted, "a retry cannot escape the request's exhausted original cycle")
+}
+
+func TestCodingQuotaDBReservationAdmissionLatency(t *testing.T) {
+	_, r, _ := quotaTestDB(t, "")
+	ctx := context.Background()
+	durations := make([]time.Duration, 200)
+	for i := range durations {
+		in := reservationInput(1, 10)
+		start := time.Now()
+		_, err := r.ReserveCodingQuota(ctx, in)
+		durations[i] = time.Since(start)
+		require.NoError(t, err)
+		require.NoError(t, r.FinishCodingReservation(ctx, in.ID, true, time.Now()))
+	}
+	sort.Slice(durations, func(i, j int) bool { return durations[i] < durations[j] })
+	t.Logf("ADMISSION_LATENCY samples=200 p95=%s p99=%s", durations[189], durations[197])
 }

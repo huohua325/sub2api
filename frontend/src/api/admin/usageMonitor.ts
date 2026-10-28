@@ -51,6 +51,7 @@ export interface UsageMonitorRequestCount {
 }
 
 export interface UsageMonitorWallet {
+ coding_control?: CodingReservationSummary | null
   purpose: string
   limit_amount: string
   stored_used_amount: string
@@ -171,4 +172,62 @@ export async function listPurposeAdjustments(params: PurposeAdjustmentQuery = {}
   if (params.limit) query.limit = params.limit
   const { data } = await apiClient.get<PurposeAdjustmentList>('/admin/usage-monitor/adjustments', { params: query })
   return data
+}
+
+export interface CodingReservationSummary {
+ user_id: number
+ purpose: string
+ settled: string
+ pending: string
+ reserved: string
+ corrections: string
+ active: number
+ unresolved: number
+ pending_tasks: number
+ failed_tasks: number
+ admission_mode: string
+ reason: string
+ reliable: boolean
+ rate: string
+ samples: number
+ observed_at: string | null
+ mode: string
+}
+export interface CodingReservation {
+ billing?: CodingBillingDiagnostic[]
+ events?: { state: string; reason: string; created_at: string }[]
+ id: string
+ user_id: number
+ account_id: number
+ purpose: string
+ model: string
+ state: string
+ reason: string
+ mode: string
+ estimated_points: string | null
+ rate: string | null
+ reliable: boolean
+ sample_count: number
+ started_at: string
+ updated_at: string
+ observed_at: string | null
+ window_end: string | null
+ would_allow: boolean
+}
+export interface CodingBillingDiagnostic {
+ request_id: string
+ state: string
+ attempts: number
+ last_error: string
+ ledger_id: number | null
+ ledger_state: string
+ points: string
+ correction: string
+ audit_event: string
+ started_at: string | null
+}
+export interface CodingReservationPage { items: CodingReservation[]; next_cursor?: string }
+export async function listCodingReservations(params: {user_id?:number;purpose?:string;state?:string;limit?:number;before?:string}):Promise<CodingReservationPage> {
+ const {data}=await apiClient.get<CodingReservationPage>('/admin/usage-monitor/requests',{params})
+ return data
 }
