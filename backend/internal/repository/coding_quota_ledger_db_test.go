@@ -66,6 +66,9 @@ func quotaTestDB(t *testing.T, seed string) (*sql.DB, *UsageMonitorRepository, t
 	corrections, err := migrations.FS.ReadFile("256_coding_quota_corrections.sql")
 	require.NoError(t, err)
 	require.NoError(t, applyMigrationsFS(context.Background(), db, fstest.MapFS{"256_coding_quota_corrections.sql": &fstest.MapFile{Data: corrections}}))
+	reservations, err := migrations.FS.ReadFile("257_coding_quota_reservations.sql")
+	require.NoError(t, err)
+	require.NoError(t, applyMigrationsFS(context.Background(), db, fstest.MapFS{"257_coding_quota_reservations.sql": &fstest.MapFile{Data: reservations}}))
 	var base time.Time
 	require.NoError(t, db.QueryRow(`SELECT window_start FROM user_purpose_allowances WHERE user_id=1 AND purpose='openai'`).Scan(&base))
 	return db, NewUsageMonitorRepository(db), base

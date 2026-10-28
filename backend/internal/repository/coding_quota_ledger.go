@@ -18,7 +18,15 @@ var _ service.CodingQuotaLedger = (*UsageMonitorRepository)(nil)
 // ReadCodingQuotas only scans the requested people's current indexed periods.
 // Deleted/unavailable parents never remove an already recorded charge.
 func (r *UsageMonitorRepository) ReadCodingQuotas(ctx context.Context, users []int64, now time.Time) ([]service.CodingQuotaReading, error) {
-	rows, err := r.db.QueryContext(ctx, `
+	return readCodingQuotas(ctx, r.db, users, now)
+}
+
+type codingQuotaQueryer interface {
+	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
+}
+
+func readCodingQuotas(ctx context.Context, db codingQuotaQueryer, users []int64, now time.Time) ([]service.CodingQuotaReading, error) {
+	rows, err := db.QueryContext(ctx, `
 WITH anchors AS (
  SELECT u.id,p.purpose,GREATEST(COALESCE(a.window_start,u.created_at),
    CASE WHEN p.purpose='openai' THEN COALESCE((SELECT MAX(effective_at) FROM coding_quota_reset_events
