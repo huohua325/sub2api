@@ -59,3 +59,18 @@ go test -race ./internal/repository -run TestCodingQuotaDB -count=1 -v
 - `TestCompositeGroupSchedulerHasAllCanonicalPlatformBuckets`
 
 完整日志保存在本地忽略目录 `output/concurrent-quota-*.log`；线上只读证据在 `output/concurrent-quota-audit.jsonl`，不包含密钥或对话内容。
+
+## 线上发布核对
+
+- 修复提交：`f3fea1652`，已推送 fork 的 `lab/0.2.17`。
+- 版本：`0.2.18-mile.20261028.quota1`，服务器 `172.104.117.114`。
+- 程序 SHA256：`e2ff41395d5b7936ab6e69ae8e4a1f00d217b5863847ffb1a4d2a3032a1f5245`。
+- 备份：`/opt/sub2api/backups/before-concurrent-quota-20261028T040153Z`，数据库转储 3,578,862 字节，通过 `pg_restore --list`。
+- 固定参考时刻 `2026-10-28T04:01:59.774903Z` 比较：1,835 条原请求记录全部保留，其中 1,703 条已结算／期初记录的原值一致；原钱包起点、已确认事件、个人周期均一致，已耗尽用户仍超过拦截阈值。
+- 309 个迁移已应用，新增校准索引有效。255 迁移仅增加索引，没有重置或改写历史业务数据。
+- 发布后只读核对：Codex、Grok 的存储倍率均等于各自窗口累计样本倍率；对应窗口 pending/unmetered 记录中，估算与当前倍率不一致的数量均为 0。
+- 公网页面、健康接口和公开设置均返回 200；复用上一版本已发布前端，18 项关键资源内容逐项一致。MemSlides relay 健康检查通过，未发送真实模型付费调用。
+
+本次没有把旧程序生成的同窗口回退候选当作已确认全体重置，也没有清空余额或改写历史已结算点数。历史重复扣记的对账与纠正属于独立的账本修复，须保留原证据和调整依据。
+
+发布记录及核对结果保存在 `output/releases/mile-20261028-quota1/`，服务器同名 release 目录保留发布清单。
