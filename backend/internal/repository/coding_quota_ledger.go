@@ -36,10 +36,11 @@ SELECT w.id,w.purpose,w.start,w.start+INTERVAL '168 hours',w.reason,
  COALESCE(q.used,0)::text,COALESCE(q.pending,0)::text,COALESCE(q.pending_count,0),
  COALESCE(q.unmetered_count,0),COALESCE(q.imported,FALSE),q.updated_at
 FROM windows w LEFT JOIN LATERAL(
- SELECT SUM(points) AS used,SUM(estimated_points) FILTER(WHERE state IN('pending','unmetered')) AS pending,
- COUNT(*) FILTER(WHERE state='pending') AS pending_count,COUNT(*) FILTER(WHERE state='unmetered') AS unmetered_count,
- BOOL_OR(state='imported') AS imported,MAX(updated_at) AS updated_at
- FROM coding_quota_requests q WHERE q.user_id=w.id AND q.purpose=w.purpose
+ SELECT SUM(q.points+COALESCE(c.delta,0)) AS used,SUM(q.estimated_points) FILTER(WHERE q.state IN('pending','unmetered')) AS pending,
+ COUNT(*) FILTER(WHERE q.state='pending') AS pending_count,COUNT(*) FILTER(WHERE q.state='unmetered') AS unmetered_count,
+ BOOL_OR(q.state='imported') AS imported,MAX(GREATEST(q.updated_at,c.created_at)) AS updated_at
+ FROM coding_quota_requests q LEFT JOIN coding_quota_corrections c ON c.request_row_id=q.id
+ WHERE q.user_id=w.id AND q.purpose=w.purpose
  AND q.started_at>=w.start AND q.started_at<w.start+INTERVAL '168 hours'
 ) q ON TRUE ORDER BY w.id,w.purpose`, pq.Array(users), now.UTC())
 	if err != nil {
@@ -323,9 +324,10 @@ func refreshCodingCalibration(ctx context.Context, tx *sql.Tx, accountID int64, 
 	// Pool all settled weights in this official window and refresh outstanding
 	// estimates together, so a transient spike cannot stay frozen on one key.
 	_, err := tx.ExecContext(ctx, `UPDATE coding_quota_meters m SET points_per_weight=s.rate,updated_at=NOW()
- FROM (SELECT ROUND(SUM(points)/NULLIF(SUM(weight),0),12) AS rate FROM coding_quota_requests
- WHERE account_id=$1 AND state='settled'
- AND official_window_end BETWEEN $2::timestamptz-INTERVAL '5 minutes' AND $2::timestamptz+INTERVAL '5 minutes') s
+ FROM (SELECT ROUND(SUM(q.points+COALESCE(c.delta,0))/NULLIF(SUM(q.weight),0),12) AS rate
+ FROM coding_quota_requests q LEFT JOIN coding_quota_corrections c ON c.request_row_id=q.id
+ WHERE q.account_id=$1 AND q.state='settled'
+ AND q.official_window_end BETWEEN $2::timestamptz-INTERVAL '5 minutes' AND $2::timestamptz+INTERVAL '5 minutes') s
  WHERE m.account_id=$1 AND m.points_per_weight IS DISTINCT FROM s.rate`, accountID, windowEnd)
 	if err != nil {
 		return err

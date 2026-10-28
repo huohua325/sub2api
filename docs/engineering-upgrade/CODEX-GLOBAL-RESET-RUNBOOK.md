@@ -24,6 +24,8 @@
 
 升级应保留 `coding_quota_reset_events`、`coding_quota_requests` 和 `user_purpose_allowances.window_start`。部署前后记录已确认事件的 ID、`effective_at`、状态和个人周期，确认没有丢失或改写；同一周期内，已耗尽状态必须保持。核对时固定同一参考时刻，避免把恰好跨过真实周期边界误认为升级引发重置。
 
+历史重复扣点通过独立的 `coding_quota_reconciliations`／`coding_quota_corrections` 追加纠正，原始请求不改写。升级、备份和恢复必须一并保留这两表；个人有效用量和累计校准样本均计入纠正差额。纠正归属原请求时间，不是一次全体重置，不能延长周期或重复退款。详见[历史对账流程](QUOTA-HISTORY-RECONCILIATION.md)。
+
 数据库备份包含这些数据。恢复较旧备份、迁移新环境或重建数据库时，需要同时保留备份之后产生的事件及消耗；不能只恢复程序或配置后重新初始化额度。历史修复脚本只用于一次性补记，不能加入普通部署或每次启动流程。
 
 仓库根目录 [AGENTS.md](../../AGENTS.md) 要求后续额度开发、上游合并与发布遵守上述约定。只有平台所有者明确修改业务规则，才调整这一行为。
