@@ -14,6 +14,11 @@ const effectiveAt = shallowRef(localInput(new Date()))
 const confirming = shallowRef(false)
 const saving = shallowRef(false)
 const pendingId = shallowRef('')
+const manualId = shallowRef('')
+const pendingTime = shallowRef('')
+const candidate = shallowRef<CodingQuotaReset | null>(null)
+const confirmationNote = shallowRef('')
+const confirmationError = shallowRef('')
 
 function localInput(date: Date): string {
   return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
@@ -25,27 +30,42 @@ async function load() {
 }
 
 function ask(event?: CodingQuotaReset) {
+  if (saving.value) return
   error.value = ''
-  if (!note.value.trim() || !Number.isFinite(Date.parse(effectiveAt.value))) {
+  if (!event && (!note.value.trim() || !Number.isFinite(Date.parse(effectiveAt.value)))) {
     error.value = t('admin.usageMonitor.resetRequired')
     return
   }
-  pendingId.value = event?.id ?? (pendingId.value.startsWith('manual:') ? pendingId.value : `manual:${Array.from(crypto.getRandomValues(new Uint32Array(4))).join('-')}`)
-  if (event) effectiveAt.value = localInput(new Date(event.effective_at))
+  if (!event && !manualId.value) manualId.value = `manual:${Array.from(crypto.getRandomValues(new Uint32Array(4))).join('-')}`
+  candidate.value = event ?? null
+  pendingId.value = event?.id ?? manualId.value
+  // Candidate timestamps are immutable evidence: preserve seconds and subsecond precision.
+  pendingTime.value = event?.effective_at ?? new Date(effectiveAt.value).toISOString()
+  confirmationNote.value = event ? '' : note.value.trim()
+  confirmationError.value = ''
   confirming.value = true
+}
+
+function cancel() {
+  if (!saving.value) confirming.value = false
 }
 
 async function confirm() {
   if (saving.value) return
+  if (!confirmationNote.value.trim() || !Number.isFinite(Date.parse(pendingTime.value))) {
+    confirmationError.value = t('admin.usageMonitor.resetRequired')
+    return
+  }
+  confirmationError.value = ''
   saving.value = true
   try {
-    await confirmCodexReset({ id: pendingId.value, effective_at: new Date(effectiveAt.value).toISOString(), note: note.value.trim(), confirm: true })
+    await confirmCodexReset({ id: pendingId.value, effective_at: pendingTime.value, note: confirmationNote.value.trim(), confirm: true })
     confirming.value = false
     pendingId.value = ''
-    note.value = ''
+    if (!candidate.value) { manualId.value = ''; note.value = '' }
     await load()
     emit('changed')
-  } catch (e) { error.value = usageMonitorErrorText(e) || t('admin.usageMonitor.resetFailed'); confirming.value = false }
+  } catch (e) { confirmationError.value = usageMonitorErrorText(e) || t('admin.usageMonitor.resetFailed') }
   finally { saving.value = false }
 }
 
@@ -82,5 +102,13 @@ onMounted(load)
       </li>
     </ul>
   </section>
-  <ConfirmDialog :show="confirming" :title="t('admin.usageMonitor.resetTitle')" :message="t('admin.usageMonitor.resetWarning')" danger @cancel="confirming = false" @confirm="confirm" />
+  <ConfirmDialog :show="confirming" :title="t('admin.usageMonitor.resetTitle')" :message="t('admin.usageMonitor.resetWarning')" :confirm-text="saving ? t('common.saving') : undefined" danger @cancel="cancel" @confirm="confirm">
+    <p class="text-sm text-gray-600 dark:text-gray-400">{{ t('admin.usageMonitor.resetTime') }}: {{ formatDateTime(pendingTime) }}</p>
+    <label v-if="candidate" class="block">
+      <span class="text-sm font-medium">{{ t('admin.usageMonitor.resetNote') }}</span>
+      <textarea v-model="confirmationNote" class="input mt-1 min-h-24 w-full" maxlength="500" rows="3" :disabled="saving" :aria-invalid="!!confirmationError" :aria-label="t('admin.usageMonitor.resetNote')" />
+    </label>
+    <p v-else class="break-words text-sm text-gray-600 dark:text-gray-400">{{ confirmationNote }}</p>
+    <p v-if="confirmationError" class="text-sm text-red-600" role="alert">{{ confirmationError }}</p>
+  </ConfirmDialog>
 </template>
