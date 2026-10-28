@@ -1,0 +1,61 @@
+# 并行 Key 额度计量修复（2026-10-28）
+
+## 线上证据与复现
+
+同一母账号允许多个用户、多个 API Key 并行工作。官方百分比是账号累计读数，不是某条请求的扣点回执。
+
+2026-10-28 的只读检查发现，Codex 母账号同一官方窗口的读数从 11:17:14 的 69% 回退到 11:17:47 的 68%，窗口结束时间仅相差约 91 秒，属于原有五分钟容差内。旧代码把任何百分比下降都当作新计量基线；回到 69% 时会重复计算已经扣过的一个百分点，并产生错误的异常重置候选。
+
+同时发现，部分待结算记录保留约 5.74 的历史估算倍率，而母账号当前倍率已降至约 0.378。旧算法只使用最近一次增量除以该小区间内已完成请求的权重，并把倍率冻结在各条入账记录上。并发流、整数百分比和响应头早于流结束的观察时间，使短区间的分子、分母不能可靠对应。
+
+真实 PostgreSQL 复现结果：
+
+- 读数 `68 → 69 → 68 → 69 → 70`：两个用户原来各扣 1.5 点，合计 3 点；正确的新增官方消耗合计应为 2 点。
+- 两次各一个百分点、请求权重分别为 `1`、`0.01`：两条权重为 1 的待结算请求原估算合计 101 点；累计样本倍率为 `2 / 1.01`，估算合计应为 3.96039604 点。
+- 换官方窗口后，原算法仍用旧窗口的 100 倍率估算；缺少新窗口样本时应保留未结算状态，而非套用旧倍率。
+- 已持久化的异常倍率不能依赖新的付费请求恢复。相同百分比的新鲜官方读数，也应重新校准待结算估算。
+
+## 算法与并发约束
+
+1. **同窗口最高读数**：官方结束时间在五分钟容差内时，较低百分比只作为原始观察保留并标记已处理，不回退已结算游标，不产生全体异常重置证据。百分比恢复到最高值时不重复扣点。
+2. **互不重叠的实际增量**：沿用既有正增量分摊和八位小数余数分配。一次官方增量最多分配一次；没有可归属请求的增量不转嫁给下一个调用者。
+3. **累计样本校准**：同一母账号、同一官方窗口内，以 `SUM(已结算点数) / SUM(对应请求权重)` 估算待结算点数。纳入该账号所有 Key 和用途的实际权重，不使用用户售价倍率；导入期初记录、其他母账号和其他窗口不参与。
+4. **统一更新估算**：新倍率同步作用于对应窗口的 pending/unmetered 记录。最终结算时清除该记录估算，避免实际值与估算叠加。仅更新数值发生变化的记录，不用无变化轮询制造“刚更新”的时间。
+5. **同账号协调**：入账和结算先取得同一个 PostgreSQL 事务级 advisory lock。请求要么在校准前写入并被统一更新，要么在校准后读到新倍率；不同母账号仍可并行。请求 ID 与 Key ID 的原计费幂等规则保留。
+6. **换窗隔离**：母账号窗口确实改变时清除旧倍率；带有不同官方窗口的请求不能套用当前窗口倍率。新窗口尚无样本时，零估算仍明确为 pending/unmetered，不能表述为免费或已精确结算。
+7. **无新增上游调用**：修复使用原有后台观察，不增加模型探测或学员页请求。新增 255 迁移仅并发建立部分覆盖索引，支持按母账号和官方窗口读取结算样本；已有迁移保持不变。
+
+## 业务边界
+
+个人 168 小时起点、已确认全体异常重置、原请求时间及期初记录保持原规则。Codex 同窗口读数回退不能修改 Grok 或 API 实验周期。既有候选事件不自动删除，也不因此确认；已确认事件仍须完整保留。
+
+本修复更新的是后续结算逻辑和可重算的待结算估算，不覆盖历史已结算点数。旧程序已经重复分配的历史增量，需要逐段对账后单独进行可审计纠正，不能为了消除显示异常而重置整个钱包。
+
+官方只提供账号累计读数；并发请求在不同用户之间的精确官方扣点无法从该接口直接取得。当前仍是按可归属请求权重分摊，待结算仍为估算。累计校准减少短区间放大，不应宣称能够还原每条并发长流的精确消耗；长流跨观察边界、延迟入账和首个样本不足仍需明确显示数据状态。鉴权也尚未实现并发请求的原子额度预留，长流可能在结束入账前越过额度阈值。
+
+## 验证
+
+隔离 PostgreSQL：`127.0.0.1:55439`，各测试使用独立随机 schema，绝不连接生产测试。
+
+```powershell
+$env:SUB2API_QUOTA_TEST_DSN='host=127.0.0.1 port=55439 user=postgres dbname=postgres sslmode=disable'
+go test -race ./internal/repository -run TestCodingQuotaDB -count=1 -v
+```
+
+专项覆盖 Codex/Grok 同窗回退、多用户、多母账号、20 个 Key 并行入账与结算、每个 Key 的重复计费去重、倍率恢复、平读数恢复、换窗隔离，以及真实迁移／重启后的已确认事件和耗尽拦截。
+
+专项 `-race` 共 25 个测试／子测试通过，0 跳过；Go vet 通过，repository 增量 golangci-lint 为 0 issues。
+
+全量 `go test -p 2 ./...` 另有以下 9 个失败，均已在未修改的原分支复现，不能把专项通过描述成全量通过：
+
+- `TestAuthIdentityFoundationSchemas`
+- `TestAllPlatformsIncludesEveryConcretePlatform`
+- `TestPgDumperHoldsMigrationLockThroughReaderClose`
+- `TestPgDumperReleasesMigrationLockWhenProcessFails`
+- `TestPgDumperReportsUnlockFailureAndDiscardsConnection`
+- `TestUsageLogRepositoryCreateSyncRequestTypeAndLegacyFields`
+- `TestUsageLogRepositoryCreate_PersistsServiceTier`
+- `TestPrepareUsageLogInsert_PersistsNativeCompactionV2WithoutChangingRequestType`
+- `TestCompositeGroupSchedulerHasAllCanonicalPlatformBuckets`
+
+完整日志保存在本地忽略目录 `output/concurrent-quota-*.log`；线上只读证据在 `output/concurrent-quota-audit.jsonl`，不包含密钥或对话内容。

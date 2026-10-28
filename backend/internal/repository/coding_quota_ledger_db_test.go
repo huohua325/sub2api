@@ -234,6 +234,10 @@ func TestCodingQuotaDBUpgradeAndRestartPreserveConfirmedReset(t *testing.T) {
 	content, err := migrations.FS.ReadFile(name)
 	require.NoError(t, err)
 	upgrade := fstest.MapFS{name: &fstest.MapFile{Data: content}}
+	const calibrationIndex = "255_coding_quota_calibration_index_notx.sql"
+	content, err = migrations.FS.ReadFile(calibrationIndex)
+	require.NoError(t, err)
+	upgrade[calibrationIndex] = &fstest.MapFile{Data: content}
 	require.NoError(t, applyMigrationsFS(ctx, db, upgrade))
 	var schema string
 	require.NoError(t, db.QueryRow(`SELECT current_schema()`).Scan(&schema))

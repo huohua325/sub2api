@@ -97,6 +97,11 @@ func recordCodingQuotaCharge(ctx context.Context, tx *sql.Tx, cmd *service.Usage
 	if err != nil || weight.IsNegative() {
 		return fmt.Errorf("invalid coding quota weight")
 	}
+	// Use the same lock order as reconciliation, before inserting observations.
+	// A charge either enters before repricing or reads the new rate afterwards.
+	if err := lockCodingMeter(ctx, tx, v.AccountID); err != nil {
+		return err
+	}
 	if v.Baseline != nil {
 		if err := insertCodingObservation(ctx, tx, *v.Baseline); err != nil {
 			return err
@@ -123,7 +128,8 @@ func recordCodingQuotaCharge(ctx context.Context, tx *sql.Tx, cmd *service.Usage
 	}
 	_, err = tx.ExecContext(ctx, `INSERT INTO coding_quota_requests(request_id,api_key_id,user_id,purpose,account_id,
  started_at,completed_at,official_window_end,weight,estimated_points,state)
- VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,COALESCE((SELECT points_per_weight FROM coding_quota_meters WHERE account_id=$5),0)*$9,$10)
+ VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,COALESCE((SELECT points_per_weight FROM coding_quota_meters WHERE account_id=$5
+ AND ($8::timestamptz IS NULL OR ABS(EXTRACT(EPOCH FROM(window_end-$8::timestamptz)))<=300)),0)*$9,$10)
  ON CONFLICT(request_id,api_key_id) DO NOTHING`, cmd.RequestID, cmd.APIKeyID, cmd.UserID, purpose, v.AccountID,
 		v.StartedAt.UTC(), v.CompletedAt.UTC(), window, weight.String(), state)
 	return err
@@ -134,6 +140,11 @@ type codingMeter struct {
 	WindowEnd  time.Time
 	ObservedAt time.Time
 	Used       decimal.Decimal
+}
+
+func lockCodingMeter(ctx context.Context, tx *sql.Tx, accountID int64) error {
+	_, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1,0))`, fmt.Sprintf("coding-meter:%d", accountID))
+	return err
 }
 
 // ReconcileCodingQuota waits for the billing queue to catch up, then closes
@@ -176,7 +187,7 @@ func (r *UsageMonitorRepository) reconcileCodingObservation(ctx context.Context,
 			err = rollbackErr
 		}
 	}()
-	if _, err = tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1,0))`, fmt.Sprintf("coding-meter:%d", v.AccountID)); err != nil {
+	if err = lockCodingMeter(ctx, tx, v.AccountID); err != nil {
 		return err
 	}
 	var processed bool
@@ -215,7 +226,13 @@ func (r *UsageMonitorRepository) reconcileCodingObservation(ctx context.Context,
 			moved = -moved
 		}
 		switch {
-		case moved > 5*time.Minute || p.LessThan(m.Used):
+		case moved <= 5*time.Minute && p.LessThan(m.Used):
+			// Concurrent upstream replicas can report a lower cumulative value
+			// with a newer HTTP Date. Preserve the high-water mark and interval
+			// cursor: recovering this value must never charge the same points
+			// twice or create platform-reset evidence.
+			err = nil
+		case moved > 5*time.Minute:
 			// Changing a parent's meter does not reset any personal ledger.
 			abnormal := v.Purpose == service.PurposeOpenAI && v.ObservedAt.Before(m.WindowEnd.Add(-5*time.Minute)) && p.LessThan(m.Used) && v.Source != "codex_local_reset"
 			if abnormal {
@@ -231,7 +248,7 @@ func (r *UsageMonitorRepository) reconcileCodingObservation(ctx context.Context,
 				}
 			}
 			evidence, _ := json.Marshal(map[string]any{"account_id": v.AccountID, "before": m.Used.String(), "after": p.String(), "previous_reset": m.WindowEnd, "new_reset": v.WindowEnd, "observed_at": v.ObservedAt, "source": v.Source})
-			_, err = tx.ExecContext(ctx, `UPDATE coding_quota_meters SET window_end=$2,observed_at=$3,used=$4,
+			_, err = tx.ExecContext(ctx, `UPDATE coding_quota_meters SET window_end=$2,observed_at=$3,used=$4,points_per_weight=NULL,
  anomaly_at=CASE WHEN $5 THEN $3 ELSE anomaly_at END,anomaly_evidence=CASE WHEN $5 THEN $6::jsonb ELSE anomaly_evidence END,updated_at=NOW() WHERE account_id=$1`, v.AccountID, v.WindowEnd, v.ObservedAt, v.Used, abnormal, string(evidence))
 			if err != nil {
 				return err
@@ -239,7 +256,9 @@ func (r *UsageMonitorRepository) reconcileCodingObservation(ctx context.Context,
 			_, err = tx.ExecContext(ctx, `UPDATE coding_quota_requests SET state='unmetered',updated_at=NOW() WHERE account_id=$1 AND state='pending' AND completed_at<=$2`, v.AccountID, v.ObservedAt)
 		case p.Equal(m.Used):
 			// Keep the original baseline until a visible positive increment arrives.
-			err = nil
+			// A flat read can still repair a legacy estimate; recovery must not
+			// depend on an exhausted user being able to make another paid call.
+			err = refreshCodingCalibration(ctx, tx, v.AccountID, m.WindowEnd)
 		default:
 			err = settleCodingIncrement(ctx, tx, v, m, p.Sub(m.Used))
 		}
@@ -261,7 +280,6 @@ func settleCodingIncrement(ctx context.Context, tx *sql.Tx, v service.OfficialQu
 		return err
 	}
 	var requests []service.PointAllocation
-	total := decimal.Zero
 	for rows.Next() {
 		var req service.PointAllocation
 		if err := rows.Scan(&req.ID, &req.Weight); err != nil {
@@ -269,12 +287,6 @@ func settleCodingIncrement(ctx context.Context, tx *sql.Tx, v service.OfficialQu
 			return err
 		}
 		requests = append(requests, req)
-		w, e := decimal.NewFromString(req.Weight)
-		if e != nil {
-			_ = rows.Close()
-			return e
-		}
-		total = total.Add(w)
 	}
 	err = rows.Err()
 	_ = rows.Close()
@@ -286,24 +298,44 @@ func settleCodingIncrement(ctx context.Context, tx *sql.Tx, v service.OfficialQu
 		return err
 	}
 	for _, a := range allocations {
-		if _, err = tx.ExecContext(ctx, `UPDATE coding_quota_requests SET points=$2,estimated_points=0,state='settled',updated_at=NOW() WHERE id=$1`, a.ID, a.Points); err != nil {
+		if _, err = tx.ExecContext(ctx, `UPDATE coding_quota_requests SET points=$2,estimated_points=0,state='settled',official_window_end=$3,updated_at=NOW() WHERE id=$1`, a.ID, a.Points, v.WindowEnd); err != nil {
 			return err
 		}
 	}
 	// Empty increments are recorded as unallocated evidence, not charged to the
 	// next gateway caller. This includes known probe and outside-gateway usage.
-	var rate any
-	if total.IsPositive() {
-		rate = delta.DivRound(total, 12).String()
-	}
 	_, err = tx.ExecContext(ctx, `UPDATE coding_quota_meters SET window_end=$2,observed_at=$3,used=$4,
- points_per_weight=COALESCE($5,points_per_weight),updated_at=NOW() WHERE account_id=$1`, v.AccountID, v.WindowEnd, v.ObservedAt, v.Used, rate)
+ updated_at=NOW() WHERE account_id=$1`, v.AccountID, v.WindowEnd, v.ObservedAt, v.Used)
 	if err != nil {
 		return err
 	}
 	// Requests that arrived after an already closed observation remain visible
 	// as unresolved; they must not dilute charges already assigned to others.
-	_, err = tx.ExecContext(ctx, `UPDATE coding_quota_requests SET state='unmetered',updated_at=NOW() WHERE account_id=$1 AND state='pending' AND completed_at<=$2`, v.AccountID, v.ObservedAt)
+	if _, err = tx.ExecContext(ctx, `UPDATE coding_quota_requests SET state='unmetered',updated_at=NOW() WHERE account_id=$1 AND state='pending' AND completed_at<=$2`, v.AccountID, v.ObservedAt); err != nil {
+		return err
+	}
+	return refreshCodingCalibration(ctx, tx, v.AccountID, v.WindowEnd)
+}
+
+func refreshCodingCalibration(ctx context.Context, tx *sql.Tx, accountID int64, windowEnd time.Time) error {
+	// One rounded official tick may contain consumption from several in-flight
+	// streams. Avoid extrapolating only the most recent completed requests.
+	// Pool all settled weights in this official window and refresh outstanding
+	// estimates together, so a transient spike cannot stay frozen on one key.
+	_, err := tx.ExecContext(ctx, `UPDATE coding_quota_meters m SET points_per_weight=s.rate,updated_at=NOW()
+ FROM (SELECT ROUND(SUM(points)/NULLIF(SUM(weight),0),12) AS rate FROM coding_quota_requests
+ WHERE account_id=$1 AND state='settled'
+ AND official_window_end BETWEEN $2::timestamptz-INTERVAL '5 minutes' AND $2::timestamptz+INTERVAL '5 minutes') s
+ WHERE m.account_id=$1 AND m.points_per_weight IS DISTINCT FROM s.rate`, accountID, windowEnd)
+	if err != nil {
+		return err
+	}
+	_, err = tx.ExecContext(ctx, `UPDATE coding_quota_requests q SET
+ estimated_points=q.weight*COALESCE(m.points_per_weight,0),updated_at=NOW()
+ FROM coding_quota_meters m WHERE m.account_id=$1 AND q.account_id=m.account_id
+ AND q.state IN('pending','unmetered')
+ AND (q.official_window_end IS NULL OR ABS(EXTRACT(EPOCH FROM(q.official_window_end-m.window_end)))<=300)
+ AND q.estimated_points IS DISTINCT FROM ROUND(q.weight*COALESCE(m.points_per_weight,0),8)`, accountID)
 	return err
 }
 
