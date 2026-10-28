@@ -256,6 +256,9 @@ func usageRecordContext(parent context.Context, base context.Context) context.Co
 	if requestID, _ := parent.Value(ctxkey.RequestID).(string); strings.TrimSpace(requestID) != "" {
 		base = context.WithValue(base, ctxkey.RequestID, strings.TrimSpace(requestID))
 	}
+	if hold := service.CodingReservationFromContext(parent); hold != nil {
+		base = service.WithCodingReservation(base, hold)
+	}
 	return base
 }
 
@@ -3437,6 +3440,10 @@ func getContextInt64(c *gin.Context, key string) (int64, bool) {
 }
 
 func (h *OpenAIGatewayHandler) submitUsageRecordTask(parent context.Context, task service.UsageRecordTask) {
+	if service.CodingReservationFromContext(parent) != nil {
+		runCodingUsageTask(parent, task)
+		return
+	}
 	if task == nil {
 		return
 	}
@@ -3469,6 +3476,9 @@ func (h *OpenAIGatewayHandler) submitUsageRecordTask(parent context.Context, tas
 }
 
 func (h *OpenAIGatewayHandler) submitOpenAIUsageRecordTask(parent context.Context, result *service.OpenAIForwardResult, task service.UsageRecordTask) {
+	if result != nil && result.CodingReservation != nil {
+		parent = service.WithCodingReservation(parent, result.CodingReservation)
+	}
 	// Money-critical bills never drop on pool overflow: media, search surcharge, voice.
 	if result != nil && (result.ImageCount > 0 || result.VideoCount > 0 ||
 		result.SearchCount > 0 || result.WebSearchCalls > 0 || result.AudioUsage != nil) {
@@ -3479,6 +3489,10 @@ func (h *OpenAIGatewayHandler) submitOpenAIUsageRecordTask(parent context.Contex
 }
 
 func (h *OpenAIGatewayHandler) submitMandatoryUsageRecordTask(parent context.Context, task service.UsageRecordTask) {
+	if service.CodingReservationFromContext(parent) != nil {
+		runCodingUsageTask(parent, task)
+		return
+	}
 	if task == nil {
 		return
 	}

@@ -57,13 +57,16 @@ func (r *UsageMonitorRepository) ReserveCodingQuota(ctx context.Context, in serv
 		return out, err
 	}
 	var oldUser, oldKey int64
-	var oldPurpose string
-	err = tx.QueryRowContext(ctx, `SELECT user_id,api_key_id,purpose FROM coding_quota_reservations WHERE id=$1`, in.ID).Scan(&oldUser, &oldKey, &oldPurpose)
+	var oldPurpose, oldState string
+	err = tx.QueryRowContext(ctx, `SELECT user_id,api_key_id,purpose,state FROM coding_quota_reservations WHERE id=$1`, in.ID).Scan(&oldUser, &oldKey, &oldPurpose, &oldState)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return out, err
 	}
 	if err == nil && (oldUser != in.UserID || oldKey != in.APIKeyID || oldPurpose != in.Purpose) {
 		return out, fmt.Errorf("reservation identity conflict")
+	}
+	if err == nil && oldState != "reserved" && oldState != "sent" {
+		return out, fmt.Errorf("reservation is already %s", oldState)
 	}
 	if err = recoverCodingPerson(ctx, tx, in.Now, in.UserID, in.Purpose); err != nil {
 		return out, err

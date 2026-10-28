@@ -54,6 +54,7 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 		// BuildInfo provider
 		provideServiceBuildInfo,
 		providePluginHostInfo,
+		provideCodingPoints,
 
 		// Cleanup function provider
 		provideCleanup,

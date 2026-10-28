@@ -114,6 +114,15 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 		}()
 	}
 
+	v, _ := c.Get("api_key")
+	codingKey, _ := v.(*APIKey)
+	var codingCleanup func()
+	var codingErr error
+	hooks, codingCleanup, codingErr = s.codingWSTurnHooks(ctx, codingKey, account, firstClientMessage, hooks)
+	if codingErr != nil {
+		return codingErr
+	}
+	defer codingCleanup()
 	wsDecision := s.getOpenAIWSProtocolResolver().Resolve(account)
 	forceHTTPBridge := account.Platform == PlatformGrok ||
 		(s.pluginManager != nil && s.pluginManager.ShouldRouteOpenAIOAuth(account))

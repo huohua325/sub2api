@@ -129,3 +129,14 @@ func TestCodingQuotaDBReservationUnknownExpiryAndLateResult(t *testing.T) {
 	require.NoError(t, err, "unknown expired stream must not permanently occupy execution slot")
 	require.NoError(t, r.FinishCodingReservation(context.Background(), hold.ID, true, in.Now.Add(123*time.Second)))
 }
+
+func TestCodingQuotaDBReservationCannotReuseTerminalIdentity(t *testing.T) {
+	_, r, _ := quotaTestDB(t, "")
+	ctx := context.Background()
+	in := reservationInput(1, 10)
+	_, err := r.ReserveCodingQuota(ctx, in)
+	require.NoError(t, err)
+	require.NoError(t, r.FinishCodingReservation(ctx, in.ID, true, in.Now))
+	_, err = r.ReserveCodingQuota(ctx, in)
+	require.Error(t, err)
+}

@@ -499,6 +499,9 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 				// Wall-clock start for usage duration_ms: create accepted → first done discovery.
 				CreatedAt: videoCreateStartedAt,
 			}
+			if hold := service.CodingReservationFromContext(c.Request.Context()); hold != nil {
+				pending.CodingReservationID = hold.ID
+			}
 			if err := h.gatewayService.StoreGrokVideoPendingBilling(requestCtx, result.ResponseID, subject.UserID, apiKey.ID, pending); err != nil {
 				reqLog.Warn("grok_media.store_video_pending_billing_failed_retrying",
 					zap.Int64("account_id", account.ID),
@@ -657,6 +660,9 @@ func prepareGrokVideoCompletionBilling(
 	}
 	// Re-merge with pending: resolution is request-only; model/duration fill gaps.
 	merged := *statusResult
+	if pending != nil && pending.CodingReservationID != "" {
+		merged.CodingReservation = h.gatewayService.ResumeCodingBilling(pending.CodingReservationID)
+	}
 	if pending != nil {
 		if strings.TrimSpace(merged.Model) == "" {
 			merged.Model = firstNonEmptyString(pending.BillingModel, pending.Model, pending.OriginalModel)

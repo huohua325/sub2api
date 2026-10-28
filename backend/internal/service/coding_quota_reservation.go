@@ -66,3 +66,15 @@ type CodingReservationStore interface {
 	RecoverCodingReservations(context.Context, time.Time) error
 	ListCodingReservations(context.Context, CodingReservationQuery) (CodingReservationPage, error)
 }
+
+// CodingBillingStore durably hands off normalized billing commands before execution.
+type CodingBillingStore interface {
+	CodingReservationStore
+	EnqueueCodingBilling(context.Context, string, *UsageBillingCommand) error
+	ReplayCodingBilling(context.Context, time.Time, int) (int, error)
+}
+
+type CodingAsyncStore interface {
+	StoreCodingAsyncJob(context.Context, string, int64, int64, GrokVideoPendingBilling) error
+	LoadCodingAsyncJob(context.Context, string, int64, int64) (*GrokVideoPendingBilling, error)
+}

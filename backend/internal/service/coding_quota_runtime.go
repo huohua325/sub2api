@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"math/big"
 	"strconv"
 	"strings"
 	"time"
@@ -75,10 +76,15 @@ func codingQuotaResult(v CodingQuotaReading, budget string) OfficialPointResult 
 	if !ok {
 		return OfficialPointResult{Blocked: true, DataStatus: "error"}
 	}
+	settled := new(big.Rat).Set(used)
 	used.Add(used, pending)
 	limit, err := ParseOfficialPointBudget(budget)
 	if err != nil {
 		return OfficialPointResult{Blocked: true, DataStatus: "error"}
+	}
+	blocked := used.Cmp(limit) >= 0
+	if CodingControlMode(v.Purpose) == "enforce" {
+		blocked = settled.Cmp(limit) >= 0
 	}
 	text := formatFixedHalfAway(used, 8)
 	percent := StudentFacingPercent(used, limit)
@@ -96,7 +102,7 @@ func codingQuotaResult(v CodingQuotaReading, budget string) OfficialPointResult 
 	if !v.UpdatedAt.IsZero() {
 		updatedAt = &v.UpdatedAt
 	}
-	return OfficialPointResult{Points: &text, Percent: &percent, Blocked: used.Cmp(limit) >= 0, Reset: &v.End,
+	return OfficialPointResult{Points: &text, Percent: &percent, Blocked: blocked, Reset: &v.End,
 		PeriodStart: &v.Start, Pending: &v.Pending, DataStatus: status, UpdatedAt: updatedAt, ResetReason: v.ResetReason}
 }
 
@@ -124,6 +130,14 @@ func (s *OfficialPointService) Start(ctx context.Context) {
 		defer ticker.Stop()
 		for {
 			cycleCtx, cycleCancel := context.WithTimeout(workerCtx, 30*time.Second)
+			if store, ok := s.store.(CodingBillingStore); ok {
+				if err := store.RecoverCodingReservations(cycleCtx, time.Now().UTC()); err != nil {
+					slog.Error("coding_reservation_recovery_failed", "error", err)
+				}
+				if _, err := store.ReplayCodingBilling(cycleCtx, time.Now().UTC(), 50); err != nil {
+					slog.Error("coding_billing_replay_failed", "error", err)
+				}
+			}
 			if err := s.reconcileLedger(cycleCtx, ledger); err != nil && workerCtx.Err() == nil {
 				slog.Warn("coding_quota_reconcile_failed", "error", err)
 			}

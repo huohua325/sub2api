@@ -377,6 +377,7 @@ func (s *OpenAIGatewayService) SelectMediaVideoRequestAccount(
 // first observes a completed video URL. Status may omit model/duration; we fall
 // back to this snapshot, then defaults.
 type GrokVideoPendingBilling struct {
+	CodingReservationID  string `json:"coding_reservation_id,omitempty"`
 	Model                string `json:"model"`
 	BillingModel         string `json:"billing_model,omitempty"`
 	UpstreamModel        string `json:"upstream_model,omitempty"`
@@ -471,6 +472,13 @@ func (s *OpenAIGatewayService) StoreGrokVideoPendingBilling(
 	} else {
 		pending.CreatedAt = strings.TrimSpace(pending.CreatedAt)
 	}
+	if pending.CodingReservationID != "" && s.codingPoints != nil {
+		if store, ok := s.codingPoints.store.(CodingAsyncStore); ok {
+			if err := store.StoreCodingAsyncJob(ctx, requestID, userID, apiKeyID, pending); err != nil {
+				return err
+			}
+		}
+	}
 	payload, err := json.Marshal(pending)
 	if err != nil {
 		return err
@@ -484,6 +492,14 @@ func (s *OpenAIGatewayService) LoadGrokVideoPendingBilling(
 	requestID string,
 	userID, apiKeyID int64,
 ) (*GrokVideoPendingBilling, error) {
+	if s != nil && s.codingPoints != nil {
+		if store, ok := s.codingPoints.store.(CodingAsyncStore); ok {
+			v, err := store.LoadCodingAsyncJob(ctx, requestID, userID, apiKeyID)
+			if err != nil || v != nil {
+				return v, err
+			}
+		}
+	}
 	if s == nil || s.cache == nil {
 		return nil, fmt.Errorf("grok video pending billing cache is unavailable")
 	}
@@ -654,6 +670,13 @@ func (s *OpenAIGatewayService) ForwardGrokMedia(
 	body []byte,
 	contentType string,
 ) (*OpenAIForwardResult, error) {
+	if endpoint != GrokMediaEndpointVideoStatus && endpoint != GrokMediaEndpointVideoContent {
+		var codingErr error
+		ctx, codingErr = s.PrepareCodingRequest(ctx, c, account, body)
+		if codingErr != nil {
+			return nil, codingErr
+		}
+	}
 	startTime := time.Now()
 	if account == nil {
 		return nil, fmt.Errorf("grok account is required")

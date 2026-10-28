@@ -399,6 +399,11 @@ func applyUsageBilling(ctx context.Context, requestID string, usageLog *UsageLog
 	billingCtx, cancel := detachedBillingContext(ctx)
 	defer cancel()
 
+	if hold := CodingReservationFromContext(ctx); hold != nil {
+		if err := hold.Handoff(billingCtx, cmd); err != nil {
+			return false, err
+		}
+	}
 	result, err := repo.Apply(billingCtx, cmd)
 	if err != nil {
 		return false, err
