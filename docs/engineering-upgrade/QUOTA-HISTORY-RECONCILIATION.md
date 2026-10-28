@@ -68,3 +68,28 @@ go test -race ./internal/quotaudit -count=1
 - `TestUsageLogRepositoryCreate_PersistsServiceTier`
 - `TestPrepareUsageLogInsert_PersistsNativeCompactionV2WithoutChangingRequestType`
 - `TestCompositeGroupSchedulerHasAllCanonicalPlatformBuckets`
+
+## 线上执行与验收
+
+2026-10-28 13:39 北京时间已部署到 `172.104.117.114`，版本 `0.2.18-mile.20261028.history1`，源码提交 `7b1fb0a5ac95f3ea66f47b4ec793ad02e5b862b6`。生产构建 SHA-256 为 `f36cffbfa11b36e2946675ee270e52b67c6e7c6235abad49c4784c968cbd3c16`；Go vet 通过，repository／quotaudit／操作工具的增量 golangci-lint 为 0 issues。
+
+先在生产库只读重建清单，确认摘要与审阅版本完全相同，再执行一次追加纠正：
+
+- 生成 1 个审计事件、7 条纠正分录，有效差额合计 `-1.00000000`，归属原请求用户 3 的原个人周期。
+- 原请求 1435–1441 保持原始点数、权重、时间和状态；合并对应差额后，该批次有效扣点为 0。
+- 对同一清单重试，新增分录为 0；没有重复返还。
+- 保留全部 2,389 条原请求，2,245 条已结算／期初记录逐字段保持原值。校准只更新当前母账号的待结算估算，不改历史结算。
+- 全部重置事件、原钱包起点、个人周期及其他用户已结算用量保持不变。用户 6 已消耗 `51.29750000`，仍超过 50 点拦截阈值；没有因升级恢复可用。
+- Grok 用量及其他母账号计量状态保持不变；没有调整 API 实验账单。个人 Codex 下一周期仍为 `2026-11-02 17:29:05 UTC+8`。
+- 共 310 个迁移，256 已实际安装。应用重新启动后再次查询，7 条差额及原请求、事件、起点仍保留。
+- 18 个公网前端资源逐一与原生产资源匹配；`/health`、`/login`、公开设置均返回 200，MemSlides 中继健康。此次没有新增前端面板，也没有使用学员 Key 发送付费模型请求。
+
+备份均留在服务器的 root 私有目录，并已通过 `pg_restore --list` 检查；未进行完整恢复演练：
+
+| 阶段 | 目录 | 数据库备份字节 |
+| --- | --- | --- |
+| 程序切换前，含原程序与配置 | `/opt/sub2api/backups/before-history-quota-20261028T053921Z` | 3,698,785 |
+| 追加纠正前，含审阅清单与前后快照 | `/opt/sub2api/backups/before-history-credit-20261028T053952Z` | 3,706,293 |
+| 纠正后，含已生效的纠正账本 | `/opt/sub2api/backups/after-history-credit-20261028T054122Z` | 3,707,741 |
+
+发布清单、只读计划、部署检查、纠正结果、重启核对及公网资源检查保存在本地忽略目录 `output/releases/mile-20261028-history1/`；服务器发布目录为 `/opt/sub2api/releases/mile-20261028-history1/`。旧备份不包含之后产生的消耗及纠正，不能覆盖当前库来回退程序；恢复必须保留后续业务账本，并使用支持纠正表的程序。

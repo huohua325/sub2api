@@ -1,6 +1,6 @@
 # MILE Lab 线上同步记录 · 2026-10-27
 
-当前线上版本为 `0.2.18-mile.20261027.upstream1`，22:48 完成切换。下方保留历次发布记录，最新上游合并与验收见 [UPSTREAM-SYNC-2026-10-27.md](UPSTREAM-SYNC-2026-10-27.md)。
+当前线上版本为 `0.2.18-mile.20261028.history1`，2026-10-28 13:39 完成切换，历史额度纠正、备份与验收见 [QUOTA-HISTORY-RECONCILIATION.md](QUOTA-HISTORY-RECONCILIATION.md#线上执行与验收)。下方保留 2026-10-27 历次发布记录，上游合并与验收见 [UPSTREAM-SYNC-2026-10-27.md](UPSTREAM-SYNC-2026-10-27.md)。
 
 23:16 补记昨天 OpenAI 全体异常重置的历史事件，修正 Codex 个人倒计时与耗尽拦截；没有更换程序。详情与备份索引见 [CODEX-GLOBAL-RESET-RUNBOOK.md](CODEX-GLOBAL-RESET-RUNBOOK.md)。
 
