@@ -228,15 +228,15 @@ func (s *OpenAIGatewayService) ProxyGrokRealtimeConn(ctx context.Context, c *gin
 			if gjson.GetBytes(msg, "type").String() == "response.created" {
 				upstream.coding.MarkExecuting()
 			}
-			if gjson.GetBytes(msg, "type").String() == "response.done" {
-				upstream.coding.End()
-			}
 			if grokRealtimeEventHasAudio(msg) {
 				audioObserved.Store(true)
 			}
 			if writeErr := client.Write(ctx, coderws.MessageText, msg); writeErr != nil {
 				errCh <- writeErr
 				return
+			}
+			if gjson.GetBytes(msg, "type").String() == "response.done" {
+				upstream.coding.End()
 			}
 		}
 	}()

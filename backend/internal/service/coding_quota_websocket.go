@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/requestdrain"
 	"log/slog"
 	"sync"
 	"time"
@@ -15,23 +16,30 @@ import (
 // never store a turn's billing identity on the shared session context.
 func (s *OpenAIGatewayService) codingWSTurnHooks(ctx context.Context, key *APIKey, account *Account, first []byte, original *OpenAIWSIngressHooks) (*OpenAIWSIngressHooks, func(), error) {
 	noop := func() {}
-	if s.codingPoints == nil || key == nil || key.Group == nil {
-		return original, noop, nil
+	purpose := ""
+	if key != nil && key.Group != nil {
+		purpose = PurposeOfGroup(key.Group.Platform, key.Group.UsageKind)
 	}
-	purpose := PurposeOfGroup(key.Group.Platform, key.Group.UsageKind)
-	if (purpose != PurposeOpenAI && purpose != PurposeGrok) || CodingControlMode(purpose) == "off" {
-		return original, noop, nil
-	}
+	codingEnabled := s.codingPoints != nil && (purpose == PurposeOpenAI || purpose == PurposeGrok) && CodingControlMode(purpose) != "off"
 	hooks := OpenAIWSIngressHooks{}
 	if original != nil {
 		hooks = *original
 	}
 	var mu sync.Mutex
 	turns := map[int]*CodingReservationHandle{}
+	finishes := map[int]func(){}
 	begin := func(turn int, body []byte) error {
 		mu.Lock()
 		defer mu.Unlock()
-		if turns[turn] != nil {
+		if finishes[turn] != nil {
+			return nil
+		}
+		finish, err := requestdrain.BeginRound(ctx)
+		if err != nil {
+			return NewOpenAIWSClientCloseError(coderws.StatusTryAgainLater, err.Error(), err)
+		}
+		finishes[turn] = finish
+		if !codingEnabled {
 			return nil
 		}
 		model, weight := codingRawEstimate(s.billingService, account, body)
@@ -62,7 +70,11 @@ func (s *OpenAIGatewayService) codingWSTurnHooks(ctx context.Context, key *APIKe
 		for _, h := range turns {
 			h.Finish()
 		}
+		for _, finish := range finishes {
+			finish()
+		}
 		clear(turns)
+		clear(finishes)
 	}
 	hooks.BeforeRequest = func(turn int, body []byte, model string) error {
 		if original != nil && original.BeforeRequest != nil {
@@ -76,7 +88,12 @@ func (s *OpenAIGatewayService) codingWSTurnHooks(ctx context.Context, key *APIKe
 		mu.Lock()
 		h := turns[turn]
 		delete(turns, turn)
+		finish := finishes[turn]
+		delete(finishes, turn)
 		mu.Unlock()
+		if finish != nil {
+			defer finish()
+		}
 		defer h.Finish()
 		if result != nil {
 			result.CodingReservation = h
@@ -95,6 +112,8 @@ func (s *OpenAIGatewayService) codingWSTurnHooks(ctx context.Context, key *APIKe
 func codingWSAdmissionErrorFrame(err error) []byte {
 	code := ""
 	switch {
+	case errors.Is(err, requestdrain.ErrDraining):
+		code = "SERVER_DRAINING"
 	case errors.Is(err, ErrCodingQuotaBusy):
 		code = "CODING_QUOTA_BUSY"
 	case errors.Is(err, ErrCodingQuotaExhausted):

@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -19,6 +20,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/handler"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/requestdrain"
 	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/setup"
 	"github.com/Wei-Shaw/sub2api/internal/web"
@@ -153,6 +155,8 @@ func runMainServer() {
 		log.Fatalf("Failed to initialize application: %v", err)
 	}
 	defer app.Cleanup()
+	drain := requestdrain.New()
+	app.Server.Handler = drain.Wrap(app.Server.Handler)
 	if app.OfficialPoints != nil {
 		app.OfficialPoints.Start(context.Background())
 		defer app.OfficialPoints.Stop()
@@ -188,10 +192,14 @@ func runMainServer() {
 
 	log.Println("Shutting down server...")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	grace := 90
+	if seconds, err := strconv.Atoi(os.Getenv("SUB2API_SHUTDOWN_GRACE_SECONDS")); err == nil && seconds > 0 && seconds <= 3600 {
+		grace = seconds
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(grace)*time.Second)
 	defer cancel()
 
-	if err := app.Server.Shutdown(ctx); err != nil {
+	if err := drain.ShutdownServer(ctx, app.Server, 15*time.Second); err != nil {
 		log.Printf("Server forced to shutdown: %v", err)
 	}
 

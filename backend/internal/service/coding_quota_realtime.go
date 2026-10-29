@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/requestdrain"
 	"log/slog"
 	"sync"
 	"time"
@@ -20,6 +21,7 @@ type codingRealtimeSession struct {
 	holds     []*CodingReservationHandle
 	closed    bool
 	executing bool
+	endRound  func()
 }
 
 func newCodingRealtimeSession(points *OfficialPointService, key *APIKey, account *Account, model string) *codingRealtimeSession {
@@ -35,7 +37,15 @@ func (s *codingRealtimeSession) Begin(ctx context.Context) error {
 	if s.closed {
 		return fmt.Errorf("realtime session closed")
 	}
-	if s.active != nil || s.points == nil || s.key == nil || s.key.Group == nil {
+	if s.active != nil || s.endRound != nil {
+		return nil
+	}
+	endRound, err := requestdrain.BeginRound(ctx)
+	if err != nil {
+		return err
+	}
+	s.endRound = endRound
+	if s.points == nil || s.key == nil || s.key.Group == nil {
 		return nil
 	}
 	purpose := PurposeOfGroup(s.key.Group.Platform, s.key.Group.UsageKind)
@@ -52,6 +62,8 @@ func (s *codingRealtimeSession) Begin(ctx context.Context) error {
 			slog.Error("coding_realtime_shadow_failed", "error", err)
 			return nil
 		}
+		s.endRound()
+		s.endRound = nil
 		return err
 	}
 	s.holds = append(s.holds, h)
@@ -59,6 +71,8 @@ func (s *codingRealtimeSession) Begin(ctx context.Context) error {
 	if err := h.MarkSent(ctx); err != nil {
 		h.Finish()
 		s.active = nil
+		s.endRound()
+		s.endRound = nil
 		return err
 	}
 	return nil
@@ -73,6 +87,10 @@ func (s *codingRealtimeSession) End() {
 	s.active.Finish()
 	s.active = nil
 	s.executing = false
+	if s.endRound != nil {
+		s.endRound()
+		s.endRound = nil
+	}
 }
 
 func (s *codingRealtimeSession) Close() *CodingReservationHandle {
@@ -84,6 +102,10 @@ func (s *codingRealtimeSession) Close() *CodingReservationHandle {
 	s.closed = true
 	for _, h := range s.holds {
 		h.Finish()
+	}
+	if s.endRound != nil {
+		s.endRound()
+		s.endRound = nil
 	}
 	if len(s.holds) == 0 {
 		return nil
