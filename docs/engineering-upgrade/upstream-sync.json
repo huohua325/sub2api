@@ -6,6 +6,7 @@
   "upstream_commit": "a3298b46ebe239fb0720b068a1eb3383955bdac2",
   "upstream_release": "v0.2.19",
   "fork_before_merge": "21bace0f4bc8c607b4154845f77ee39513e95f72",
+  "merge_commit": "ac3bb933b83e8eda16300ec8fe8ab7fdb6113b63",
   "fork_remote": "fork",
   "fork_branch": "lab/0.2.17",
   "merge_strategy": "merge-commit-no-squash",
@@ -13,5 +14,16 @@
   "changed_files": 39,
   "new_database_migrations": 0,
   "record": "docs/engineering-upgrade/UPSTREAM-SYNC-2026-10-29.md",
-  "runbook": "docs/engineering-upgrade/UPSTREAM-MERGE-RUNBOOK.md"
+  "runbook": "docs/engineering-upgrade/UPSTREAM-MERGE-RUNBOOK.md",
+  "deployment": {
+    "host": "172.104.117.114",
+    "version": "0.2.19-mile.20261029.upstream1",
+    "source_commit": "ac3bb933b83e8eda16300ec8fe8ab7fdb6113b63",
+    "reference_time": "2026-10-29T08:14:06.091752Z",
+    "backup_directory": "/opt/sub2api/backups/before-upstream-sync-20261029T081356Z",
+    "binary_sha256": "09021b8b696b7a7cd81a9457021a3a214d4503dc119f9a4dad6f78f30dabc2f6",
+    "openai_mode": "shadow",
+    "grok_mode": "shadow",
+    "shadow_started_at": "2026-10-28T09:00:11.898991Z"
+  }
 }
