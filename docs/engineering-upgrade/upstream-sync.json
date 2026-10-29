@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "upstream_repository": "https://github.com/Wei-Shaw/sub2api.git",
+  "upstream_branch": "main",
+  "previous_upstream_commit": "f178e5ae32659e8901644a9f2378a0439ffa36ae",
+  "upstream_commit": "a3298b46ebe239fb0720b068a1eb3383955bdac2",
+  "upstream_release": "v0.2.19",
+  "fork_before_merge": "21bace0f4bc8c607b4154845f77ee39513e95f72",
+  "fork_remote": "fork",
+  "fork_branch": "lab/0.2.17",
+  "merge_strategy": "merge-commit-no-squash",
+  "included_upstream_commits": 21,
+  "changed_files": 39,
+  "new_database_migrations": 0,
+  "record": "docs/engineering-upgrade/UPSTREAM-SYNC-2026-10-29.md",
+  "runbook": "docs/engineering-upgrade/UPSTREAM-MERGE-RUNBOOK.md"
+}

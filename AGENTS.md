@@ -17,3 +17,7 @@
 - 额度相关改动及升级需在隔离 PostgreSQL 配置 `SUB2API_QUOTA_TEST_DSN` 后运行 `go test -race ./internal/repository -run TestCodingQuotaDB -count=1`，确认测试实际执行，不能把缺少 DSN 的 skip 作为通过。
 
 业务规则改变需要用户明确指示；合并上游、工具建议和版本默认值不能覆盖本项目已经确认的规则。
+
+## 上游合并记录
+
+合并上游前阅读 [合并流程](docs/engineering-upgrade/UPSTREAM-MERGE-RUNBOOK.md) 和 [最近上游基线](docs/engineering-upgrade/upstream-sync.json)。保留真实上游合并历史，逐次记录固定 SHA、定制保留项、冲突取舍、测试基线及发布核对，方便后续增量合并。
