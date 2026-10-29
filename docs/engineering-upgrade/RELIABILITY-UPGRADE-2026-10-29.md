@@ -49,7 +49,29 @@ Grok `response.done` 在转发给客户端之后才结束该轮，避免排空�
 
 9 项既有失败为：`TestAuthIdentityFoundationSchemas`；`TestAllPlatformsIncludesEveryConcretePlatform`、`TestCompositeGroupSchedulerHasAllCanonicalPlatformBuckets`；`TestPgDumperHoldsMigrationLockThroughReaderClose`、`TestPgDumperReleasesMigrationLockWhenProcessFails`、`TestPgDumperReportsUnlockFailureAndDiscardsConnection`；`TestUsageLogRepositoryCreateSyncRequestTypeAndLegacyFields`、`TestUsageLogRepositoryCreate_PersistsServiceTier`、`TestPrepareUsageLogInsert_PersistsNativeCompactionV2WithoutChangingRequestType`。分类及既有基线见 [并发额度验收](QUOTA-CONTROL-ACCEPTANCE.md)。
 
-本地检查、失败复现、竞态结果、SQL 测量保存在忽略目录 `output/service-audit-20261029/`。发布记录另附；不能把本地检查等同于已部署。
+本地检查、失败复现、竞态结果、SQL 测量保存在忽略目录 `output/service-audit-20261029/`。
+
+## 发布包
+
+- 版本：`0.2.19-mile.20261029.reliability1`。
+- 修复提交：`9591c56e9`（观测和批量摘要）、`011172d0e1ac9589abc287dd336b3a3b620057b6`（退出及协议轮次）；已推送 fork 的 `lab/0.2.17`。
+- 构建完成时间：2026-10-29 23:43:56（北京时间）；Linux/amd64、嵌入资源构建，源码状态 `vcs.modified=false`。
+- 程序 SHA-256：`2b570b58616c9d111c11c4f8fb0adf2c4a4883a0fe64980799dff996a8026592`；125,640,864 字节，压缩后 39,027,152 字节。
+- 沿用上次上线确认的前端资源，194 个本地文件逐项哈希一致。构建前发现根目录遗留 dist 与线上不同，因此使用上一发布目录的已验证资源重新构建，避免夹带界面回退。
+
+## 线上发布核对
+
+2026-10-29 23:51（北京时间）已部署至 `172.104.117.114`，运行程序版本、源码提交及 SHA-256 与发布包一致。发布前持续有请求，第一次两分钟空闲等待未满足条件便安全退出；第二次延长观察，等到连续两次无有效在途预留后才停止旧进程。新版本的 90 秒排空并不作用于此次被替换的旧进程；空闲预留采样也不能证明所有协议连接均为空。
+
+- 私有备份：`/opt/sub2api/backups/before-reliability-20261029T155034Z`；包含旧程序、配置和数据、可列目录的 PostgreSQL 备份（5,144,542 字节）及固定参考时刻的前后核对记录。
+- 参考时刻：`2026-10-29T15:51:45.017045Z`。3 条已确认全体重置及全部重置事件、原钱包起点、纠正和对账分录逐项一致；5,130 条原请求保留，4,858 条原已结算／期初记录内容不变；全部预留、事件、计费任务和异步任务标识保留。
+- 同一参考时刻的个人周期一致，6 名存量用户 Codex 仍于 2026-11-04 14:35:59（北京时间）重置；Grok 维持原个人周期。没有修改此次用户要求不处理的历史误差，没有退款或新增重置。
+- 迁移数仍为 312，没有新增迁移；校准索引有效。Codex/Grok 都保持 `shadow`，原有各 1 条待核实记录保留，不为了启用条件而清空。
+- Docker 停止期限实测 120 秒，程序排空配置为默认 90 秒。应用和 MemSlides 健康接口均返回 200。
+- 公网 `/health`、`/login`、`/api/v1/settings/public` 返回 200；16 个重点静态资源与已验证前端构建逐项哈希一致。
+- 发布后短时核对：17 条新持久计费任务已应用，未记录重试错误；这是上线快照，不能替代持续观察。Codex/Grok 的可信观测时间分别为当时的 23:52:00／23:50:02，与各自结算游标区分，未回写游标来伪造新鲜度。
+
+本地发布证据位于 `output/releases/mile-20261029-reliability1/`：`manifest.json`、`deployment.json`、`server-verification.json`、`public-verification.json`。PowerShell 把 Compose 的标准错误进度文字标为 `NativeCommandError`；远端脚本已写出成功发布记录，并另行以版本、程序哈希、数据库不变量和健康检查确认，未将该包装层状态冒充发布失败或忽略实际异常。
 
 ## 回退
 
