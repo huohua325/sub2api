@@ -152,6 +152,27 @@ func (s *OfficialPointService) CardsForUser(ctx context.Context, userID int64) m
 
 // CardsForUserStored reads the durable personal ledger in production.
 func (s *OfficialPointService) CardsForUserStored(ctx context.Context, userID int64) map[string]OfficialPointResult {
+	if s != nil {
+		if ledger, ok := s.store.(CodingQuotaLedger); ok {
+			now := time.Now().UTC()
+			if s.now != nil {
+				now = s.now()
+			}
+			cards := map[string]OfficialPointResult{
+				PurposeOpenAI: {Blocked: true, DataStatus: "error"}, PurposeGrok: {Blocked: true, DataStatus: "error"},
+			}
+			readings, err := ledger.ReadCodingQuotas(ctx, []int64{userID}, now)
+			if err != nil {
+				return cards
+			}
+			budget := s.Budget(ctx)
+			for _, reading := range readings {
+				cards[reading.Purpose] = codingQuotaResult(reading, budget.ForPurpose(reading.Purpose))
+			}
+			s.applyCodingActivitiesForReadings(ctx, userID, now, cards, readings)
+			return cards
+		}
+	}
 	cards := s.pointsForUser(ctx, userID, false)
 	if s != nil {
 		s.applyCodingActivities(ctx, userID, time.Now().UTC(), cards)
@@ -307,7 +328,13 @@ func (s *OfficialPointService) ApplyMonitor(ctx context.Context, view *UsageMoni
 		}
 		summaries := map[int64]map[string]CodingReservationSummary{}
 		if store, ok := s.store.(CodingSummaryStore); ok {
-			rows, summaryErr := store.ReadCodingReservationSummaries(ctx, ids, view.GeneratedAt)
+			var rows []CodingReservationSummary
+			var summaryErr error
+			if batch, ok := s.store.(CodingSummaryReadingStore); ok && err == nil {
+				rows, summaryErr = batch.ReadCodingReservationSummariesForReadings(ctx, readings, view.GeneratedAt)
+			} else {
+				rows, summaryErr = store.ReadCodingReservationSummaries(ctx, ids, view.GeneratedAt)
+			}
 			if summaryErr == nil {
 				for _, v := range rows {
 					if summaries[v.UserID] == nil {

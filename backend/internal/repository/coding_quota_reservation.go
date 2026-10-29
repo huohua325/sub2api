@@ -116,9 +116,9 @@ func (r *UsageMonitorRepository) ReserveCodingQuota(ctx context.Context, in serv
 	var rate sql.NullString
 	var observed, end sql.NullTime
 	var samples int
-	err = tx.QueryRowContext(ctx, `SELECT m.points_per_weight::text,m.observed_at,m.window_end,
+	err = tx.QueryRowContext(ctx, `SELECT m.points_per_weight::text,`+codingTrustedObservationSQL+`,m.window_end,
  (SELECT count(*) FROM coding_quota_requests q WHERE q.account_id=m.account_id AND q.state='settled' AND q.official_window_end BETWEEN m.window_end-INTERVAL '5 minutes' AND m.window_end+INTERVAL '5 minutes')
- FROM coding_quota_meters m WHERE m.account_id=$1 AND m.purpose=$2`, in.AccountID, in.Purpose).Scan(&rate, &observed, &end, &samples)
+ FROM coding_quota_meters m WHERE m.account_id=$1 AND m.purpose=$2`, in.AccountID, in.Purpose, in.Now).Scan(&rate, &observed, &end, &samples)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return out, err
 	}
@@ -127,6 +127,20 @@ func (r *UsageMonitorRepository) ReserveCodingQuota(ctx context.Context, in serv
 	reliable := we == nil && weight.IsPositive() && re == nil && multiplier.IsPositive() && samples >= in.MinSamples && observed.Valid && !observed.Time.After(in.Now.Add(time.Minute)) && in.Now.Sub(observed.Time) <= in.MaxAge && end.Valid && end.Time.After(in.Now) && unknown == 0
 	var estimate any
 	reason := "uncalibrated"
+	switch {
+	case !end.Valid || !end.Time.After(in.Now):
+		reason = "window_unknown"
+	case !observed.Valid || observed.Time.After(in.Now.Add(time.Minute)) || in.Now.Sub(observed.Time) > in.MaxAge:
+		reason = "observation_stale"
+	case re != nil || !multiplier.IsPositive():
+		reason = "rate_unknown"
+	case samples < in.MinSamples:
+		reason = "insufficient_samples"
+	case we != nil || !weight.IsPositive():
+		reason = "estimate_unknown"
+	case unknown > 0:
+		reason = "uncertain_inflight"
+	}
 	mode := "single"
 	allowed := active == 0
 	if we == nil && weight.IsPositive() && re == nil && multiplier.IsPositive() && end.Valid && end.Time.After(in.Now) {

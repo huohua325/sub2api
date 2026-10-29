@@ -54,6 +54,13 @@ func (s *OfficialPointService) BeginCodingReservation(ctx context.Context, in Co
 	if in.StartedAt.IsZero() {
 		in.StartedAt = in.Now
 	}
+	minSamples, maxAge := CodingCalibrationLimits()
+	if in.MinSamples <= 0 {
+		in.MinSamples = minSamples
+	}
+	if in.MaxAge <= 0 {
+		in.MaxAge = maxAge
+	}
 	if in.Limit == "" {
 		in.Limit = s.Budget(ctx).ForPurpose(in.Purpose)
 	}

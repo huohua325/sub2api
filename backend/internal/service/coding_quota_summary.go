@@ -2,8 +2,9 @@ package service
 
 import (
 	"context"
-	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"time"
+
+	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 )
 
 // CodingReservationSummary is administrator-only. Student responses expose only
@@ -40,11 +41,21 @@ func (s *UsageMonitorService) ListCodingReservations(ctx context.Context, q Codi
 }
 
 func (s *OfficialPointService) applyCodingActivities(ctx context.Context, user int64, now time.Time, cards map[string]OfficialPointResult) {
+	s.applyCodingActivitiesForReadings(ctx, user, now, cards, nil)
+}
+
+func (s *OfficialPointService) applyCodingActivitiesForReadings(ctx context.Context, user int64, now time.Time, cards map[string]OfficialPointResult, readings []CodingQuotaReading) {
 	store, ok := s.store.(CodingSummaryStore)
 	if !ok {
 		return
 	}
-	rows, err := store.ReadCodingReservationSummaries(ctx, []int64{user}, now)
+	var rows []CodingReservationSummary
+	var err error
+	if batch, ok := s.store.(CodingSummaryReadingStore); ok && readings != nil {
+		rows, err = batch.ReadCodingReservationSummariesForReadings(ctx, readings, now)
+	} else {
+		rows, err = store.ReadCodingReservationSummaries(ctx, []int64{user}, now)
+	}
 	if err != nil {
 		for purpose, card := range cards {
 			card.ActivityStatus = "unavailable"
@@ -61,6 +72,11 @@ func (s *OfficialPointService) applyCodingActivities(ctx context.Context, user i
 
 type CodingSummaryStore interface {
 	ReadCodingReservationSummaries(context.Context, []int64, time.Time) ([]CodingReservationSummary, error)
+}
+
+// CodingSummaryReadingStore avoids rereading a ledger already loaded at now.
+type CodingSummaryReadingStore interface {
+	ReadCodingReservationSummariesForReadings(context.Context, []CodingQuotaReading, time.Time) ([]CodingReservationSummary, error)
 }
 
 func (v CodingReservationSummary) ActivityStatus() string {

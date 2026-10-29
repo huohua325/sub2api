@@ -70,6 +70,11 @@ func codingPositiveEnv(key string, fallback int) int {
 	return n
 }
 
+// CodingCalibrationLimits is shared by admission and diagnostics.
+func CodingCalibrationLimits() (int, time.Duration) {
+	return codingPositiveEnv("SUB2API_CODING_QUOTA_MIN_SAMPLES", 20), time.Duration(codingPositiveEnv("SUB2API_CODING_QUOTA_MAX_AGE_SECONDS", 1200)) * time.Second
+}
+
 func prepareCodingRequest(ctx context.Context, c *gin.Context, points *OfficialPointService, billing *BillingService, account *Account, body []byte) (context.Context, error) {
 	if points == nil || c == nil || account == nil {
 		return ctx, nil
