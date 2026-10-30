@@ -117,7 +117,9 @@ func (r *UsageMonitorRepository) ReserveCodingQuota(ctx context.Context, in serv
 	var observed, end sql.NullTime
 	var samples int
 	err = tx.QueryRowContext(ctx, `SELECT m.points_per_weight::text,`+codingTrustedObservationSQL+`,m.window_end,
- (SELECT count(*) FROM coding_quota_requests q WHERE q.account_id=m.account_id AND q.state='settled' AND q.official_window_end BETWEEN m.window_end-INTERVAL '5 minutes' AND m.window_end+INTERVAL '5 minutes')
+ (SELECT count(*) FROM coding_quota_requests q WHERE q.account_id=m.account_id AND q.state='settled'
+ AND q.started_at>=COALESCE(m.calibration_started_at,'-infinity'::timestamptz)
+ AND q.official_window_end BETWEEN m.window_end-INTERVAL '5 minutes' AND m.window_end+INTERVAL '5 minutes')
  FROM coding_quota_meters m WHERE m.account_id=$1 AND m.purpose=$2`, in.AccountID, in.Purpose, in.Now).Scan(&rate, &observed, &end, &samples)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return out, err

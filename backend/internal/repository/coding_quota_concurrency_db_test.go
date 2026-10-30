@@ -78,7 +78,7 @@ func TestCodingQuotaDBConcurrentCalibrationRepricesPending(t *testing.T) {
 func TestCodingQuotaDBNewOfficialWindowDoesNotReuseOldCalibration(t *testing.T) {
 	db, r, base := quotaTestDB(t, "")
 	ctx := context.Background()
-	end := base.Add(7 * 24 * time.Hour)
+	end := base.Add(6 * 24 * time.Hour)
 	quotaObserve(t, r, 10, base, end, "50")
 	require.NoError(t, r.ReconcileCodingQuota(ctx, base))
 	quotaRequest(t, db, "old-window", 1, 10, base.Add(time.Minute), "0.01", "openai")

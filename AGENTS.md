@@ -6,6 +6,7 @@
 [Codex 全体异常重置规范](docs/engineering-upgrade/CODEX-GLOBAL-RESET-RUNBOOK.md)。
 
 - 正常 Codex 周期沿用注册／旧钱包起点，每 168 小时更新；不得自行改成首次使用、最近访问或部署时间。
+- 官方扩大母账号容量不等于个人补额度或全体重置。已入账消耗及个人周期保留；扩容前后分别校准倍率，不能用新倍率重算扩容前的历史消耗。`coding_quota_capacity_events` 是经核实、幂等、不可改写的持久审计数据，升级及回退须保留；未确认的百分比下降不能自动当成扩容。参见 [扩容计量与同步记录](docs/engineering-upgrade/CAPACITY-AND-UPSTREAM-2026-10-30.md)。
 - 已确认的 OpenAI 官方全体异常重置，从事件实际发生时间建立新的 Codex 七天周期；保留事件后的消耗，已耗尽用户继续拦截。Grok、API 实验不跟随重置。
 - `coding_quota_reset_events` 中的已确认事件、`coding_quota_requests` 账本和原钱包起点是持久业务数据。升级、重启、换程序、缓存重建不能删除、覆盖或重新初始化这些数据，也不能重新创建一个以部署时间起算的同类事件。
 - 历史对账用 `coding_quota_reconciliations`／`coding_quota_corrections` 追加有证据关联的纠正分录，原始请求和扣点保持不变；两张审计表必须随账本保留。同一请求不能重复退款，纠正归属原请求周期，不得以纠正时间补额度或重启周期。

@@ -137,8 +137,12 @@ func recordCodingQuotaCharge(ctx context.Context, tx *sql.Tx, cmd *service.Usage
 	}
 	_, err = tx.ExecContext(ctx, `INSERT INTO coding_quota_requests(request_id,api_key_id,user_id,purpose,account_id,
  started_at,completed_at,official_window_end,weight,estimated_points,state)
- VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,COALESCE((SELECT points_per_weight FROM coding_quota_meters WHERE account_id=$5
- AND ($8::timestamptz IS NULL OR ABS(EXTRACT(EPOCH FROM(window_end-$8::timestamptz)))<=300)),0)*$9,$10)
+ VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,COALESCE((SELECT CASE WHEN $6<calibration_started_at THEN
+ (SELECT previous_rate FROM coding_quota_capacity_events e WHERE e.account_id=$5 AND e.purpose=$4 AND e.effective_at>$6
+ AND e.window_end BETWEEN m.window_end-INTERVAL '5 minutes' AND m.window_end+INTERVAL '5 minutes' ORDER BY e.effective_at LIMIT 1)
+ ELSE points_per_weight END FROM coding_quota_meters m WHERE account_id=$5
+ AND ($8::timestamptz IS NULL OR ABS(EXTRACT(EPOCH FROM(window_end-$8::timestamptz)))<=300)),0)*$9,
+ CASE WHEN EXISTS(SELECT 1 FROM coding_quota_meters WHERE account_id=$5 AND $6<calibration_started_at) THEN 'unmetered' ELSE $10 END)
  ON CONFLICT(request_id,api_key_id) DO NOTHING`, cmd.RequestID, cmd.APIKeyID, cmd.UserID, purpose, v.AccountID,
 		v.StartedAt.UTC(), v.CompletedAt.UTC(), window, weight.String(), state)
 	return err
@@ -235,6 +239,13 @@ func (r *UsageMonitorRepository) reconcileCodingObservation(ctx context.Context,
 			moved = -moved
 		}
 		switch {
+		case moved > 5*time.Minute && v.Purpose == service.PurposeOpenAI && v.ObservedAt.Before(m.WindowEnd) &&
+			(v.WindowEnd.Add(-7*24*time.Hour).Before(m.ObservedAt.Add(-5*time.Minute)) ||
+				v.WindowEnd.Add(-7*24*time.Hour).After(v.ObservedAt.Add(time.Minute))):
+			// A new weekly cycle must have started since our last trustworthy
+			// counter. A drifting reset-after header cannot erase the high-water
+			// mark of an ongoing week, even if the drift persists or later returns.
+			err = nil
 		case moved <= 5*time.Minute && p.LessThan(m.Used):
 			// Concurrent upstream replicas can report a lower cumulative value
 			// with a newer HTTP Date. Preserve the high-water mark and interval
@@ -257,7 +268,7 @@ func (r *UsageMonitorRepository) reconcileCodingObservation(ctx context.Context,
 				}
 			}
 			evidence, _ := json.Marshal(map[string]any{"account_id": v.AccountID, "before": m.Used.String(), "after": p.String(), "previous_reset": m.WindowEnd, "new_reset": v.WindowEnd, "observed_at": v.ObservedAt, "source": v.Source})
-			_, err = tx.ExecContext(ctx, `UPDATE coding_quota_meters SET window_end=$2,observed_at=$3,used=$4,points_per_weight=NULL,
+			_, err = tx.ExecContext(ctx, `UPDATE coding_quota_meters SET window_end=$2,observed_at=$3,used=$4,points_per_weight=NULL,calibration_started_at=NULL,
  anomaly_at=CASE WHEN $5 THEN $3 ELSE anomaly_at END,anomaly_evidence=CASE WHEN $5 THEN $6::jsonb ELSE anomaly_evidence END,updated_at=NOW() WHERE account_id=$1`, v.AccountID, v.WindowEnd, v.ObservedAt, v.Used, abnormal, string(evidence))
 			if err != nil {
 				return err
@@ -284,6 +295,7 @@ func (r *UsageMonitorRepository) reconcileCodingObservation(ctx context.Context,
 func settleCodingIncrement(ctx context.Context, tx *sql.Tx, v service.OfficialQuotaObservation, m codingMeter, delta decimal.Decimal) error {
 	rows, err := tx.QueryContext(ctx, `SELECT id,weight::text FROM coding_quota_requests WHERE account_id=$1 AND state='pending'
  AND completed_at>$2 AND completed_at<=$3 AND (official_window_end IS NULL OR ABS(EXTRACT(EPOCH FROM(official_window_end-$4::timestamptz)))<=300)
+ AND started_at>=COALESCE((SELECT calibration_started_at FROM coding_quota_meters WHERE account_id=$1),'-infinity'::timestamptz)
  ORDER BY id FOR UPDATE`, v.AccountID, m.ObservedAt, v.ObservedAt, v.WindowEnd)
 	if err != nil {
 		return err
@@ -335,6 +347,7 @@ func refreshCodingCalibration(ctx context.Context, tx *sql.Tx, accountID int64, 
  FROM (SELECT ROUND(SUM(q.points+COALESCE(c.delta,0))/NULLIF(SUM(q.weight),0),12) AS rate
  FROM coding_quota_requests q LEFT JOIN coding_quota_corrections c ON c.request_row_id=q.id
  WHERE q.account_id=$1 AND q.state='settled'
+ AND q.started_at>=COALESCE((SELECT calibration_started_at FROM coding_quota_meters WHERE account_id=$1),'-infinity'::timestamptz)
  AND q.official_window_end BETWEEN $2::timestamptz-INTERVAL '5 minutes' AND $2::timestamptz+INTERVAL '5 minutes') s
  WHERE m.account_id=$1 AND m.points_per_weight IS DISTINCT FROM s.rate`, accountID, windowEnd)
 	if err != nil {
@@ -343,7 +356,8 @@ func refreshCodingCalibration(ctx context.Context, tx *sql.Tx, accountID int64, 
 	_, err = tx.ExecContext(ctx, `UPDATE coding_quota_requests q SET
  estimated_points=q.weight*COALESCE(m.points_per_weight,0),updated_at=NOW()
  FROM coding_quota_meters m WHERE m.account_id=$1 AND q.account_id=m.account_id
- AND q.state IN('pending','unmetered')
+ AND q.state='pending'
+ AND q.started_at>=COALESCE(m.calibration_started_at,'-infinity'::timestamptz)
  AND (q.official_window_end IS NULL OR ABS(EXTRACT(EPOCH FROM(q.official_window_end-m.window_end)))<=300)
  AND q.estimated_points IS DISTINCT FROM ROUND(q.weight*COALESCE(m.points_per_weight,0),8)`, accountID)
 	return err

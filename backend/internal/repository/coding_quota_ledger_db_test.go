@@ -72,6 +72,9 @@ func quotaTestDB(t *testing.T, seed string) (*sql.DB, *UsageMonitorRepository, t
 	asyncJobs, err := migrations.FS.ReadFile("258_coding_quota_async_jobs.sql")
 	require.NoError(t, err)
 	require.NoError(t, applyMigrationsFS(context.Background(), db, fstest.MapFS{"258_coding_quota_async_jobs.sql": &fstest.MapFile{Data: asyncJobs}}))
+	capacity, err := migrations.FS.ReadFile("259_coding_quota_capacity_events.sql")
+	require.NoError(t, err)
+	require.NoError(t, applyMigrationsFS(context.Background(), db, fstest.MapFS{"259_coding_quota_capacity_events.sql": &fstest.MapFile{Data: capacity}}))
 	var base time.Time
 	require.NoError(t, db.QueryRow(`SELECT window_start FROM user_purpose_allowances WHERE user_id=1 AND purpose='openai'`).Scan(&base))
 	return db, NewUsageMonitorRepository(db), base
@@ -287,7 +290,7 @@ func TestCodingQuotaDBWholePoolDetection(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			db, r, base := quotaTestDB(t, "")
 			ctx := context.Background()
-			end := base.Add(7 * 24 * time.Hour)
+			end := base.Add(6 * 24 * time.Hour)
 			accounts := []int64{10, 20}
 			if tc.single {
 				_, err := db.Exec(`DELETE FROM account_groups WHERE account_id=20`)
