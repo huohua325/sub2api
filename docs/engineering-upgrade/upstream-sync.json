@@ -27,5 +27,14 @@
     "shadow_started_at": "2026-10-28T09:00:11.898991Z",
     "migration_count": 314,
     "capacity_event_id": "operator:openai-capacity:account5:2026-10-29T17:05:39Z"
+  },
+  "last_upstream_check": {
+    "checked_at": "2026-11-01T05:30:41Z",
+    "upstream_commit": "d851a38477597157e78450d30af2d8504764d085",
+    "upstream_release": "v0.2.19",
+    "fork_commit_at_check": "9af38c8eaa464b27278b977344fac8307dd5e912",
+    "missing_upstream_commits": 0,
+    "action": "already-current-no-merge-or-deploy",
+    "record": "docs/engineering-upgrade/UPSTREAM-CHECK-2026-11-01.md"
   }
 }
