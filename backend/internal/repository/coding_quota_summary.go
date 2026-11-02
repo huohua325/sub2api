@@ -32,11 +32,11 @@ func (r *UsageMonitorRepository) ReadCodingReservationSummariesForReadings(ctx c
 		starts = append(starts, v.Start)
 		ends = append(ends, v.End)
 	}
-	rows, err := r.db.QueryContext(ctx, `WITH wanted AS (
+	rows, err := r.db.QueryContext(ctx, `WITH RECURSIVE `+codingCapacityCTE("$3::timestamptz")+`, wanted AS (
  SELECT * FROM unnest($1::bigint[],$2::text[],$4::timestamptz[],$5::timestamptz[]) AS w(user_id,purpose,start_at,end_at)
 ), reservations AS (
  SELECT w.user_id,w.purpose,
- COALESCE(SUM(r.estimated_points) FILTER(WHERE r.started_at>=w.start_at AND r.started_at<w.end_at),0)::text reserved,
+ COALESCE(ROUND(SUM(r.estimated_points/`+codingCapacityFactorSQL("r.account_id", "r.purpose", codingReservationBasisSQL("$3::timestamptz"))+`) FILTER(WHERE r.started_at>=w.start_at AND r.started_at<w.end_at),8),0)::text reserved,
  COUNT(*) FILTER(WHERE r.state IN('reserved','sent','handoff')) active,
  COUNT(*) FILTER(WHERE r.state='unresolved' AND r.started_at>=w.start_at AND r.started_at<w.end_at) unresolved
  FROM wanted w JOIN coding_quota_reservations r USING(user_id,purpose)
@@ -46,7 +46,7 @@ func (r *UsageMonitorRepository) ReadCodingReservationSummariesForReadings(ctx c
  FROM coding_quota_billing_tasks t JOIN coding_quota_reservations r ON r.id=t.reservation_id
  JOIN wanted w USING(user_id,purpose) WHERE t.state<>'applied' GROUP BY r.user_id,r.purpose
 ), corrections AS (
- SELECT w.user_id,w.purpose,SUM(c.delta)::text delta FROM wanted w
+ SELECT w.user_id,w.purpose,ROUND(SUM(c.delta/`+codingCapacityFactorSQL("q.account_id", "q.purpose", "q.started_at")+`),8)::text delta FROM wanted w
  JOIN coding_quota_requests q ON q.user_id=w.user_id AND q.purpose=w.purpose AND q.started_at>=w.start_at AND q.started_at<w.end_at
  JOIN coding_quota_corrections c ON c.request_row_id=q.id GROUP BY w.user_id,w.purpose
 ), latest AS (

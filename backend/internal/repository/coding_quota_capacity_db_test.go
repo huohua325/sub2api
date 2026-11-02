@@ -30,8 +30,8 @@ func TestCodingQuotaDBCapacityChangeKeepsHistoryAndStartsNewCalibration(t *testi
 	after := quotaUsed(t, r, 2, base.Add(6*time.Minute), "openai")
 	require.Equal(t, before.Start, after.Start)
 	require.Equal(t, before.End, after.End)
-	require.Equal(t, "1.00000000", after.Pending, "old usage must not be repriced to 0.5 after capacity doubles")
-	require.Equal(t, "2.00000000", quotaUsed(t, r, 1, base.Add(time.Hour), "openai").Used, "old settled 1 + new settled 1")
+	require.Equal(t, "0.50000000", after.Pending, "old estimate is expressed in the doubled capacity without rewriting its source")
+	require.Equal(t, "1.50000000", quotaUsed(t, r, 1, base.Add(time.Hour), "openai").Used, "old settled 1/2 + new settled 1")
 	var rate string
 	require.NoError(t, db.QueryRow(`SELECT points_per_weight::text FROM coding_quota_meters WHERE account_id=10`).Scan(&rate))
 	require.Equal(t, "0.250000000000", rate, "old and new capacity samples must not mix")
@@ -40,13 +40,13 @@ func TestCodingQuotaDBCapacityChangeKeepsHistoryAndStartsNewCalibration(t *testi
 	require.Equal(t, 1, reservation.SampleCount)
 	require.False(t, reservation.Reliable, "one sample on either side of expansion is not two post-expansion samples")
 	quotaRequest(t, db, "new-estimate", 2, 10, base.Add(7*time.Minute), "4", "openai")
-	require.Equal(t, "2.00000000", quotaUsed(t, r, 2, base.Add(time.Hour), "openai").Pending)
+	require.Equal(t, "1.50000000", quotaUsed(t, r, 2, base.Add(time.Hour), "openai").Pending)
 	// A retry after new usage must neither rewind the raw counter nor grant usage.
 	require.NoError(t, NewUsageMonitorRepository(db).ConfirmCodingCapacityChange(ctx, change))
 	var raw string
 	require.NoError(t, db.QueryRow(`SELECT used::text FROM coding_quota_meters WHERE account_id=10`).Scan(&raw))
 	require.Equal(t, "17.00000000", raw)
-	require.Equal(t, "2.00000000", quotaUsed(t, r, 1, base.Add(time.Hour), "openai").Used)
+	require.Equal(t, "1.50000000", quotaUsed(t, r, 1, base.Add(time.Hour), "openai").Used)
 	change.Factor = "3"
 	require.Error(t, r.ConfirmCodingCapacityChange(ctx, change), "stable event IDs cannot be reused with edited evidence")
 	events, err := r.ListCodingResets(ctx)

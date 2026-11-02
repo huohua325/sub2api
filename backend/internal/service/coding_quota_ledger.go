@@ -41,6 +41,17 @@ type CodingQuotaReading struct {
 	End            time.Time
 	UpdatedAt      time.Time
 	ResetReason    string
+	Accounts       []CodingQuotaAccountReading
+}
+
+// CodingQuotaAccountReading is the same personal-period projection grouped by
+// parent, so monitor attribution and the wallet cannot use different formulas.
+type CodingQuotaAccountReading struct {
+	AccountID      int64  `json:"account_id"`
+	Used           string `json:"used"`
+	Pending        string `json:"pending"`
+	PendingCount   int    `json:"pending_count"`
+	UnmeteredCount int    `json:"unmetered_count"`
 }
 
 // OfficialQuotaObservation is a cumulative reading, never a per-request charge.

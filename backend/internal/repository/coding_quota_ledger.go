@@ -26,8 +26,13 @@ type codingQuotaQueryer interface {
 }
 
 func readCodingQuotas(ctx context.Context, db codingQuotaQueryer, users []int64, now time.Time) ([]service.CodingQuotaReading, error) {
+	return readCodingQuotasAt(ctx, db, users, now, now)
+}
+
+func readCodingQuotasAt(ctx context.Context, db codingQuotaQueryer, users []int64, periodAt, capacityAt time.Time) ([]service.CodingQuotaReading, error) {
+	factor := codingCapacityFactorSQL("q.account_id", "q.purpose", "q.started_at")
 	rows, err := db.QueryContext(ctx, `
-WITH anchors AS (
+WITH RECURSIVE `+codingCapacityCTE("$3::timestamptz")+`, anchors AS (
  SELECT u.id,p.purpose,GREATEST(COALESCE(a.window_start,u.created_at),
    CASE WHEN p.purpose='openai' THEN COALESCE((SELECT MAX(effective_at) FROM coding_quota_reset_events
      WHERE status='confirmed' AND effective_at<=$2),'-infinity'::timestamptz) ELSE '-infinity'::timestamptz END) AS anchor,
@@ -42,15 +47,22 @@ WITH anchors AS (
 )
 SELECT w.id,w.purpose,w.start,w.start+INTERVAL '168 hours',w.reason,
  COALESCE(q.used,0)::text,COALESCE(q.pending,0)::text,COALESCE(q.pending_count,0),
- COALESCE(q.unmetered_count,0),COALESCE(q.imported,FALSE),q.updated_at
+ COALESCE(q.unmetered_count,0),COALESCE(q.imported,FALSE),q.updated_at,COALESCE(q.accounts,'[]'::jsonb)
 FROM windows w LEFT JOIN LATERAL(
- SELECT SUM(q.points+COALESCE(c.delta,0)) AS used,SUM(q.estimated_points) FILTER(WHERE q.state IN('pending','unmetered')) AS pending,
- COUNT(*) FILTER(WHERE q.state='pending') AS pending_count,COUNT(*) FILTER(WHERE q.state='unmetered') AS unmetered_count,
- BOOL_OR(q.state='imported') AS imported,MAX(GREATEST(q.updated_at,c.created_at)) AS updated_at
+ SELECT SUM(a.used) used,SUM(a.pending) pending,SUM(a.pending_count) pending_count,SUM(a.unmetered_count) unmetered_count,
+ BOOL_OR(a.imported) imported,MAX(a.updated_at) updated_at,
+ jsonb_agg(jsonb_build_object('account_id',a.account_id,'used',a.used::text,'pending',a.pending::text,
+ 'pending_count',a.pending_count,'unmetered_count',a.unmetered_count) ORDER BY a.account_id) FILTER(WHERE a.account_id IS NOT NULL) accounts
+ FROM (
+ SELECT q.account_id,ROUND(SUM((q.points+COALESCE(c.delta,0))/`+factor+`),8) used,
+ ROUND(COALESCE(SUM((`+codingProjectedEstimateSQL("$3::timestamptz")+`)/`+factor+`) FILTER(WHERE q.state IN('pending','unmetered')),0),8) pending,
+ COUNT(*) FILTER(WHERE q.state='pending') pending_count,COUNT(*) FILTER(WHERE q.state='unmetered') unmetered_count,
+ BOOL_OR(q.state='imported') imported,MAX(GREATEST(q.updated_at,c.created_at)) updated_at
  FROM coding_quota_requests q LEFT JOIN coding_quota_corrections c ON c.request_row_id=q.id
- WHERE q.user_id=w.id AND q.purpose=w.purpose
- AND q.started_at>=w.start AND q.started_at<w.start+INTERVAL '168 hours'
-) q ON TRUE ORDER BY w.id,w.purpose`, pq.Array(users), now.UTC())
+ LEFT JOIN coding_quota_meters m ON m.account_id=q.account_id AND m.purpose=q.purpose
+ WHERE q.user_id=w.id AND q.purpose=w.purpose AND q.started_at>=w.start AND q.started_at<w.start+INTERVAL '168 hours'
+ GROUP BY q.account_id) a
+) q ON TRUE ORDER BY w.id,w.purpose`, pq.Array(users), periodAt.UTC(), capacityAt.UTC())
 	if err != nil {
 		return nil, err
 	}
@@ -59,8 +71,12 @@ FROM windows w LEFT JOIN LATERAL(
 	for rows.Next() {
 		var v service.CodingQuotaReading
 		var updatedAt sql.NullTime
+		var accounts []byte
 		if err := rows.Scan(&v.UserID, &v.Purpose, &v.Start, &v.End, &v.ResetReason, &v.Used, &v.Pending,
-			&v.PendingCount, &v.UnmeteredCount, &v.Imported, &updatedAt); err != nil {
+			&v.PendingCount, &v.UnmeteredCount, &v.Imported, &updatedAt, &accounts); err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal(accounts, &v.Accounts); err != nil {
 			return nil, err
 		}
 		if updatedAt.Valid {

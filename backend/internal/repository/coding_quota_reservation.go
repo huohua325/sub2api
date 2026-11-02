@@ -81,7 +81,7 @@ func (r *UsageMonitorRepository) ReserveCodingQuota(ctx context.Context, in serv
 	if err == nil && oldState != "reserved" && oldState != "sent" {
 		return out, fmt.Errorf("reservation is already %s", oldState)
 	}
-	readings, err := readCodingQuotas(ctx, tx, []int64{in.UserID}, in.StartedAt)
+	readings, err := readCodingQuotasAt(ctx, tx, []int64{in.UserID}, in.StartedAt, in.Now)
 	if err != nil {
 		return out, err
 	}
@@ -105,11 +105,12 @@ func (r *UsageMonitorRepository) ReserveCodingQuota(ctx context.Context, in serv
 	}
 	var reserved string
 	var active, unknown, unresolved int
-	err = tx.QueryRowContext(ctx, `SELECT COALESCE(SUM(estimated_points) FILTER(WHERE started_at>=$3 AND started_at<$4),0)::text,
+	err = tx.QueryRowContext(ctx, `WITH RECURSIVE `+codingCapacityCTE("$6::timestamptz")+`
+ SELECT COALESCE(ROUND(SUM(r.estimated_points/`+codingCapacityFactorSQL("r.account_id", "r.purpose", codingReservationBasisSQL("$6::timestamptz"))+`) FILTER(WHERE started_at>=$3 AND started_at<$4),8),0)::text,
  COUNT(*) FILTER(WHERE state IN('reserved','sent','handoff')),
  COUNT(*) FILTER(WHERE (state='unresolved' OR NOT reliable OR estimated_points IS NULL) AND started_at>=$3 AND started_at<$4),
  COUNT(*) FILTER(WHERE state='unresolved' AND started_at>=$3 AND started_at<$4)
- FROM coding_quota_reservations WHERE user_id=$1 AND purpose=$2 AND id<>$5 AND state IN('reserved','sent','handoff','unresolved')`, in.UserID, in.Purpose, reading.Start, reading.End, in.ID).Scan(&reserved, &active, &unknown, &unresolved)
+ FROM coding_quota_reservations r WHERE user_id=$1 AND purpose=$2 AND id<>$5 AND state IN('reserved','sent','handoff','unresolved')`, in.UserID, in.Purpose, reading.Start, reading.End, in.ID, in.Now).Scan(&reserved, &active, &unknown, &unresolved)
 	if err != nil {
 		return out, err
 	}
