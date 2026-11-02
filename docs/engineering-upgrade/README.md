@@ -10,6 +10,8 @@
 
 Codex 扩容后的个人点数、母账号分摊与历史未核实估算核对见 [QUOTA-CAPACITY-VALIDATION-2026-11-02.md](QUOTA-CAPACITY-VALIDATION-2026-11-02.md)。
 
+实际消耗不变、原始账本保留与按当前容量折算点数的定义见 [QUOTA-CAPACITY-UNITS.md](QUOTA-CAPACITY-UNITS.md)；文中明确区分约定澄清与线上实现状态。
+
 当前学员额度公式、重置时钟及已确认问题见 [QUOTA-AUDIT.md](QUOTA-AUDIT.md)。
 
 个人独立周期、Codex 50/Grok 30 点及全体异常重置的改造分析见 [QUOTA-REDESIGN.md](QUOTA-REDESIGN.md)。
