@@ -408,8 +408,28 @@ func applyMonitorCapacityAccounts(view *UsageMonitorView, readings []CodingQuota
 		return
 	}
 	parents := make(map[int64]*UsageMonitorParent, len(view.Parents))
+	known := make(map[int64]map[string]bool, len(readings))
+	for _, reading := range readings {
+		if known[reading.UserID] == nil {
+			known[reading.UserID] = make(map[string]bool)
+		}
+		known[reading.UserID][reading.Purpose] = true
+	}
 	for i := range view.Parents {
-		parents[view.Parents[i].AccountID] = &view.Parents[i]
+		parent := &view.Parents[i]
+		parents[parent.AccountID] = parent
+		for j := range parent.Users {
+			row := &parent.Users[j]
+			row.LedgerStatus = "error"
+			if known[row.UserID][parent.Purpose] {
+				// A personal rollover can leave official-window costs but no
+				// current personal requests. Its attribution is zero, not a fee share.
+				row.LedgerPoints = stringPtr("0.00000000")
+				row.LedgerSettled = stringPtr("0.00000000")
+				row.LedgerPending = stringPtr("0.00000000")
+				row.LedgerStatus = "current"
+			}
+		}
 	}
 	for _, reading := range readings {
 		for _, account := range reading.Accounts {

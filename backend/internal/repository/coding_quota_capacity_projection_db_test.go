@@ -89,6 +89,19 @@ func TestCodingQuotaDBCapacityProjectionCorrectionsFollowOriginalBasis(t *testin
 	}
 }
 
+func TestCodingQuotaDBCapacityProjectionDoesNotSkipUnknownStageRate(t *testing.T) {
+	db, r, base := quotaTestDB(t, "")
+	end := base.Add(6 * 24 * time.Hour)
+	seedCapacityProjectionEvent(t, db, "first-no-rate", 10, base.Add(10*time.Minute), end, "2", "0")
+	seedCapacityProjectionEvent(t, db, "next-valid-rate", 10, base.Add(20*time.Minute), end, "3", "0.25")
+	_, err := db.Exec(`INSERT INTO coding_quota_requests(request_id,api_key_id,user_id,purpose,account_id,started_at,completed_at,official_window_end,weight,estimated_points,state)
+ VALUES('old-unknown-stage',1,1,'openai',10,$1,$1,$2,4,6,'unmetered')`, base.Add(time.Minute), end)
+	require.NoError(t, err)
+	reading := quotaUsed(t, r, 1, base.Add(25*time.Minute), "openai")
+	require.Equal(t, "1.00000000", reading.Pending, "retain raw estimate 6 divided by 2*3, never borrow an intermediate stage rate")
+	require.Equal(t, 1, reading.UnmeteredCount)
+}
+
 func TestCodingQuotaDBCapacityProjectionAdmissionAndReservationRefresh(t *testing.T) {
 	db, r, base := quotaTestDB(t, "")
 	ctx := context.Background()

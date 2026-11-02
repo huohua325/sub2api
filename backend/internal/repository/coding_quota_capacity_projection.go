@@ -29,9 +29,10 @@ func codingCapacityFactorSQL(account, purpose, basis string) string {
 // exact charge or silently turn an unknown request into a free settled request.
 func codingProjectedEstimateSQL(asOf string) string {
 	return fmt.Sprintf(`CASE WHEN q.state='unmetered' AND q.weight>0 THEN COALESCE(
- (SELECT q.weight*f.previous_rate FROM capacity_factors f
-  WHERE f.account_id=q.account_id AND f.purpose=q.purpose AND f.effective_at>q.started_at AND f.previous_rate>0
+ (SELECT CASE WHEN f.previous_rate>0
   AND q.official_window_end BETWEEN f.window_end-INTERVAL '5 minutes' AND f.window_end+INTERVAL '5 minutes'
+  THEN q.weight*f.previous_rate END FROM capacity_factors f
+  WHERE f.account_id=q.account_id AND f.purpose=q.purpose AND f.effective_at>q.started_at
   ORDER BY f.effective_at LIMIT 1),
  CASE WHEN m.points_per_weight>0 AND q.started_at>=COALESCE(m.calibration_started_at,'-infinity'::timestamptz)
   AND COALESCE(m.calibration_started_at,'-infinity'::timestamptz)<=%s AND m.observed_at<=%s+INTERVAL '1 minute'

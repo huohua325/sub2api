@@ -83,6 +83,7 @@ vi.mock('@/api/admin/usage', async (importOriginal) => {
 })
 
 import UsageMonitorParents from '../UsageMonitorParents.vue'
+import { accountShares } from '../usageMonitorBoard'
 import PurposeWalletTable from '../PurposeWalletTable.vue'
 import PurposeAdjustModal from '../PurposeAdjustModal.vue'
 import PurposeAdjustmentList from '../PurposeAdjustmentList.vue'
@@ -181,7 +182,7 @@ describe('usage monitor display', () => {
     const wrapper = mountWithI18n(PurposeWalletTable, { users: [
       user({ id: 1, wallets: [wallet({ data_status: 'partial', blocked: false })] }),
       user({ id: 2, wallets: [wallet({ data_status: 'pending', blocked: false })] }),
-      user({ id: 3, wallets: [wallet({ data_status: 'error', blocked: false })] }),
+      user({ id: 3, wallets: [wallet({ data_status: 'error', blocked: true })] }),
     ] })
     expect(wrapper.get('[data-testid="status-1-openai"]').text()).toBe('含待核实估算')
     expect(wrapper.get('[data-testid="status-2-openai"]').text()).toBe('结算中')
@@ -195,6 +196,16 @@ describe('usage monitor display', () => {
     })
     await wrapper.get('button').trigger('click')
     expect(wrapper.text()).toContain('21.12500000 点')
+    expect(wrapper.text()).not.toContain('20.7184 点')
+  })
+
+  it('does not substitute a fee share when personal ledger attribution is unavailable', async () => {
+    expect(accountShares([parent({ users: [{ user_id: 12, gateway_actual_cost: '110', observed_share: '20.7184', slope_share: null, ledger_status: 'error' }] })], 12, 'openai')[0].share).toBeNull()
+    const wrapper = mountWithI18n(PurposeWalletTable, {
+      users: [user({ wallets: [wallet({ data_status: 'error', blocked: true })] })],
+      parents: [parent({ users: [{ user_id: 12, gateway_actual_cost: '110', observed_share: '20.7184', slope_share: null, ledger_status: 'error' }] })],
+    })
+    await wrapper.get('button').trigger('click')
     expect(wrapper.text()).not.toContain('20.7184 点')
   })
 

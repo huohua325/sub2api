@@ -166,11 +166,11 @@ function statusOf(user: UsageMonitorUser, purpose: string): PurposeStatus {
 }
 
 function statusLabel(status: PurposeStatus, wallet?: UsageMonitorWallet): string {
+  if (wallet?.data_status === 'error') return t('admin.usageMonitor.statusUnavailable')
   if (status === 'over') return t('admin.usageMonitor.statusOver')
   if (status === 'near') return t('admin.usageMonitor.statusNear')
   if (wallet?.data_status === 'partial') return t('admin.usageMonitor.statusUncertain')
   if (wallet?.data_status === 'pending') return t('admin.usageMonitor.statusPending')
-  if (wallet?.data_status === 'error') return t('admin.usageMonitor.statusUnavailable')
   if (status === 'missing') return t('admin.usageMonitor.statusMissing')
   return ''
 }

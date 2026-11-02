@@ -93,7 +93,7 @@ export function accountShares(parents: UsageMonitorParent[], userId: number, pur
       return [{
         accountId: parent.account_id,
         name: parent.name,
-        share: row.ledger_points ?? row.observed_share,
+        share: row.ledger_status ? row.ledger_points ?? null : row.observed_share,
         cost: row.gateway_actual_cost,
       }]
     })

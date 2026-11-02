@@ -2,11 +2,28 @@ package service
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 )
+
+func TestCodingCapacityMonitorZeroPeriodAndReadFailureDoNotReuseFeeShare(t *testing.T) {
+	makeView := func() *UsageMonitorView {
+		return &UsageMonitorView{Parents: []UsageMonitorParent{{AccountID: 10, Purpose: PurposeOpenAI, Users: []UsageMonitorParentUser{{UserID: 1, ObservedShare: stringPtr("20.7184")}}}}}
+	}
+	view := makeView()
+	applyMonitorCapacityAccounts(view, []CodingQuotaReading{{UserID: 1, Purpose: PurposeOpenAI, Used: "0", Pending: "0"}}, nil)
+	require.NotNil(t, view.Parents[0].Users[0].LedgerPoints)
+	require.Equal(t, "0.00000000", *view.Parents[0].Users[0].LedgerPoints)
+	require.Equal(t, "current", view.Parents[0].Users[0].LedgerStatus)
+	require.Equal(t, "20.7184", *view.Parents[0].Users[0].ObservedShare)
+	failed := makeView()
+	applyMonitorCapacityAccounts(failed, nil, errors.New("database unavailable"))
+	require.Nil(t, failed.Parents[0].Users[0].LedgerPoints)
+	require.Equal(t, "error", failed.Parents[0].Users[0].LedgerStatus)
+}
 
 func TestCodingCapacityMonitorUsesSameAccountProjectionAsWallet(t *testing.T) {
 	store := &summaryReuseStore{codingReadTestStore: codingReadTestStore{rows: []CodingQuotaReading{{UserID: 1, Purpose: PurposeOpenAI, Used: "15.00000000", Pending: "2.00000000", Start: time.Now().Add(-time.Hour), End: time.Now().Add(time.Hour), Accounts: []CodingQuotaAccountReading{
