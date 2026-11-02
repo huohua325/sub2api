@@ -1,7 +1,9 @@
-import { describe, expect, it, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { flushPromises, mount } from '@vue/test-utils'
 
 const copyToClipboard = vi.hoisted(() => vi.fn(async () => true))
+const getModelCatalog = vi.hoisted(() => vi.fn())
+vi.mock('@/api/modelCatalog', () => ({ getModelCatalog }))
 
 vi.mock('@/components/layout/AppLayout.vue', () => ({
   default: { template: '<div><slot /></div>' },
@@ -53,37 +55,75 @@ vi.mock('@/composables/useClipboard', () => ({
 }))
 
 import ModelsView from '../ModelsView.vue'
-import { experimentModels } from '@/data/experimentModels'
 
 describe('ModelsView', () => {
-  it('lists GlobalAI names with prices and copies a name', async () => {
-    const ids = experimentModels.map((model) => model.id)
-    expect(ids).toContain('gpt-4o')
-    expect(ids).toContain('gpt-5-nano')
-    expect(ids).toContain('gpt-6.1-sol')
-    expect(ids).toContain('gpt-5.3-codex')
-    expect(ids).toContain('qwen3.6-plus')
-    expect(ids).toContain('claude-haiku-4-5-20251001')
-    expect(ids).not.toContain('grok-4.20-0309-reasoning')
-
-    const nano = experimentModels.find((model) => model.id === 'gpt-5-nano')
-    expect(nano).toMatchObject({ family: 'gpt', input: 0.03, output: 0.24 })
-
+  beforeEach(() => {
+    vi.clearAllMocks()
+    getModelCatalog.mockResolvedValue({ partial: false, models: [
+      { id: 'gpt-6.1-terra', display_name: 'GPT-6.1 Terra', platform: 'openai', groups: [{ id: 1, name: 'Codex', source: 'upstream', observed_at: '2026-11-02T03:00:00Z' }] },
+      { id: 'unreleased-2027', display_name: 'Future model', platform: 'openai', groups: [{ id: 2, name: 'API 实验', source: 'configured', observed_at: null }] },
+      { id: 'grok-new', display_name: '', platform: 'grok', groups: [{ id: 3, name: 'Grok', source: 'stale', observed_at: '2026-11-02T02:00:00Z' }] },
+    ] })
+  })
+  it('loads new account models without a frontend list and copies their public IDs', async () => {
     const wrapper = mount(ModelsView, {
       global: { stubs: { AppLayout: { template: '<div><slot /></div>' } } },
     })
-
-    expect(wrapper.text()).toContain('gpt-5-nano')
-    expect(wrapper.text()).toContain('0.03')
-    expect(wrapper.text()).toContain('元/百万 token')
-    expect(wrapper.text()).not.toContain('订阅账号')
-    expect(wrapper.text()).toContain('gpt-6.1-sol')
-    expect(wrapper.text()).not.toContain('编程')
-
-    await wrapper.get('[data-testid="copy-qwen3.8-max"]').trigger('click')
-    expect(copyToClipboard).toHaveBeenCalledWith('qwen3.8-max', '已复制')
-
+    await flushPromises()
+    expect(wrapper.findAll('[data-testid="model-card"]')).toHaveLength(3)
+    expect(wrapper.text()).toContain('gpt-6.1-terra')
+    expect(wrapper.text()).toContain('unreleased-2027')
+    expect(wrapper.text()).toContain('API 实验')
+    expect(wrapper.text()).toContain('models.sources.configured')
+    expect(wrapper.text()).toContain('models.sources.stale')
+    expect(wrapper.text()).not.toContain('gpt-5-nano')
+    expect(wrapper.text()).not.toContain('元/百万 token')
+    await wrapper.get('[data-testid="copy-unreleased-2027"]').trigger('click')
+    expect(copyToClipboard).toHaveBeenCalledWith('unreleased-2027', '已复制')
+    await wrapper.get('[data-testid="model-search"]').setValue('Terra')
+    expect(wrapper.findAll('[data-testid="model-card"]')).toHaveLength(1)
     await wrapper.get('[data-testid="model-search"]').setValue('没有的名字')
     expect(wrapper.get('[data-testid="model-empty"]').text()).toContain('没有这个模型名')
+    wrapper.unmount()
+  })
+  it('distinguishes loading and request failures from an empty catalog and retries', async () => {
+    let reject!: (reason: Error) => void
+    getModelCatalog.mockReturnValueOnce(new Promise((_resolve, rejectPromise) => { reject = rejectPromise }))
+    const wrapper = mount(ModelsView)
+    expect(wrapper.find('[data-testid="model-loading"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="model-empty"]').exists()).toBe(false)
+    reject(new Error('unavailable'))
+    await flushPromises()
+    expect(wrapper.find('[data-testid="model-error"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="model-empty"]').exists()).toBe(false)
+    await wrapper.get('[data-testid="model-refresh"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.findAll('[data-testid="model-card"]')).toHaveLength(3)
+    expect(wrapper.find('[data-testid="model-error"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+  it('keeps previous models visible on a failed refresh without claiming fresh data', async () => {
+    const wrapper = mount(ModelsView)
+    await flushPromises()
+    getModelCatalog.mockRejectedValueOnce(new Error('offline'))
+    await wrapper.get('[data-testid="model-refresh"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.findAll('[data-testid="model-card"]')).toHaveLength(3)
+    expect(wrapper.find('[data-testid="model-error"]').exists()).toBe(true)
+    wrapper.unmount()
+  })
+  it('shows partial discovery and filters by the dynamically present families', async () => {
+    getModelCatalog.mockResolvedValueOnce({partial:true, models:[
+      {id:'qwen-99',display_name:'New Qwen',platform:'openai',groups:[{id:1,name:'API',source:'upstream',observed_at:null}]},
+      {id:'gpt-6.1-terra',display_name:'Terra',platform:'openai',groups:[{id:1,name:'API',source:'upstream',observed_at:null}]},
+    ]})
+    const wrapper=mount(ModelsView)
+    await flushPromises()
+    expect(wrapper.find('[data-testid="model-partial"]').exists()).toBe(true)
+    await wrapper.findAll('button').find(button => button.text() === 'Qwen')!.trigger('click')
+    expect(wrapper.findAll('[data-testid="model-card"]')).toHaveLength(1)
+    expect(wrapper.text()).toContain('qwen-99')
+    expect(wrapper.text()).not.toContain('gpt-6.1-terra')
+    wrapper.unmount()
   })
 })

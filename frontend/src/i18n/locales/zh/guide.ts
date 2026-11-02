@@ -121,7 +121,15 @@ export default {
   },
   models: {
     title: '模型',
-    lead: '把名字填进 model。下面是元/百万 token。个人额度看仪表盘。',
+    lead: '自动汇总你有权使用的账号模型。复制模型名，并使用对应分组的密钥接入。',
+    refresh: '刷新目录',
+    loading: '正在读取账号模型目录…',
+    loadError: '模型目录暂时无法刷新。已加载的内容仍可查看，请稍后重试。',
+    partial: '部分上游目录暂不可查询。标记为缓存或配置的模型尚未取得最新确认。',
+    availableGroups: '可用分组',
+    catalogNote: '目录按账号自动更新，短期缓存约一分钟；刷新不会发起模型对话。可用性与计费以所选密钥的分组及实际调用为准，个人额度请查看仪表盘。',
+    showMore: '显示更多模型',
+    sources: { stale: '最近缓存', configured: '配置模型，待确认' },
     search: '搜索模型名',
     count: '{count} 个模型',
     empty: '没有这个模型名',
@@ -141,7 +149,9 @@ export default {
       qwen: 'Qwen',
       kimi: 'Kimi',
       deepseek: 'DeepSeek',
-      glm: 'GLM'
+      glm: 'GLM',
+      minimax: 'MiniMax',
+      other: '其他'
     },
     notes: {
       peak: '工作日 9:00–12:00、14:00–18:00 按两倍',

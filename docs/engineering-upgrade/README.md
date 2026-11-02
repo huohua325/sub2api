@@ -6,6 +6,8 @@
 
 浅色光谱设计系统实现见 [DESIGN-SYSTEM.md](DESIGN-SYSTEM.md)，视觉、业务与性能验收见 [DESIGN-ACCEPTANCE.md](DESIGN-ACCEPTANCE.md)。
 
+账号模型动态目录、Codex Terra 插件显示排查及维护边界见 [MODEL-CATALOG-2026-11-02.md](MODEL-CATALOG-2026-11-02.md)。
+
 当前学员额度公式、重置时钟及已确认问题见 [QUOTA-AUDIT.md](QUOTA-AUDIT.md)。
 
 个人独立周期、Codex 50/Grok 30 点及全体异常重置的改造分析见 [QUOTA-REDESIGN.md](QUOTA-REDESIGN.md)。

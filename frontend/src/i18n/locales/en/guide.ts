@@ -121,7 +121,15 @@ export default {
   },
   models: {
     title: 'Models',
-    lead: 'Put the name in the model field. Prices are yuan per million tokens. Your own limit is on the dashboard.',
+    lead: 'Models are collected automatically from accounts you can access. Copy a model ID and use a key from a listed group.',
+    refresh: 'Refresh catalog',
+    loading: 'Loading account model catalogs…',
+    loadError: 'The model catalog could not be refreshed. Previously loaded models remain visible. Please try again.',
+    partial: 'Some upstream catalogs are unavailable. Cached or configured models have not been verified with the latest catalog.',
+    availableGroups: 'Available groups',
+    catalogNote: 'Account catalogs update automatically with a cache of about one minute. Refreshing does not run model conversations. Availability and billing depend on your key’s group and the actual request. Personal limits are on the dashboard.',
+    showMore: 'Show more models',
+    sources: { stale: 'Recent cache', configured: 'Configured, unverified' },
     search: 'Search model names',
     count: '{count} models',
     empty: 'No model with that name',
@@ -141,7 +149,9 @@ export default {
       qwen: 'Qwen',
       kimi: 'Kimi',
       deepseek: 'DeepSeek',
-      glm: 'GLM'
+      glm: 'GLM',
+      minimax: 'MiniMax',
+      other: 'Other'
     },
     notes: {
       peak: 'Weekdays 9:00–12:00 and 14:00–18:00 cost double',
