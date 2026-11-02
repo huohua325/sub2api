@@ -36,7 +36,7 @@
                         <template v-else>{{ walletOf(user, purpose)?.student_percent }}%</template>
                       </p>
                       <span v-if="statusOf(user, purpose) !== 'ok'" class="rounded-full px-2 py-0.5 text-xs font-medium" :class="statusClass(statusOf(user, purpose))" :data-testid="`status-${user.id}-${purpose}`">
-                        {{ statusLabel(statusOf(user, purpose)) }}
+                        {{ statusLabel(statusOf(user, purpose), walletOf(user, purpose)) }}
                       </span>
                     </div>
                     <p v-if="walletOf(user, purpose)?.official_points" class="mt-1 tabular-nums text-gray-700 dark:text-gray-200">
@@ -165,9 +165,12 @@ function statusOf(user: UsageMonitorUser, purpose: string): PurposeStatus {
   return purposeStatus(walletOf(user, purpose))
 }
 
-function statusLabel(status: PurposeStatus): string {
+function statusLabel(status: PurposeStatus, wallet?: UsageMonitorWallet): string {
   if (status === 'over') return t('admin.usageMonitor.statusOver')
   if (status === 'near') return t('admin.usageMonitor.statusNear')
+  if (wallet?.data_status === 'partial') return t('admin.usageMonitor.statusUncertain')
+  if (wallet?.data_status === 'pending') return t('admin.usageMonitor.statusPending')
+  if (wallet?.data_status === 'error') return t('admin.usageMonitor.statusUnavailable')
   if (status === 'missing') return t('admin.usageMonitor.statusMissing')
   return ''
 }

@@ -66,6 +66,10 @@ type UsageMonitorParentUser struct {
 	GatewayActualCost string  `json:"gateway_actual_cost"`
 	ObservedShare     *string `json:"observed_share"`
 	SlopeShare        *string `json:"slope_share"`
+	LedgerPoints      *string `json:"ledger_points,omitempty"`
+	LedgerSettled     *string `json:"ledger_settled,omitempty"`
+	LedgerPending     *string `json:"ledger_pending,omitempty"`
+	LedgerStatus      string  `json:"ledger_status,omitempty"`
 }
 
 // UsageMonitorSlope is the recent official-percent slope. It is absent when

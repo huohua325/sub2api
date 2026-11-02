@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"math/big"
+	"sort"
 	"strconv"
 	"sync"
 	"time"
@@ -320,6 +321,7 @@ func (s *OfficialPointService) ApplyMonitor(ctx context.Context, view *UsageMoni
 			}
 			byUser[reading.UserID][reading.Purpose] = codingQuotaResult(reading, budget.ForPurpose(reading.Purpose))
 		}
+		applyMonitorCapacityAccounts(view, readings, err)
 		for i := range view.Parents {
 			text := budget.ForPurpose(view.Parents[i].Purpose)
 			if text != "" {
@@ -393,6 +395,60 @@ func (s *OfficialPointService) ApplyMonitor(ctx context.Context, view *UsageMoni
 			wallet.PointBudget = stringPtr(budget.ForPurpose(wallet.Purpose))
 			wallet.ManualPoints = "0"
 		}
+	}
+}
+
+func applyMonitorCapacityAccounts(view *UsageMonitorView, readings []CodingQuotaReading, readErr error) {
+	if readErr != nil {
+		for i := range view.Parents {
+			for j := range view.Parents[i].Users {
+				view.Parents[i].Users[j].LedgerStatus = "error"
+			}
+		}
+		return
+	}
+	parents := make(map[int64]*UsageMonitorParent, len(view.Parents))
+	for i := range view.Parents {
+		parents[view.Parents[i].AccountID] = &view.Parents[i]
+	}
+	for _, reading := range readings {
+		for _, account := range reading.Accounts {
+			parent := parents[account.AccountID]
+			if parent == nil || parent.Purpose != reading.Purpose {
+				continue
+			}
+			idx := -1
+			for j := range parent.Users {
+				if parent.Users[j].UserID == reading.UserID {
+					idx = j
+					break
+				}
+			}
+			if idx < 0 {
+				idx = len(parent.Users)
+				parent.Users = append(parent.Users, UsageMonitorParentUser{UserID: reading.UserID, GatewayActualCost: "0"})
+			}
+			row := &parent.Users[idx]
+			used, usedOK := parseDecimal(account.Used)
+			pending, pendingOK := parseDecimal(account.Pending)
+			if !usedOK || !pendingOK {
+				row.LedgerStatus = "error"
+				continue
+			}
+			row.LedgerSettled = stringPtr(account.Used)
+			row.LedgerPending = stringPtr(account.Pending)
+			row.LedgerPoints = stringPtr(formatFixedHalfAway(new(big.Rat).Add(used, pending), 8))
+			row.LedgerStatus = "current"
+			if account.PendingCount > 0 {
+				row.LedgerStatus = "pending"
+			}
+			if account.UnmeteredCount > 0 {
+				row.LedgerStatus = "partial"
+			}
+		}
+	}
+	for i := range view.Parents {
+		sort.Slice(view.Parents[i].Users, func(a, b int) bool { return view.Parents[i].Users[a].UserID < view.Parents[i].Users[b].UserID })
 	}
 }
 

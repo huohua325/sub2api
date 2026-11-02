@@ -20,6 +20,10 @@ export interface UsageMonitorParentUser {
   gateway_actual_cost: string
   observed_share: string | null
   slope_share: string | null
+  ledger_points?: string | null
+  ledger_settled?: string | null
+  ledger_pending?: string | null
+  ledger_status?: 'current' | 'pending' | 'partial' | 'error'
 }
 
 export interface UsageMonitorParent {

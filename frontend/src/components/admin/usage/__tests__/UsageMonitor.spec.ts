@@ -162,6 +162,42 @@ function parent(overrides: Partial<UsageMonitorParent> = {}): UsageMonitorParent
 }
 
 describe('usage monitor display', () => {
+  it('separates normalized personal account points from the old fee-share estimate', () => {
+    const wrapper = mountWithI18n(UsageMonitorParents, {
+      users: [user()],
+      parents: [parent({ official_used_percent: '36', point_budget: '50', users: [{
+        user_id: 12, gateway_actual_cost: '110.38413562', observed_share: '20.7184', slope_share: null,
+        ledger_points: '21.12500000', ledger_settled: '17.40546458', ledger_pending: '3.71953542', ledger_status: 'partial',
+      }] })],
+    })
+    expect(wrapper.get('[data-testid="parent-ledger-points-12"]').text()).toContain('21.12500000')
+    expect(wrapper.text()).toContain('个人本周期归属')
+    expect(wrapper.text()).toContain('整窗费用分摊估算')
+    expect(wrapper.text()).toContain('待核实估算')
+    expect(wrapper.get('[data-testid="observed-share-12"]').text()).toBe('20.7184')
+  })
+
+  it('distinguishes unknown historical allocation, ordinary settlement and unavailable data', () => {
+    const wrapper = mountWithI18n(PurposeWalletTable, { users: [
+      user({ id: 1, wallets: [wallet({ data_status: 'partial', blocked: false })] }),
+      user({ id: 2, wallets: [wallet({ data_status: 'pending', blocked: false })] }),
+      user({ id: 3, wallets: [wallet({ data_status: 'error', blocked: false })] }),
+    ] })
+    expect(wrapper.get('[data-testid="status-1-openai"]').text()).toBe('含待核实估算')
+    expect(wrapper.get('[data-testid="status-2-openai"]').text()).toBe('结算中')
+    expect(wrapper.get('[data-testid="status-3-openai"]').text()).toBe('数据暂不可用')
+  })
+
+  it('uses normalized account points in the expanded account list', async () => {
+    const wrapper = mountWithI18n(PurposeWalletTable, {
+      users: [user({ wallets: [wallet({ official_points: '21.12500000', point_budget: '50' })] })],
+      parents: [parent({ users: [{ user_id: 12, gateway_actual_cost: '110', observed_share: '20.7184', slope_share: null, ledger_points: '21.12500000', ledger_status: 'partial' }] })],
+    })
+    await wrapper.get('button').trigger('click')
+    expect(wrapper.text()).toContain('21.12500000 点')
+    expect(wrapper.text()).not.toContain('20.7184 点')
+  })
+
   it('leaves a missing official percent blank and keeps a 0.0000 share next to its cost', () => {
     const wrapper = mountWithI18n(UsageMonitorParents, {
       users: [user(), user({ id: 3, username: 'quiet', email: 'quiet@example' })],

@@ -59,11 +59,19 @@
               <p class="break-all text-sm font-medium text-gray-900 dark:text-white">{{ emailFor(row.user_id) }}</p>
               <p v-if="nameFor(row.user_id)" class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">{{ nameFor(row.user_id) }}</p>
               <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-100 dark:bg-dark-700">
-                <div class="h-full rounded-full bg-primary-400" :style="{ width: shareWidth(parent.official_used_percent, row.observed_share) }"></div>
+                <div class="h-full rounded-full bg-primary-400" :style="{ width: row.ledger_points != null ? shareWidth(parent.point_budget ?? null, row.ledger_points) : shareWidth(parent.official_used_percent, row.observed_share) }"></div>
               </div>
             </div>
             <div class="text-right">
-              <p class="text-lg font-semibold tabular-nums text-gray-900 dark:text-white">
+              <template v-if="row.ledger_points != null">
+                <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('admin.usageMonitor.personalAttribution') }}</p>
+                <p class="text-lg font-semibold tabular-nums text-gray-900 dark:text-white" :data-testid="`parent-ledger-points-${row.user_id}`">{{ row.ledger_points }} {{ t('admin.usageMonitor.pointUnit') }}</p>
+                <p v-if="row.ledger_status === 'partial'" class="text-xs text-amber-700 dark:text-amber-300">{{ t('admin.usageMonitor.uncertainEstimate') }}</p>
+                <p v-else-if="row.ledger_status === 'pending'" class="text-xs text-gray-500">{{ t('admin.usageMonitor.statusPending') }}</p>
+              </template>
+              <p v-else-if="row.ledger_status === 'error'" class="text-sm text-red-600">{{ t('admin.usageMonitor.statusUnavailable') }}</p>
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('admin.usageMonitor.feeShareEstimate') }}</p>
+              <p class="text-sm tabular-nums text-gray-500 dark:text-gray-400">
                 <span :data-testid="`observed-share-${row.user_id}`">{{ row.observed_share ?? '' }}</span><span v-if="row.observed_share">%</span>
               </p>
               <p class="text-sm tabular-nums text-gray-500 dark:text-gray-400">

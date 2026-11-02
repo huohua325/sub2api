@@ -5,6 +5,7 @@
       <span>{{ t(`codingQuota.modes.${summary.admission_mode}`) }}</span>
       <span>{{ t('codingQuota.active') }} {{ summary.active }}</span>
     </div>
+    <p class="mt-2 text-gray-500 dark:text-gray-400">{{ t('codingQuota.capacityBasis') }}</p>
     <dl class="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 tabular-nums">
       <dt>{{ t('codingQuota.settled') }}</dt><dd>{{ summary.settled }}</dd>
       <dt>{{ t('codingQuota.pending') }}</dt><dd>{{ summary.pending }}</dd>
@@ -34,12 +35,12 @@
           <p class="break-all font-mono">{{ item.id }}</p>
           <p class="mt-1 break-all">{{ item.model || '—' }} · #{{ item.account_id }}</p>
           <p class="mt-1">{{ t(`codingQuota.states.${item.state}`) }} · {{ item.mode }} · {{ t(item.would_allow ? 'codingQuota.wouldAllow' : 'codingQuota.wouldReject') }}</p>
-          <p class="mt-1">{{ t('codingQuota.reserved') }} {{ item.estimated_points ?? t('codingQuota.unknown') }}</p>
+          <p class="mt-1">{{ t('codingQuota.rawReserved') }} {{ item.estimated_points ?? t('codingQuota.unknown') }}</p>
           <p class="mt-1 break-words text-gray-500">{{ formatDateTime(item.started_at) }} → {{ formatDateTime(item.updated_at) }}</p>
           <div v-for="bill in item.billing ?? []" :key="bill.request_id" class="mt-2 border-t border-gray-100 pt-2 dark:border-dark-700">
             <p class="break-all font-mono">{{ bill.request_id }}</p>
             <p>{{ bill.state }} · {{ t('codingQuota.attempts') }} {{ bill.attempts }} · {{ t('codingQuota.ledger') }} #{{ bill.ledger_id ?? '—' }}</p>
-            <p>{{ t('codingQuota.corrections') }} {{ bill.correction }} <span class="break-all">{{ bill.audit_event }}</span></p>
+            <p>{{ t('codingQuota.rawCorrections') }} {{ bill.correction }} <span class="break-all">{{ bill.audit_event }}</span></p>
             <p v-if="bill.last_error" class="mt-1 break-all text-red-600">{{ bill.last_error }}</p>
           </div>
           <details v-if="item.events?.length" class="mt-2">

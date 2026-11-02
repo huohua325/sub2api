@@ -25,7 +25,7 @@ func TestCodingSummaryBatchUsesOneQueryIndependentOfUserCount(t *testing.T) {
 				readings = append(readings, service.CodingQuotaReading{UserID: int64(i), Purpose: "openai", Used: "12", Pending: "3", Start: now.Add(-time.Hour), End: now.Add(time.Hour)})
 				result.AddRow(i, "openai", "0", 0, 0, 0, 0, "0", "single", "uncalibrated", false, "", 0, nil, nil)
 			}
-			mock.ExpectQuery("WITH wanted AS").WillReturnRows(result)
+			mock.ExpectQuery("WITH.*wanted AS").WillReturnRows(result)
 			rows, err := r.ReadCodingReservationSummariesForReadings(context.Background(), readings, now)
 			require.NoError(t, err)
 			require.Len(t, rows, n)
