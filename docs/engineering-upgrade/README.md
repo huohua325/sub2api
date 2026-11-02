@@ -8,6 +8,8 @@
 
 账号模型动态目录、Codex Terra 插件显示排查及维护边界见 [MODEL-CATALOG-2026-11-02.md](MODEL-CATALOG-2026-11-02.md)。
 
+Codex 扩容后的个人点数、母账号分摊与历史未核实估算核对见 [QUOTA-CAPACITY-VALIDATION-2026-11-02.md](QUOTA-CAPACITY-VALIDATION-2026-11-02.md)。
+
 当前学员额度公式、重置时钟及已确认问题见 [QUOTA-AUDIT.md](QUOTA-AUDIT.md)。
 
 个人独立周期、Codex 50/Grok 30 点及全体异常重置的改造分析见 [QUOTA-REDESIGN.md](QUOTA-REDESIGN.md)。
