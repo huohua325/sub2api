@@ -17,28 +17,36 @@
   "runbook": "docs/engineering-upgrade/UPSTREAM-MERGE-RUNBOOK.md",
   "deployment": {
     "host": "172.104.117.114",
-    "version": "0.2.19-mile.20261030.capacity1",
-    "source_commit": "3f35985b16e17bcee14ac1048984124b00cd688d",
-    "reference_time": "2026-10-30T14:37:12.764324Z",
-    "backup_directory": "/opt/sub2api/backups/before-capacity-20261030T143710Z",
-    "binary_sha256": "64ebc2b72acf4234d0e5882764a5f2d7898158325fce6ab891cf18705cfdc705",
+    "version": "0.2.19-mile.20261103.upstream1",
+    "source_commit": "f9d40a50d092f90d81644849e7e119dfadaa257a",
+    "reference_time": "2026-11-03T02:49:36.685460+00:00",
+    "backup_directory": "/opt/sub2api/backups/before-upstream-20261103-20261103T024858Z",
+    "binary_sha256": "5bb72d993a299867508137a170074cbe98fbeb5e4a70de8d0e4c52c0e6dec1ac",
     "openai_mode": "shadow",
     "grok_mode": "shadow",
     "shadow_started_at": "2026-10-28T09:00:11.898991Z",
     "migration_count": 314,
-    "capacity_event_id": "operator:openai-capacity:account5:2026-10-29T17:05:39Z"
+    "capacity_event_id": "operator:openai-capacity:account5:2026-10-29T17:05:39Z",
+    "record": "docs/engineering-upgrade/UPSTREAM-SYNC-2026-11-03.md",
+    "confirmed_events_preserved": true,
+    "capacity_events_preserved": true,
+    "personal_clocks_preserved": true,
+    "admin_key_policies_preserved": true,
+    "normalized_settled_did_not_decrease": true,
+    "public_assets_matched": 19,
+    "startup_error_lines": 0
   },
   "last_upstream_check": {
-    "checked_at": "2026-11-03T02:10:20.793956+00:00",
+    "checked_at": "2026-11-03T02:56:20.078241+00:00",
     "upstream_commit": "4a4a83ee5ec86b19d3a2dd9b6471de5128963bec",
     "upstream_release": "v0.2.19",
-    "fork_commit_at_check": "22d109355aee093ad7269a0b81c66e86677cf7a5",
+    "fork_commit_at_check": "f9d40a50d092f90d81644849e7e119dfadaa257a",
     "missing_upstream_commits": 0,
-    "action": "merged-and-validated-not-deployed",
+    "action": "merged-validated-and-deployed",
     "record": "docs/engineering-upgrade/UPSTREAM-SYNC-2026-11-03.md"
   },
-  "deployment_status": "not-deployed",
-  "deployment_note": "deployment retains the last upstream merge deployment record; this merge has not been deployed. The later known MILE runtime is documented in QUOTA-CAPACITY-RELEASE-2026-11-02.md.",
+  "deployment_status": "deployed",
+  "deployment_note": "This merged upstream and responsive correction were deployed after the platform owner passed both visual groups and explicitly requested production deployment.",
   "validation": {
     "frontend_tests": 3183,
     "frontend_files": 399,
@@ -65,7 +73,14 @@
     "protected_blobs_preserved": 522,
     "independent_review": "no Critical/Important/Minor source findings",
     "mobile_geometry_red_to_green": true,
-    "final_frontend_tests": 3183
+    "final_frontend_tests": 3183,
+    "visual_review": {
+      "permissions": "passed",
+      "interaction_mobile": "passed",
+      "mobile_passed_at": "2026-11-03T02:31:03.544Z"
+    },
+    "deployment_quota_race_passed": 66,
+    "deployment_quota_race_skipped": 0
   },
   "integration_fixes": [
     {
