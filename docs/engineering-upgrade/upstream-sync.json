@@ -2,18 +2,18 @@
   "schema_version": 1,
   "upstream_repository": "https://github.com/Wei-Shaw/sub2api.git",
   "upstream_branch": "main",
-  "previous_upstream_commit": "a3298b46ebe239fb0720b068a1eb3383955bdac2",
-  "upstream_commit": "d851a38477597157e78450d30af2d8504764d085",
+  "previous_upstream_commit": "d851a38477597157e78450d30af2d8504764d085",
+  "upstream_commit": "4a4a83ee5ec86b19d3a2dd9b6471de5128963bec",
   "upstream_release": "v0.2.19",
-  "fork_before_merge": "c072ac5cf5161c8a6e5494d0355d72792a0e7de8",
-  "merge_commit": "3f35985b16e17bcee14ac1048984124b00cd688d",
+  "fork_before_merge": "eb4289dcb35d45554ad9253ea6fd8233b21e8aed",
+  "merge_commit": "1069204ebfc2313e5bd45f926ce24bf6beb43f4a",
   "fork_remote": "fork",
   "fork_branch": "lab/0.2.17",
   "merge_strategy": "merge-commit-no-squash",
-  "included_upstream_commits": 10,
-  "changed_files": 85,
-  "new_database_migrations": 1,
-  "record": "docs/engineering-upgrade/UPSTREAM-SYNC-2026-10-30.md",
+  "included_upstream_commits": 4,
+  "changed_files": 65,
+  "new_database_migrations": 0,
+  "record": "docs/engineering-upgrade/UPSTREAM-SYNC-2026-11-03.md",
   "runbook": "docs/engineering-upgrade/UPSTREAM-MERGE-RUNBOOK.md",
   "deployment": {
     "host": "172.104.117.114",
@@ -29,12 +29,50 @@
     "capacity_event_id": "operator:openai-capacity:account5:2026-10-29T17:05:39Z"
   },
   "last_upstream_check": {
-    "checked_at": "2026-11-01T05:30:41Z",
-    "upstream_commit": "d851a38477597157e78450d30af2d8504764d085",
+    "checked_at": "2026-11-03T02:10:20.793956+00:00",
+    "upstream_commit": "4a4a83ee5ec86b19d3a2dd9b6471de5128963bec",
     "upstream_release": "v0.2.19",
-    "fork_commit_at_check": "9af38c8eaa464b27278b977344fac8307dd5e912",
+    "fork_commit_at_check": "22d109355aee093ad7269a0b81c66e86677cf7a5",
     "missing_upstream_commits": 0,
-    "action": "already-current-no-merge-or-deploy",
-    "record": "docs/engineering-upgrade/UPSTREAM-CHECK-2026-11-01.md"
-  }
+    "action": "merged-and-validated-not-deployed",
+    "record": "docs/engineering-upgrade/UPSTREAM-SYNC-2026-11-03.md"
+  },
+  "deployment_status": "not-deployed",
+  "deployment_note": "deployment retains the last upstream merge deployment record; this merge has not been deployed. The later known MILE runtime is documented in QUOTA-CAPACITY-RELEASE-2026-11-02.md.",
+  "validation": {
+    "frontend_tests": 3183,
+    "frontend_files": 399,
+    "quota_postgres_race_passed": 66,
+    "quota_postgres_race_skipped": 0,
+    "scoped_repository_passed": 42,
+    "scoped_service_handler_passed": 15,
+    "scoped_postgres_skipped": 0,
+    "targeted_unit_race_initial_passed": 532,
+    "targeted_unit_race_initial_skipped": 18,
+    "initial_skips_executed_with_scoped_dsn": true,
+    "default_go_before_passed": 14183,
+    "default_go_after_passed": 14185,
+    "default_go_skipped": 15,
+    "known_deterministic_failure_roots": 9,
+    "timing_baseline_record": "docs/engineering-upgrade/UPSTREAM-SYNC-2026-11-03.md",
+    "vet": true,
+    "incremental_lint": "0 issues",
+    "browser_engines": [
+      "Chromium",
+      "WebKit"
+    ],
+    "custom_blobs_preserved": 462,
+    "protected_blobs_preserved": 522,
+    "independent_review": "no Critical/Important/Minor source findings",
+    "mobile_geometry_red_to_green": true,
+    "final_frontend_tests": 3183
+  },
+  "integration_fixes": [
+    {
+      "commit": "22d109355aee093ad7269a0b81c66e86677cf7a5",
+      "path": "frontend/src/components/admin/settings/AdminAccessKeysSettings.vue",
+      "reason": "human mobile-layout rejection; responsive-only fix with real-browser RED-to-GREEN",
+      "backend_logic_changed": false
+    }
+  ]
 }
