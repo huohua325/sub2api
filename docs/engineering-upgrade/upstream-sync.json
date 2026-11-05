@@ -37,13 +37,13 @@
     "startup_error_lines": 0
   },
   "last_upstream_check": {
-    "checked_at": "2026-11-04T04:56:25Z",
-    "upstream_commit": "4a4a83ee5ec86b19d3a2dd9b6471de5128963bec",
+    "checked_at": "2026-11-05T05:29:58Z",
+    "upstream_commit": "8e92c892b47f3f934f18ce63da4c4dcb75f0b6bd",
     "upstream_release": "v0.2.19",
-    "fork_commit_at_check": "82b085ac77352fe0a581d1023d21c265f111fa6a",
-    "missing_upstream_commits": 0,
-    "action": "checked-already-up-to-date",
-    "record": "docs/engineering-upgrade/UPSTREAM-CHECK-2026-11-04.md"
+    "fork_commit_at_check": "10331d5730d5a6fabe2fe216aa5b3dc1ad766470",
+    "missing_upstream_commits": 23,
+    "action": "checked-updates-available-not-merged",
+    "record": "docs/engineering-upgrade/UPSTREAM-CHECK-2026-11-05.md"
   },
   "deployment_status": "deployed",
   "deployment_note": "This merged upstream and responsive correction were deployed after the platform owner passed both visual groups and explicitly requested production deployment.",
