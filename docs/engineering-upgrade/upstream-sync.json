@@ -2,20 +2,100 @@
   "schema_version": 1,
   "upstream_repository": "https://github.com/Wei-Shaw/sub2api.git",
   "upstream_branch": "main",
-  "previous_upstream_commit": "d851a38477597157e78450d30af2d8504764d085",
-  "upstream_commit": "4a4a83ee5ec86b19d3a2dd9b6471de5128963bec",
+  "previous_upstream_commit": "4a4a83ee5ec86b19d3a2dd9b6471de5128963bec",
+  "upstream_commit": "25608d216bb7be04e4a646830cb065cd09b7d7e9",
   "upstream_release": "v0.2.19",
-  "fork_before_merge": "eb4289dcb35d45554ad9253ea6fd8233b21e8aed",
-  "merge_commit": "1069204ebfc2313e5bd45f926ce24bf6beb43f4a",
+  "fork_before_merge": "a7f80183003582dfda0ca8659a8f6551d282d3cc",
+  "merge_commit": "3347375e4b26a86c5dbb08f931b0018d5e23a0c7",
   "fork_remote": "fork",
   "fork_branch": "lab/0.2.17",
   "merge_strategy": "merge-commit-no-squash",
-  "included_upstream_commits": 4,
-  "changed_files": 65,
+  "included_upstream_commits": 24,
+  "changed_files": 188,
   "new_database_migrations": 0,
-  "record": "docs/engineering-upgrade/UPSTREAM-SYNC-2026-11-03.md",
+  "record": "docs/engineering-upgrade/UPSTREAM-SYNC-2026-11-05.md",
   "runbook": "docs/engineering-upgrade/UPSTREAM-MERGE-RUNBOOK.md",
   "deployment": {
+    "host": "172.104.117.114",
+    "version": "0.2.19-mile.20261105.upstream1",
+    "source_commit": "3347375e4b26a86c5dbb08f931b0018d5e23a0c7",
+    "reference_time": "2026-11-06T01:47:29.085251+00:00",
+    "backup_directory": "/opt/sub2api/backups/before-upstream-20261105-20261106T014655Z",
+    "binary_sha256": "3ce1021bb4e061acdc6c8c1154640bf716365a93253a5d42753e76c027c62683",
+    "openai_mode": "shadow",
+    "grok_mode": "shadow",
+    "shadow_started_at": "2026-10-28T09:00:11.898991Z",
+    "migration_count": 314,
+    "capacity_event_id": "operator:openai-capacity:account5:2026-10-29T17:05:39Z",
+    "record": "docs/engineering-upgrade/UPSTREAM-SYNC-2026-11-05.md",
+    "confirmed_events_preserved": true,
+    "capacity_events_preserved": true,
+    "personal_clocks_preserved": true,
+    "admin_key_policies_preserved": true,
+    "normalized_settled_did_not_decrease": true,
+    "public_assets_matched": 25,
+    "startup_error_lines": 0,
+    "request_rows_preserved": 15744,
+    "settled_imported_preserved": 14331,
+    "database_backup_bytes": 11788360
+  },
+  "last_upstream_check": {
+    "checked_at": "2026-11-06T01:51:34.821472+00:00",
+    "upstream_commit": "25608d216bb7be04e4a646830cb065cd09b7d7e9",
+    "upstream_release": "v0.2.19",
+    "fork_commit_at_check": "3347375e4b26a86c5dbb08f931b0018d5e23a0c7",
+    "missing_upstream_commits": 0,
+    "action": "merged-validated-and-deployed",
+    "record": "docs/engineering-upgrade/UPSTREAM-SYNC-2026-11-05.md"
+  },
+  "deployment_status": "deployed",
+  "deployment_note": "User explicitly authorized safe upstream integration, fork push and production deployment. Business merge and sponsor-only follow-up are deployed; existing data and shadow modes preserved.",
+  "validation": {
+    "frontend_tests": 3209,
+    "frontend_files": 403,
+    "frontend_baseline_tests": 3183,
+    "quota_postgres_race_passed": 66,
+    "quota_postgres_race_skipped": 0,
+    "deployment_quota_race_passed": 66,
+    "deployment_quota_race_skipped": 0,
+    "targeted_unit_race_passed": 1406,
+    "targeted_unit_race_skipped": 0,
+    "repository_extra_race_passed": 29,
+    "repository_extra_race_skipped": 0,
+    "default_go_after_passed": 14576,
+    "default_go_skipped": 15,
+    "known_deterministic_failure_roots": 9,
+    "server_timing_baseline_and_merged_repeat": 3,
+    "baseline_initial_database_unavailable": true,
+    "baseline_quota_race_rerun_passed": 66,
+    "vet": true,
+    "incremental_lint": "0 issues",
+    "initial_lint_test_errcheck_fixed": true,
+    "initial_lint_timeout_not_counted_as_pass": true,
+    "browser_engines": [
+      "Chromium",
+      "WebKit"
+    ],
+    "custom_blobs_preserved": 430,
+    "protected_blobs_preserved": 476,
+    "independent_review": "no actionable integration regressions; test-only and sponsor-only addenda passed",
+    "browser_real_api_mutations": 0
+  },
+  "integration_fixes": [
+    {
+      "path": "backend/internal/service/auth_service.go",
+      "reason": "Preserve exact student allowlist and invitation exemptions after explicit inbox blacklist checks; RED-to-GREEN policy regression."
+    },
+    {
+      "path": "frontend/src/utils/__tests__/ccswitchImport.spec.ts",
+      "reason": "Match intentional upstream gpt-5.6-sol default; focused18 and full3209passed."
+    },
+    {
+      "path": "backend/internal/pkg/httputil/body_budget_test.go",
+      "reason": "Read error channel result in unchanged fatal assertion; errcheck RED-to-GREEN and full package race passed."
+    }
+  ],
+  "previous_deployment": {
     "host": "172.104.117.114",
     "version": "0.2.19-mile.20261103.upstream1",
     "source_commit": "f9d40a50d092f90d81644849e7e119dfadaa257a",
@@ -36,58 +116,6 @@
     "public_assets_matched": 19,
     "startup_error_lines": 0
   },
-  "last_upstream_check": {
-    "checked_at": "2026-11-05T05:29:58Z",
-    "upstream_commit": "8e92c892b47f3f934f18ce63da4c4dcb75f0b6bd",
-    "upstream_release": "v0.2.19",
-    "fork_commit_at_check": "10331d5730d5a6fabe2fe216aa5b3dc1ad766470",
-    "missing_upstream_commits": 23,
-    "action": "checked-updates-available-not-merged",
-    "record": "docs/engineering-upgrade/UPSTREAM-CHECK-2026-11-05.md"
-  },
-  "deployment_status": "deployed",
-  "deployment_note": "This merged upstream and responsive correction were deployed after the platform owner passed both visual groups and explicitly requested production deployment.",
-  "validation": {
-    "frontend_tests": 3183,
-    "frontend_files": 399,
-    "quota_postgres_race_passed": 66,
-    "quota_postgres_race_skipped": 0,
-    "scoped_repository_passed": 42,
-    "scoped_service_handler_passed": 15,
-    "scoped_postgres_skipped": 0,
-    "targeted_unit_race_initial_passed": 532,
-    "targeted_unit_race_initial_skipped": 18,
-    "initial_skips_executed_with_scoped_dsn": true,
-    "default_go_before_passed": 14183,
-    "default_go_after_passed": 14185,
-    "default_go_skipped": 15,
-    "known_deterministic_failure_roots": 9,
-    "timing_baseline_record": "docs/engineering-upgrade/UPSTREAM-SYNC-2026-11-03.md",
-    "vet": true,
-    "incremental_lint": "0 issues",
-    "browser_engines": [
-      "Chromium",
-      "WebKit"
-    ],
-    "custom_blobs_preserved": 462,
-    "protected_blobs_preserved": 522,
-    "independent_review": "no Critical/Important/Minor source findings",
-    "mobile_geometry_red_to_green": true,
-    "final_frontend_tests": 3183,
-    "visual_review": {
-      "permissions": "passed",
-      "interaction_mobile": "passed",
-      "mobile_passed_at": "2026-11-03T02:31:03.544Z"
-    },
-    "deployment_quota_race_passed": 66,
-    "deployment_quota_race_skipped": 0
-  },
-  "integration_fixes": [
-    {
-      "commit": "22d109355aee093ad7269a0b81c66e86677cf7a5",
-      "path": "frontend/src/components/admin/settings/AdminAccessKeysSettings.vue",
-      "reason": "human mobile-layout rejection; responsive-only fix with real-browser RED-to-GREEN",
-      "backend_logic_changed": false
-    }
-  ]
+  "business_merge_commit": "1b6bb9724ab1581346b3f9c3ae8d0c53de6d5c29",
+  "source_changed_files": 190
 }
