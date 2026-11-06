@@ -1212,7 +1212,20 @@ func (s *AuthService) registrationAllowlistState(ctx context.Context, email stri
 	return true, IsRegistrationEmailAllowlisted(email, s.settingService.GetRegistrationEmailAllowlist(ctx))
 }
 
+// validateRegistrationEmailPolicy 校验邮箱能否用于新建账号或绑定为账号邮箱：精确黑名单与域名白名单。
 func (s *AuthService) validateRegistrationEmailPolicy(ctx context.Context, email string) error {
+	if s.settingService == nil {
+		return nil
+	}
+	if s.settingService.IsRegistrationEmailBlacklisted(ctx, email) {
+		return ErrEmailBlocked
+	}
+	return s.validateRegistrationEmailSuffixPolicy(ctx, email)
+}
+
+// validateRegistrationEmailSuffixPolicy preserves the exact student allowlist
+// before applying the fallback domain policy. Callers check the blacklist first.
+func (s *AuthService) validateRegistrationEmailSuffixPolicy(ctx context.Context, email string) error {
 	if s.settingService == nil {
 		return nil
 	}
@@ -1229,12 +1242,15 @@ func (s *AuthService) validateRegistrationEmailPolicy(ctx context.Context, email
 	return nil
 }
 
-// validateRegistrationEmailQuota 保留白名单为空时的全放行行为；配置白名单后，
-// 非白名单域名默认直接拒绝（严格白名单模式）；仅当域名限量注册开关开启时，
+// validateRegistrationEmailQuota 精确黑名单命中直接拒绝；保留白名单为空时的全放行行为；
+// 配置白名单后，非白名单域名默认直接拒绝（严格白名单模式）；仅当域名限量注册开关开启时，
 // 非白名单域名每个最多允许一个账户。
 func (s *AuthService) validateRegistrationEmailQuota(ctx context.Context, email string) error {
 	if s.settingService == nil {
 		return nil
+	}
+	if s.settingService.IsRegistrationEmailBlacklisted(ctx, email) {
+		return ErrEmailBlocked
 	}
 	if active, approved := s.registrationAllowlistState(ctx, email); active {
 		if !approved {
