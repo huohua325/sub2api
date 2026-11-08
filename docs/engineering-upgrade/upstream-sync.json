@@ -40,13 +40,13 @@
     "database_backup_bytes": 11788360
   },
   "last_upstream_check": {
-    "checked_at": "2026-11-06T01:51:34.821472+00:00",
-    "upstream_commit": "25608d216bb7be04e4a646830cb065cd09b7d7e9",
-    "upstream_release": "v0.2.19",
-    "fork_commit_at_check": "3347375e4b26a86c5dbb08f931b0018d5e23a0c7",
-    "missing_upstream_commits": 0,
-    "action": "merged-validated-and-deployed",
-    "record": "docs/engineering-upgrade/UPSTREAM-SYNC-2026-11-05.md"
+    "checked_at": "2026-11-08T11:40:34Z",
+    "upstream_commit": "6b4b37db43443b5e88e424fe3c69602cc3810dfb",
+    "upstream_release": "v0.2.20",
+    "fork_commit_at_check": "68b4bf6ac444daaadf4322cabb808257645b0904",
+    "missing_upstream_commits": 69,
+    "action": "checked-updates-available-not-merged",
+    "record": "docs/engineering-upgrade/UPSTREAM-CHECK-2026-11-08.md"
   },
   "deployment_status": "deployed",
   "deployment_note": "User explicitly authorized safe upstream integration, fork push and production deployment. Business merge and sponsor-only follow-up are deployed; existing data and shadow modes preserved.",
