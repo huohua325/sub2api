@@ -41,7 +41,7 @@ describe('GettingStartedView', () => {
     expect(wrapper.text()).not.toContain('还不能调用')
     const snippet = wrapper.find('[data-testid="guide-snippet"]').text()
     expect(snippet).toContain('https://gateway.example/v1')
-    expect(snippet).toContain('gpt-5.5')
+    expect(snippet).toContain('gpt-6.1-sol')
     expect(snippet).toContain('model_provider = "OpenAI"')
     expect(snippet).not.toContain('/v1/v1/')
     expect(wrapper.text()).toContain('OPENAI_API_KEY')

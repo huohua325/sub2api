@@ -1,6 +1,7 @@
 import { buildCodexModelCatalogUrl } from '@/api/codex'
+import { buildCodexApiKeyAuthConfig } from '@/utils/codexAuthConfig'
 
-export const DEFAULT_CODEX_MODEL = 'gpt-5.5'
+export const DEFAULT_CODEX_MODEL = 'gpt-6.1-sol'
 export const DEFAULT_GROK_MODEL = 'grok-4.7'
 export interface ConnectionFile { path: string; content: string; hint?: string }
 export interface ConnectionOptions { baseUrl: string; apiKey: string; shell?: string }
@@ -58,9 +59,7 @@ function joinConfigPath(dir: string, file: string, windows: boolean): string {
 
 function codexAuthConfig(apiKey: string, authMode: 'legacy' | 'api-key'): string {
   return authMode === 'api-key'
-    ? `requires_openai_auth = false
-experimental_bearer_token = "${escapeTomlBasicString(apiKey)}"
-http_headers = { "x-openai-actor-authorization" = "local-image-extension" }`
+    ? buildCodexApiKeyAuthConfig(apiKey)
     : 'requires_openai_auth = true'
 }
 
@@ -76,6 +75,7 @@ export function generateCodexFiles(options: CodexConnectionOptions): ConnectionF
   const configContent = `model_provider = "OpenAI"
 model = "${escapeTomlBasicString(model)}"
 review_model = "${escapeTomlBasicString(model)}"
+web_search = "live"
 ${reasoningEffortLine}disable_response_storage = true
 ${localCatalog}network_access = "enabled"
 windows_wsl_setup_acknowledged = true
@@ -87,7 +87,7 @@ ${catalogMode === 'remote' ? `model_catalog_url = "${escapeTomlBasicString(build
 ${codexAuthConfig(apiKey, authMode)}
 
 [features]
-${catalogMode === 'remote' ? 'api_key_model_discovery = true\n' : ''}goals = true`
+${catalogMode === 'remote' ? 'api_key_model_discovery = true\n' : ''}${authMode === 'api-key' ? 'image_generation = true\n' : ''}goals = true`
 
   return [
     { path: `${configDir}/config.toml`, content: configContent },

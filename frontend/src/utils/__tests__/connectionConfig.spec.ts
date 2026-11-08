@@ -16,6 +16,22 @@ function parseToml(content: string) {
 }
 
 describe('connection configurations', () => {
+  it('preserves native image and live search configuration through the shared Codex generator', () => {
+    for (const authMode of ['legacy', 'api-key'] as const) {
+      const files = generateCodexFiles({ baseUrl: 'https://example.test/prefix/v1', apiKey: 'sk-native-test', authMode })
+      const config = parse(files[0]!.content) as unknown as {
+        model: string
+        web_search: string
+        features: { image_generation?: boolean }
+        model_providers: { OpenAI: { requires_openai_auth: boolean } }
+      }
+      expect(config.model).toBe('gpt-6.1-sol')
+      expect(config.web_search).toBe('live')
+      expect(config.features.image_generation).toBe(authMode === 'api-key' ? true : undefined)
+      expect(config.model_providers.OpenAI.requires_openai_auth).toBe(authMode === 'legacy')
+    }
+  })
+
   it.each(['unix', 'powershell', 'cmd'])('keeps special credentials out of the experiment shell command (%s)', (shell) => {
     const apiKey = 'sk-"$percent%&caret^backtick`'
     for (const platform of ['openai', 'grok', 'anthropic', 'gemini']) {

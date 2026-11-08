@@ -2,18 +2,18 @@
   "schema_version": 1,
   "upstream_repository": "https://github.com/Wei-Shaw/sub2api.git",
   "upstream_branch": "main",
-  "previous_upstream_commit": "4a4a83ee5ec86b19d3a2dd9b6471de5128963bec",
-  "upstream_commit": "25608d216bb7be04e4a646830cb065cd09b7d7e9",
-  "upstream_release": "v0.2.19",
-  "fork_before_merge": "a7f80183003582dfda0ca8659a8f6551d282d3cc",
-  "merge_commit": "3347375e4b26a86c5dbb08f931b0018d5e23a0c7",
+  "previous_upstream_commit": "25608d216bb7be04e4a646830cb065cd09b7d7e9",
+  "upstream_commit": "6b4b37db43443b5e88e424fe3c69602cc3810dfb",
+  "upstream_release": "v0.2.20",
+  "fork_before_merge": "260fbfe564cad515c6924894ded8389adeaa9ea9",
+  "merge_commit": null,
   "fork_remote": "fork",
   "fork_branch": "lab/0.2.17",
   "merge_strategy": "merge-commit-no-squash",
   "included_upstream_commits": 24,
   "changed_files": 188,
   "new_database_migrations": 0,
-  "record": "docs/engineering-upgrade/UPSTREAM-SYNC-2026-11-05.md",
+  "record": "docs/engineering-upgrade/UPSTREAM-SYNC-2026-11-08.md",
   "runbook": "docs/engineering-upgrade/UPSTREAM-MERGE-RUNBOOK.md",
   "deployment": {
     "host": "172.104.117.114",
@@ -45,54 +45,56 @@
     "upstream_release": "v0.2.20",
     "fork_commit_at_check": "68b4bf6ac444daaadf4322cabb808257645b0904",
     "missing_upstream_commits": 69,
-    "action": "checked-updates-available-not-merged",
+    "action": "merged-pinned-sha-validated",
     "record": "docs/engineering-upgrade/UPSTREAM-CHECK-2026-11-08.md"
   },
-  "deployment_status": "deployed",
-  "deployment_note": "User explicitly authorized safe upstream integration, fork push and production deployment. Business merge and sponsor-only follow-up are deployed; existing data and shadow modes preserved.",
+  "deployment_status": "validated-awaiting-deployment",
+  "deployment_note": "Current deployment remains previous version until this pinned upstream merge is built and deployed. User authorized merge, fork push and deployment.",
   "validation": {
-    "frontend_tests": 3209,
+    "frontend_tests": 3213,
     "frontend_files": 403,
-    "frontend_baseline_tests": 3183,
+    "frontend_baseline_tests": 3209,
     "quota_postgres_race_passed": 66,
     "quota_postgres_race_skipped": 0,
     "deployment_quota_race_passed": 66,
     "deployment_quota_race_skipped": 0,
-    "targeted_unit_race_passed": 1406,
+    "targeted_unit_race_passed": 1697,
     "targeted_unit_race_skipped": 0,
-    "repository_extra_race_passed": 29,
-    "repository_extra_race_skipped": 0,
-    "default_go_after_passed": 14576,
+    "isolated_zero_allocation_test_passed": 3,
+    "default_go_after_passed": 15017,
     "default_go_skipped": 15,
     "known_deterministic_failure_roots": 9,
-    "server_timing_baseline_and_merged_repeat": 3,
-    "baseline_initial_database_unavailable": true,
-    "baseline_quota_race_rerun_passed": 66,
     "vet": true,
     "incremental_lint": "0 issues",
-    "initial_lint_test_errcheck_fixed": true,
-    "initial_lint_timeout_not_counted_as_pass": true,
     "browser_engines": [
       "Chromium",
       "WebKit"
     ],
-    "custom_blobs_preserved": 430,
+    "custom_blobs_preserved": 443,
     "protected_blobs_preserved": 476,
-    "independent_review": "no actionable integration regressions; test-only and sponsor-only addenda passed",
+    "independent_review": "one legacy Cyber block compatibility regression corrected and narrow review approved",
     "browser_real_api_mutations": 0
   },
   "integration_fixes": [
     {
-      "path": "backend/internal/service/auth_service.go",
-      "reason": "Preserve exact student allowlist and invitation exemptions after explicit inbox blacklist checks; RED-to-GREEN policy regression."
+      "path": "backend/internal/service/api_key_auth_cache_impl.go",
+      "reason": "Reject ambiguous v27 cache and preserve fork plus upstream fields using v28."
     },
     {
-      "path": "frontend/src/utils/__tests__/ccswitchImport.spec.ts",
-      "reason": "Match intentional upstream gpt-5.6-sol default; focused18 and full3209passed."
+      "path": "frontend/src/utils/connectionConfig.ts",
+      "reason": "Port upstream Sol default/live search/native images to retained MILE generator; Grok single-file unchanged."
     },
     {
-      "path": "backend/internal/pkg/httputil/body_budget_test.go",
-      "reason": "Read error channel result in unchanged fatal assertion; errcheck RED-to-GREEN and full package race passed."
+      "path": "backend/internal/repository/gateway_cache.go",
+      "reason": "Preserve legacy transcript blocks until original expiry; bounded exact-prefix compatibility."
+    },
+    {
+      "path": "backend/internal/service/openai_subscription_long_context_test.go",
+      "reason": "Assert purpose wallets are not additionally debited through legacy balance."
+    },
+    {
+      "path": "backend/internal/service/content_moderation_cyber_test.go",
+      "reason": "Remove racy test-only TTL mutation after workers start."
     }
   ],
   "previous_deployment": {
@@ -116,6 +118,6 @@
     "public_assets_matched": 19,
     "startup_error_lines": 0
   },
-  "business_merge_commit": "1b6bb9724ab1581346b3f9c3ae8d0c53de6d5c29",
-  "source_changed_files": 190
+  "source_changed_files": null,
+  "merge_record": "docs/engineering-upgrade/UPSTREAM-SYNC-2026-11-08.md"
 }
