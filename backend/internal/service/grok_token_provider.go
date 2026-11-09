@@ -59,7 +59,19 @@ func (p *GrokTokenProvider) SetTempUnschedCache(cache TempUnschedCache) {
 	p.tempUnschedCache = cache
 }
 
-func (p *GrokTokenProvider) GetAccessToken(ctx context.Context, account *Account) (string, error) {
+func (p *GrokTokenProvider) GetAccessToken(ctx context.Context, account *Account) (credential string, resultErr error) {
+	observation := grokCredentialObservationFromContext(ctx)
+	if observation != nil {
+		defer func() {
+			observation.Result = "success"
+			if resultErr != nil {
+				observation.Result = "failed"
+			}
+			if account != nil {
+				observation.ExpiresAt = account.GetCredentialAsTime("expires_at")
+			}
+		}()
+	}
 	if account == nil {
 		return "", errors.New("account is nil")
 	}
@@ -85,6 +97,9 @@ func (p *GrokTokenProvider) GetAccessToken(ctx context.Context, account *Account
 			cachedToken := strings.TrimSpace(token)
 			if cachedToken != "" && accountAccessToken != "" && cachedToken == accountAccessToken &&
 				expiresAt != nil && time.Until(*expiresAt) > grokTokenRefreshSkew {
+				if observation != nil {
+					observation.Source = "cache"
+				}
 				return cachedToken, nil
 			}
 		}
@@ -92,6 +107,9 @@ func (p *GrokTokenProvider) GetAccessToken(ctx context.Context, account *Account
 
 	needsRefresh := expiresAt == nil || time.Until(*expiresAt) <= grokTokenRefreshSkew
 	if needsRefresh {
+		if observation != nil {
+			observation.RefreshResult = "unavailable"
+		}
 		if p.refreshAPI == nil || p.executor == nil {
 			return "", errGrokOAuthRefreshNotConfigured
 		}
@@ -99,10 +117,16 @@ func (p *GrokTokenProvider) GetAccessToken(ctx context.Context, account *Account
 		defer cancel()
 		result, err := p.refreshAPI.RefreshIfNeeded(withOAuthRefreshRequestPath(refreshCtx), account, p.executor, grokTokenRefreshSkew)
 		if err != nil {
+			if observation != nil {
+				observation.RefreshResult = "failed"
+			}
 			if p.refreshPolicy.OnRefreshError == ProviderRefreshErrorReturn {
 				return "", err
 			}
 		} else if result != nil && result.LockHeld {
+			if observation != nil {
+				observation.RefreshResult = "lock_held"
+			}
 			if p.refreshPolicy.OnLockHeld == ProviderLockHeldWaitForCache {
 				token, waitErr := p.waitForRefreshedToken(refreshCtx, account, cacheKey)
 				return token, withGrokCredentialFailureSnapshot(waitErr, account)
@@ -111,6 +135,12 @@ func (p *GrokTokenProvider) GetAccessToken(ctx context.Context, account *Account
 				return "", withGrokCredentialFailureSnapshot(errGrokOAuthAccessTokenExpired, account)
 			}
 		} else if result != nil && result.Account != nil {
+			if observation != nil {
+				observation.RefreshResult = "already_refreshed"
+				if result.Refreshed {
+					observation.RefreshResult = "refreshed"
+				}
+			}
 			if eligibilityErr := grokOAuthRequestAccountEligibilityError(result.Account); eligibilityErr != nil {
 				return "", withGrokCredentialFailureSnapshot(eligibilityErr, result.Account)
 			}

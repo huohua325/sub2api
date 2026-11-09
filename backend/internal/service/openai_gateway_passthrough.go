@@ -1668,6 +1668,7 @@ func (s *OpenAIGatewayService) recordOpenAIStreamUpstreamError(
 	kind string,
 	payload []byte,
 	message string,
+	responseHeaders ...http.Header,
 ) string {
 	message = sanitizeUpstreamErrorMessage(strings.TrimSpace(message))
 	if message == "" {
@@ -1700,7 +1701,19 @@ func (s *OpenAIGatewayService) recordOpenAIStreamUpstreamError(
 			event.AccountID = account.ID
 			event.AccountName = account.Name
 		}
-		appendOpsUpstreamError(c, event)
+		if account != nil && account.IsGrok() {
+			headers := http.Header{}
+			if len(responseHeaders) > 0 {
+				headers = responseHeaders[0]
+			}
+			model := ""
+			if value, ok := c.Get(OpsUpstreamModelKey); ok {
+				model, _ = value.(string)
+			}
+			appendGrokUpstreamError(c, account, &http.Response{StatusCode: statusCode, Header: headers}, payload, model, event)
+		} else {
+			appendOpsUpstreamError(c, event)
+		}
 	}
 	return message
 }
@@ -1738,7 +1751,7 @@ func (s *OpenAIGatewayService) newOpenAIStreamFailoverErrorWithModel(
 	statusCode, shouldDisable := s.handleOpenAIStreamTerminalAccountSideEffects(c, account, payload, message, headers, canonicalModel)
 	// 流内 failed 事件承载于 HTTP 200；使用事件的语义状态更新账号健康，
 	// 再由 failover 引擎按 StatusCode/RetryableOnSameAccount 决定恢复策略。
-	message = s.recordOpenAIStreamUpstreamError(c, account, passthrough, upstreamRequestID, "failover", payload, message)
+	message = s.recordOpenAIStreamUpstreamError(c, account, passthrough, upstreamRequestID, "failover", payload, message, headers)
 	errType := "upstream_error"
 	if statusCode == http.StatusTooManyRequests {
 		errType = "rate_limit_error"

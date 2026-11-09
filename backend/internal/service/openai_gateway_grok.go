@@ -169,7 +169,7 @@ func (s *OpenAIGatewayService) forwardGrokResponses(
 		if s.shouldFailoverGrokUpstreamError(resp.StatusCode, respBody) {
 			kind = "failover"
 		}
-		appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
+		appendGrokUpstreamError(c, account, resp, respBody, upstreamModel, OpsUpstreamErrorEvent{
 			ProxyID:            opsUpstreamProxyID(account),
 			ProxyName:          opsUpstreamProxyName(account),
 			Platform:           account.Platform,
@@ -1424,7 +1424,7 @@ func (s *OpenAIGatewayService) describeGrokComposerImage(
 		if s.shouldFailoverGrokUpstreamError(resp.StatusCode, respBody) {
 			kind = "failover"
 		}
-		appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
+		appendGrokUpstreamError(c, account, resp, respBody, grokComposerImageBridgeVisionModel, OpsUpstreamErrorEvent{
 			ProxyID:            opsUpstreamProxyID(account),
 			ProxyName:          opsUpstreamProxyName(account),
 			Platform:           account.Platform,

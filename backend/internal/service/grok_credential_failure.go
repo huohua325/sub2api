@@ -139,6 +139,11 @@ func (s *OpenAIGatewayService) getRequestCredential(ctx context.Context, c *gin.
 		})
 	}
 
+	if c != nil {
+		observation := &grokCredentialObservation{AccountID: account.ID, Result: "unknown", Source: "account", RefreshResult: "not_needed"}
+		c.Set(grokCredentialObservationKey, observation)
+		credentialCtx = context.WithValue(credentialCtx, grokCredentialObservationContextKey{}, observation)
+	}
 	token, kind, err := s.GetAccessToken(credentialCtx, account)
 	if err == nil {
 		if s.isOpenAIAccountRuntimeBlocked(account) {
@@ -646,6 +651,16 @@ func (s *OpenAIGatewayService) newGrokCredentialFailover(c *gin.Context, account
 	if strings.TrimSpace(class.message) == "" {
 		class.message = "Grok OAuth credentials are unavailable"
 	}
+	detail := ""
+	if c != nil {
+		if value, ok := c.Get(grokCredentialObservationKey); ok {
+			if observation, ok := value.(*grokCredentialObservation); ok && observation.AccountID == account.ID {
+				if encoded, err := json.Marshal(map[string]any{"authentication": observation}); err == nil {
+					detail = string(encoded)
+				}
+			}
+		}
+	}
 	appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
 		// Credential acquisition happens before the inference transport opens,
 		// so the account binding is not evidence of an inference proxy route.
@@ -658,6 +673,7 @@ func (s *OpenAIGatewayService) newGrokCredentialFailover(c *gin.Context, account
 		Reason:    string(class.reason),
 		Kind:      "credential_failover",
 		Message:   class.message,
+		Detail:    detail,
 	})
 	return &UpstreamFailoverError{
 		Stage:             GatewayFailureStageAccountAuth,
