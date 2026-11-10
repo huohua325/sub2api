@@ -9,6 +9,14 @@ export default {
     grokModelToken: '分组里的模型名',
     dashboardHint: '还没有密钥？看开始使用',
     keysHint: '第一次调用看这里',
+    baseUrl: {
+      title: 'API Base URL',
+      hint: '复制到客户端的 Base URL / API 地址，保留末尾 /v1。密钥使用对应分组的 Key。',
+      format: '格式：https://你的服务域名/v1。上方是本站实际地址，可直接复制；Base URL 不要再追加 /responses 或 /chat/completions。',
+      codex: 'Codex / OpenAI SDK',
+      http: '完整 HTTP 请求地址',
+      protocols: '以上为 OpenAI 兼容协议示例，请按分组选择支持的接口和模型。Claude / Anthropic、Gemini 等客户端请使用密钥的「使用密钥」面板生成对应配置，地址格式可能不同。',
+    },
     steps: {
       login: {
         title: '登录',

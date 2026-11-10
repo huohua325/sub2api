@@ -1,5 +1,13 @@
 export default {
   guide: {
+    baseUrl: {
+      title: 'API Base URL',
+      hint: 'Copy into your client’s Base URL / API address, including /v1. Use a key from the matching group.',
+      format: 'Format: https://your-service-domain/v1. Copy this site’s address above. Do not append /responses or /chat/completions to the Base URL.',
+      codex: 'Codex / OpenAI SDK',
+      http: 'Full HTTP request URLs',
+      protocols: 'These examples use the OpenAI-compatible protocol. Choose endpoints and models supported by your group. For Claude / Anthropic, Gemini and other clients, generate the appropriate configuration from “Use key”; their address formats may differ.',
+    },
     title: 'Get started',
     lead: 'Call Codex and Grok with your own key. Use this site as the address, and use the model name from that key’s group.',
     tocLabel: 'Steps',

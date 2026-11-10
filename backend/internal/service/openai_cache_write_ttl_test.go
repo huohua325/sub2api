@@ -96,7 +96,9 @@ func TestOpenAICacheWriteTTLRecordUsage(t *testing.T) {
 				assert.InDelta(t, cacheCost, log.CacheCreationCost, 1e-12)
 				assert.InDelta(t, totalCost, log.TotalCost, 1e-12)
 				assert.InDelta(t, totalCost*0.5, log.ActualCost, 1e-12)
-				assert.InDelta(t, totalCost*0.5, userRepo.lastAmount, 1e-12)
+				// MILE purpose wallets retain the priced usage above; billing must
+				// not additionally debit the legacy user balance.
+				assert.Zero(t, userRepo.lastAmount)
 				require.NotNil(t, log.AccountStatsCost)
 				assert.InDelta(t, totalCost, *log.AccountStatsCost, 1e-12)
 			})

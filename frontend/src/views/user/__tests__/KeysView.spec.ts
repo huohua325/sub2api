@@ -274,6 +274,16 @@ const getButtonByText = (wrapper: VueWrapper, text: string) => {
 }
 
 describe('user KeysView column settings', () => {
+  it('exposes and copies the configured API base without duplicating the version path', async () => {
+    getPublicSettings.mockResolvedValue({ api_base_url: 'https://gateway.example/proxy/v1/' })
+    copyToClipboard.mockResolvedValue(true)
+    const wrapper = await mountView()
+    const address = wrapper.get<HTMLInputElement>('input[readonly]')
+    expect(address.element.value).toBe('https://gateway.example/proxy/v1')
+    await wrapper.get('button[aria-label="guide.copy guide.baseUrl.title"]').trigger('click')
+    expect(copyToClipboard).toHaveBeenCalledWith('https://gateway.example/proxy/v1')
+    wrapper.unmount()
+  })
   beforeEach(() => {
     route.query = {}
     localStorage.clear()

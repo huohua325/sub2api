@@ -55,6 +55,7 @@
       </template>
       <template #filters>
         <div class="flex flex-col gap-2">
+          <ApiBaseUrl :base-url="publicSettings?.api_base_url" />
           <div class="flex flex-wrap items-center gap-3">
             <SearchInput
               v-model="filterSearch"
@@ -82,8 +83,8 @@
             </router-link>
           </div>
           <EndpointPopover
-            v-if="publicSettings?.api_base_url || (publicSettings?.custom_endpoints?.length ?? 0) > 0"
-            :api-base-url="publicSettings?.api_base_url || ''"
+            v-if="(publicSettings?.custom_endpoints?.length ?? 0) > 0"
+            api-base-url=""
             :custom-endpoints="publicSettings?.custom_endpoints || []"
           />
 
@@ -1240,6 +1241,7 @@ import PageHeader from '@/components/common/PageHeader.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
 import BulkEditKeysModal from '@/components/keys/BulkEditKeysModal.vue'
+import ApiBaseUrl from '@/components/keys/ApiBaseUrl.vue'
 	import DataTable from '@/components/common/DataTable.vue'
 	import Pagination from '@/components/common/Pagination.vue'
 	import BaseDialog from '@/components/common/BaseDialog.vue'

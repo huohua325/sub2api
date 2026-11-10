@@ -2,18 +2,18 @@
   "schema_version": 1,
   "upstream_repository": "https://github.com/Wei-Shaw/sub2api.git",
   "upstream_branch": "main",
-  "previous_upstream_commit": "25608d216bb7be04e4a646830cb065cd09b7d7e9",
-  "upstream_commit": "6b4b37db43443b5e88e424fe3c69602cc3810dfb",
+  "previous_upstream_commit": "6b4b37db43443b5e88e424fe3c69602cc3810dfb",
+  "upstream_commit": "e2c9812190dd71bb309c8ad020a1211da1e0d3b4",
   "upstream_release": "v0.2.20",
-  "fork_before_merge": "260fbfe564cad515c6924894ded8389adeaa9ea9",
-  "merge_commit": "cdc09bea8d630d15ab27e9bee339ef26854adcd4",
+  "fork_before_merge": "406880d1396d1bb9747b90b8618760ea2cc9f39a",
+  "merge_commit": "c7297838b1b3bf0e0a0e64340d52bf112f32dc9a",
   "fork_remote": "fork",
   "fork_branch": "lab/0.2.17",
   "merge_strategy": "merge-commit-no-squash",
-  "included_upstream_commits": 24,
-  "changed_files": 188,
-  "new_database_migrations": 0,
-  "record": "docs/engineering-upgrade/UPSTREAM-SYNC-2026-11-08.md",
+  "included_upstream_commits": 77,
+  "changed_files": 177,
+  "new_database_migrations": 2,
+  "record": "docs/engineering-upgrade/UPSTREAM-SYNC-2026-11-11.md",
   "runbook": "docs/engineering-upgrade/UPSTREAM-MERGE-RUNBOOK.md",
   "deployment": {
     "host": "172.104.117.114",
@@ -40,61 +40,62 @@
     "database_backup_bytes": 13053129
   },
   "last_upstream_check": {
-    "checked_at": "2026-11-08T11:40:34Z",
-    "upstream_commit": "6b4b37db43443b5e88e424fe3c69602cc3810dfb",
-    "upstream_release": "v0.2.20",
-    "fork_commit_at_check": "260fbfe564cad515c6924894ded8389adeaa9ea9",
-    "missing_upstream_commits": 69,
-    "action": "merged-and-deployed-pinned-sha",
-    "record": "docs/engineering-upgrade/UPSTREAM-SYNC-2026-11-08.md"
+    "checked_at": "2026-11-10T18:22:55.815301+00:00",
+    "upstream_commit": "e2c9812190dd71bb309c8ad020a1211da1e0d3b4",
+    "upstream_release": "v0.2.20 + main commits",
+    "fork_commit_at_check": "406880d1396d1bb9747b90b8618760ea2cc9f39a",
+    "missing_upstream_commits": 77,
+    "action": "merged-pinned-sha",
+    "record": "docs/engineering-upgrade/UPSTREAM-SYNC-2026-11-11.md"
   },
-  "deployment_status": "deployed",
-  "deployment_note": "Custom Grok diagnostics upgrade deployed after pinned v0.2.20 upstream merge. Existing clocks, ledgers, events, capacity projections and shadow modes preserved. No new upstream commits or database migrations in this custom upgrade.",
+  "deployment_status": "validated-awaiting-deployment",
+  "deployment_note": "Pinned upstream merge and copyable Base URL pages verified. Deployment still records last running release until post-deployment verification.",
   "validation": {
-    "frontend_tests": 3213,
-    "frontend_files": 403,
-    "frontend_baseline_tests": 3209,
+    "frontend_tests": 3233,
+    "frontend_files": 404,
     "quota_postgres_race_passed": 66,
     "quota_postgres_race_skipped": 0,
-    "deployment_quota_race_passed": 66,
-    "deployment_quota_race_skipped": 0,
-    "targeted_unit_race_passed": 1697,
-    "targeted_unit_race_skipped": 0,
-    "isolated_zero_allocation_test_passed": 3,
-    "default_go_after_passed": 15017,
+    "targeted_unit_race_passed": 3150,
+    "targeted_unit_race_skipped": 1,
+    "default_go_after_passed": 15490,
     "default_go_skipped": 15,
-    "known_deterministic_failure_roots": 9,
+    "known_deterministic_failure_roots": 6,
+    "windows_only_new_failure": "TestCgroupMemoryLimit: symlink privilege; unchanged original Linux tests 12 passed",
     "vet": true,
     "incremental_lint": "0 issues",
     "browser_engines": [
       "Chromium",
       "WebKit"
     ],
-    "custom_blobs_preserved": 443,
-    "protected_blobs_preserved": 476,
-    "independent_review": "one legacy Cyber block compatibility regression corrected and narrow review approved",
-    "browser_real_api_mutations": 0
+    "independent_review": "Separate self-review; no independent reviewer",
+    "browser_real_api_mutations": 0,
+    "new_migration_isolated_idempotency": true,
+    "custom_blobs_outside_upstream_preserved": 448
   },
   "integration_fixes": [
     {
-      "path": "backend/internal/service/api_key_auth_cache_impl.go",
-      "reason": "Reject ambiguous v27 cache and preserve fork plus upstream fields using v28."
+      "path": "backend/internal/repository/usage_log_repo_insert.go",
+      "reason": "Preserve seven official metering fields plus two upstream cache TTL fields; consistent 71-argument insert/read paths."
     },
     {
-      "path": "frontend/src/utils/connectionConfig.ts",
-      "reason": "Port upstream Sol default/live search/native images to retained MILE generator; Grok single-file unchanged."
+      "path": "backend/internal/repository/migrations_runner.go",
+      "reason": "Retain both fork official-window and upstream API-key-cost invalid-index recovery cases."
     },
     {
-      "path": "backend/internal/repository/gateway_cache.go",
-      "reason": "Preserve legacy transcript blocks until original expiry; bounded exact-prefix compatibility."
+      "path": "backend/internal/repository/usage_log_repo_request_type_test.go",
+      "reason": "Repair three related pre-existing SQL fixture failures without changing production charge behavior."
     },
     {
-      "path": "backend/internal/service/openai_subscription_long_context_test.go",
-      "reason": "Assert purpose wallets are not additionally debited through legacy balance."
+      "path": "backend/internal/server/api_contract_test.go",
+      "reason": "Assert five existing MILE admin settings fields in strict JSON contract fixtures."
     },
     {
-      "path": "backend/internal/service/content_moderation_cyber_test.go",
-      "reason": "Remove racy test-only TTL mutation after workers start."
+      "path": "backend/internal/service/openai_cache_write_ttl_test.go",
+      "reason": "Retain real priced-usage assertions while verifying no duplicate legacy-balance debit for a purpose wallet."
+    },
+    {
+      "path": "backend/internal/service/auth_service_email_bind_test.go",
+      "reason": "Make the existing concurrent email-cache test double return a locked snapshot, matching Redis semantics."
     }
   ],
   "previous_deployment": {
@@ -124,8 +125,8 @@
     "catalog_terra_present": true
   },
   "source_changed_files": 200,
-  "merge_record": "docs/engineering-upgrade/UPSTREAM-SYNC-2026-11-08.md",
-  "business_merge_commit": "cdc09bea8d630d15ab27e9bee339ef26854adcd4",
+  "merge_record": "docs/engineering-upgrade/UPSTREAM-SYNC-2026-11-11.md",
+  "business_merge_commit": "c7297838b1b3bf0e0a0e64340d52bf112f32dc9a",
   "last_custom_upgrade": {
     "name": "grok-upstream-diagnostics",
     "base_commit": "83ff8ea9f9e8cee059c19277980b6e12b3081ff6",

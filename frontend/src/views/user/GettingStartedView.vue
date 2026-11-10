@@ -35,6 +35,19 @@
             </li>
           </ol>
           <p class="mt-4 max-w-[40rem] text-sm leading-6 text-gray-500 dark:text-gray-400">{{ t('guide.manual.keyHint') }}</p>
+          <div class="mt-6">
+            <ApiBaseUrl :base-url="apiV1" />
+            <p class="mt-3 text-sm leading-6 text-gray-600 dark:text-gray-300">{{ t('guide.baseUrl.format') }}</p>
+            <dl class="mt-3 grid gap-2 text-xs leading-6 sm:grid-cols-[auto_minmax(0,1fr)]">
+              <dt class="font-medium text-gray-900 dark:text-white">{{ t('guide.baseUrl.codex') }}</dt>
+              <dd class="min-w-0 break-all font-mono text-gray-600 dark:text-gray-300" translate="no">base_url = "{{ apiV1 }}"</dd>
+              <dt class="font-medium text-gray-900 dark:text-white">Grok Build</dt>
+              <dd class="min-w-0 break-all font-mono text-gray-600 dark:text-gray-300" translate="no">models_base_url = "{{ apiV1 }}"</dd>
+              <dt class="font-medium text-gray-900 dark:text-white">{{ t('guide.baseUrl.http') }}</dt>
+              <dd class="min-w-0 break-all font-mono text-gray-600 dark:text-gray-300" translate="no">POST {{ apiV1 }}/responses<br />POST {{ apiV1 }}/chat/completions</dd>
+            </dl>
+            <p class="mt-3 text-xs leading-5 text-gray-500 dark:text-gray-400">{{ t('guide.baseUrl.protocols') }}</p>
+          </div>
         </section>
 
         <section v-show="selectedPurpose === 'codex'" id="guide-codex" data-testid="guide-client" class="mt-12 scroll-mt-24 border-t border-gray-100 pt-10 dark:border-dark-700">
@@ -165,6 +178,7 @@ import { KEY_GROUP_PROVIDERS, type KeyGroupProvider } from '@/utils/keyGroupProv
 import { useI18n } from 'vue-i18n'
 import PageHeader from '@/components/common/PageHeader.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import ApiBaseUrl from '@/components/keys/ApiBaseUrl.vue'
 import { useClipboard } from '@/composables/useClipboard'
 import { useAppStore } from '@/stores/app'
 import { generateCodexFiles, generateGrokFiles, DEFAULT_GROK_MODEL } from '@/utils/connectionConfig'

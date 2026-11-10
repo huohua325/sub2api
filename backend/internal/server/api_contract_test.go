@@ -718,6 +718,11 @@ func TestAPIContracts(t *testing.T) {
 				"message": "success",
 				"data": {
 					"registration_enabled": true,
+					"official_point_budget": {"openai": "50", "grok": "30"},
+					"official_point_student_percent": false,
+					"platform_quota_week_mode": "registration",
+					"registration_email_allowlist_enabled": false,
+					"registration_email_allowlist": [],
 					"email_verify_enabled": false,
 					"registration_email_suffix_whitelist": [],
 					"registration_email_domain_quota_enabled": false,
@@ -1077,6 +1082,11 @@ func TestAPIContracts(t *testing.T) {
 				"message": "success",
 				"data": {
 					"registration_enabled": true,
+					"official_point_budget": {"openai": "50", "grok": "30"},
+					"official_point_student_percent": false,
+					"platform_quota_week_mode": "registration",
+					"registration_email_allowlist_enabled": false,
+					"registration_email_allowlist": [],
 					"email_verify_enabled": false,
 					"registration_email_suffix_whitelist": [],
 					"registration_email_domain_quota_enabled": false,

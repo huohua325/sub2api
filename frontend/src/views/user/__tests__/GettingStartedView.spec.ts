@@ -28,7 +28,7 @@ vi.mock('@/components/layout/AppLayout.vue', () => ({
 import GettingStartedView from '../GettingStartedView.vue'
 
 describe('GettingStartedView', () => {
-  it('shows Codex and Grok Build setup without a wallet balance', () => {
+  it('shows Codex and Grok Build setup without a wallet balance', async () => {
     const wrapper = mount(GettingStartedView, {
       global: {
         stubs: { 'router-link': { props: ['to'], template: '<a :href="to"><slot /></a>' } },
@@ -47,5 +47,9 @@ describe('GettingStartedView', () => {
     expect(wrapper.text()).toContain('OPENAI_API_KEY')
     expect(wrapper.text()).toContain('[model."grok-4.7"]')
     expect(wrapper.text()).not.toContain('XAI_API_KEY')
+    expect(wrapper.get<HTMLInputElement>('input[readonly]').element.value).toBe('https://gateway.example/v1')
+    const experiment = wrapper.findAll('button').find(button => button.text() === 'keys.providers.experiment')!
+    await experiment.trigger('click')
+    expect(wrapper.get<HTMLInputElement>('input[readonly]').element.value).toBe('https://gateway.example/v1')
   })
 })
