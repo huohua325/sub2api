@@ -47,12 +47,13 @@ export default {
     },
     troubleshoot: {
       title: 'If a call fails, check these three things',
-      quota: 'Whether the weekly limit is already used up',
+      quota: 'Whether the allowance for this purpose is sufficient',
       group: 'Whether the key belongs to this group',
       model: 'Whether the group allows that model name'
     },
     manual: {
-      lead: 'Codex and Grok Build are both ready. Create a key, then install, write the config, and send one test.',
+      lead: 'Prepare a key and gateway address, follow the Codex, Grok Build or API experiment setup, then verify the call in usage records.',
+      choosePath: 'Choose a setup path to jump to its instructions',
       windows: 'Windows',
       unix: 'macOS / Linux',
       openFolder: 'Open the config folder',
@@ -60,11 +61,20 @@ export default {
       keyHint: 'sk-YOUR_KEY in the samples is only a placeholder. Replace it with the whole key you just copied. Do not send a real key in chat or a screenshot.',
       fieldsTitle: 'What these settings do',
       prep: {
-        title: 'Prepare a key',
+        title: 'Key and gateway address',
         login: 'Register with an email an administrator approved, set a password, and sign in.',
-        quota: 'Codex and Grok have separate personal weekly quotas. All Keys for one purpose share quota. A rounded 100% is not necessarily exhausted; check the status.',
+        quota: 'Codex and Grok have separate personal weekly quotas; API experiments use a separate experiment allowance. All Keys for one purpose share quota. A rounded 100% is not necessarily exhausted; check the status.',
         key: 'Choose a purpose and group, then create a Key. Creation opens the connection panel. Existing Keys can reopen it using Use Key.',
         link: 'Open API Keys'
+      },
+      experiment: {
+        lead: 'Connect models to your own program, SDK or tools. Use an experiment-group key; charges count toward your separate experiment allowance.',
+        key: 'Choose “API experiment” when creating a key, then select the experiment group you need. An existing key can be reused.',
+        model: 'Open Models and check the model name and protocol supported by the group. Copy the complete model name. Do not substitute a key from a Codex or Grok coding group.',
+        configure: 'Return to API Keys, click “Use key” for this key and select an API example. Copy the matching protocol and operating-system configuration. Run it manually, then verify the charged usage in Usage records.',
+        create: 'Create experiment key',
+        exampleTitle: 'View an OpenAI-compatible API example',
+        exampleHint: 'Only for experiment groups supporting Responses. Save the three files in one directory, replace YOUR_MODEL_ID and the placeholder key, then run request.sh on macOS / Linux / WSL. For Windows or other protocols, generate matching examples in “Use key”; their address formats may differ.',
       },
       codex: {
         title: 'Codex',

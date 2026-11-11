@@ -47,12 +47,13 @@ export default {
     },
     troubleshoot: {
       title: '调用失败时先看这三件事',
-      quota: '周限额是不是已经用完',
+      quota: '对应用途的可用额度是否不足',
       group: '密钥是不是这个分组的',
       model: '模型名是不是该分组允许的'
     },
     manual: {
-      lead: 'Codex 和 Grok Build 都可以用。先建密钥，再按下面的顺序安装、写配置、试一次。',
+      lead: '先准备密钥与接入地址，再选择 Codex、Grok Build 或 API 实验完成接入，最后核对调用记录。',
+      choosePath: '选择接入方式，跳转到对应说明',
       windows: 'Windows',
       unix: 'macOS / Linux',
       openFolder: '打开配置目录',
@@ -60,11 +61,20 @@ export default {
       keyHint: '示例里的 sk-你的密钥只是占位。换成你刚复制的整把密钥，不要发到聊天或截图里。',
       fieldsTitle: '这些配置是什么意思',
       prep: {
-        title: '准备密钥',
+        title: '密钥与接入地址',
         login: '用管理员开通的邮箱注册并设置密码，然后登录。',
-        quota: 'Codex 和 Grok 分别使用个人周额度。同用途的 Key 共用额度；是否耗尽以状态为准，显示四舍五入后的 100% 不一定代表已耗尽。',
+        quota: 'Codex 和 Grok 分别使用个人周额度，API 实验使用独立实验额度。同用途的 Key 共用额度；是否耗尽以状态为准，显示四舍五入后的 100% 不一定代表已耗尽。',
         key: '按用途选择分组并创建密钥。创建后会打开接入面板；已有密钥也能通过“使用密钥”重新配置。',
         link: '打开 API 密钥'
+      },
+      experiment: {
+        lead: '把模型接入自己的程序、SDK 或其他工具。使用实验分组的 Key，调用费用计入独立实验额度。',
+        key: '创建密钥时选择“API 实验”，再选择你要使用的实验分组。已有 Key 可直接继续使用。',
+        model: '打开“模型”页，确认分组支持的模型名与协议。模型名按页面提供的完整名称填写，不要用 Codex 或 Grok 编程分组的 Key 替代。',
+        configure: '回到“API 密钥”，点击这把 Key 的“使用密钥”，选择 API 示例，复制对应协议和操作系统的配置。示例需要手动运行，会产生用量；完成后到“使用记录”核对。',
+        create: '创建实验密钥',
+        exampleTitle: '查看 OpenAI 兼容 API 示例',
+        exampleHint: '仅适用于支持 Responses 接口的实验分组。将下面三个文件保存在同一目录，把 YOUR_MODEL_ID 和占位密钥换成自己的值，再在 macOS / Linux / WSL 中运行 request.sh。Windows 或其他协议请从“使用密钥”面板获取匹配示例；不要直接套用这些地址。',
       },
       codex: {
         title: 'Codex',

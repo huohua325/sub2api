@@ -3,26 +3,29 @@
     <div class="grid w-full grid-cols-1 items-start gap-8 xl:grid-cols-[minmax(0,46rem)_16rem]">
       <article class="lab-guide-content">
         <PageHeader :title="t('guide.title')" :description="t('guide.manual.lead')" />
-        <div class="mt-5 flex flex-wrap gap-2" :aria-label="t('keys.providerLabel')">
-          <button v-for="purpose in KEY_GROUP_PROVIDERS" :key="purpose" class="btn min-h-11" :class="selectedPurpose === purpose ? 'btn-primary' : 'btn-secondary'" type="button" :aria-pressed="selectedPurpose === purpose" @click="selectedPurpose = purpose">{{ t(`keys.providers.${purpose}`) }}</button>
-        </div>
+        <p class="mt-5 text-sm font-medium text-gray-900 dark:text-gray-100">{{ t('guide.manual.choosePath') }}</p>
+        <nav class="mt-3 flex flex-wrap gap-2" :aria-label="t('keys.providerLabel')">
+          <router-link v-for="item in entryPaths" :key="item.id" :to="sectionLocation(item)" :data-guide-path="item.purpose" class="btn min-h-11" :class="activeStep === item.id ? 'btn-primary' : 'btn-secondary'" :aria-current="activeStep === item.id ? 'location' : undefined" @click="focusRepeatedChapter(item, $event)">{{ item.title }}</router-link>
+        </nav>
         <div class="mt-4 flex flex-wrap gap-3">
           <router-link class="btn btn-primary" :to="{ path: '/keys', query: { purpose: selectedPurpose, create: '1' } }">{{ t('keys.createKey') }}</router-link>
           <router-link class="btn btn-secondary" to="/keys">{{ t('keys.connection.chooseExisting') }}</router-link>
         </div>
 
-        <nav :aria-label="t('guide.tocLabel')" class="mt-6 flex flex-wrap gap-x-4 gap-y-2 border-b border-gray-100 pb-4 dark:border-dark-700 xl:hidden">
-          <a
+        <nav data-guide-toc :aria-label="t('guide.tocLabel')" class="mt-6 flex flex-wrap gap-x-4 gap-y-2 border-b border-gray-100 pb-4 dark:border-dark-700 xl:hidden">
+          <router-link
             v-for="item in toc"
             :key="item.id"
-            :href="`#${item.id}`"
-            class="text-sm text-gray-600 underline-offset-4 hover:text-gray-900 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40 dark:text-gray-300 dark:hover:text-white"
+            :to="sectionLocation(item)"
+            :aria-current="activeStep === item.id ? 'location' : undefined"
+            @click="focusRepeatedChapter(item, $event)"
+            class="inline-flex min-h-11 items-center text-sm text-gray-600 underline-offset-4 hover:text-gray-900 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40 dark:text-gray-300 dark:hover:text-white"
           >
             {{ item.title }}
-          </a>
+          </router-link>
         </nav>
 
-        <section id="guide-prep" data-testid="guide-step" class="mt-10 scroll-mt-24">
+        <section id="guide-prep" tabindex="-1" data-testid="guide-step" class="mt-10 scroll-mt-28 focus:outline-none">
           <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('guide.manual.prep.title') }}</h3>
           <ol class="mt-4 max-w-[40rem] list-decimal space-y-3 pl-5 text-sm leading-6 text-gray-600 dark:text-gray-300">
             <li>{{ t('guide.manual.prep.login') }}</li>
@@ -50,7 +53,7 @@
           </div>
         </section>
 
-        <section v-show="selectedPurpose === 'codex'" id="guide-codex" data-testid="guide-client" class="mt-12 scroll-mt-24 border-t border-gray-100 pt-10 dark:border-dark-700">
+        <section id="guide-codex" tabindex="-1" data-testid="guide-client" class="mt-12 scroll-mt-28 border-t border-gray-100 pt-10 focus:outline-none dark:border-dark-700">
           <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('guide.manual.codex.title') }}</h3>
           <p class="mt-2 max-w-[40rem] text-sm leading-6 text-gray-600 dark:text-gray-300">{{ t('guide.manual.codex.ready') }}</p>
           <p class="mt-4 max-w-[40rem] text-sm leading-6 text-gray-600 dark:text-gray-300">{{ t('guide.manual.codex.install') }}</p>
@@ -94,7 +97,7 @@
           <GuideCommand class="mt-3" label="codex" command="codex" />
         </section>
 
-        <section v-show="selectedPurpose === 'grok_build'" id="guide-grok" data-testid="guide-client" class="mt-12 scroll-mt-24 border-t border-gray-100 pt-10 dark:border-dark-700">
+        <section id="guide-grok" tabindex="-1" data-testid="guide-client" class="mt-12 scroll-mt-28 border-t border-gray-100 pt-10 focus:outline-none dark:border-dark-700">
           <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('guide.manual.grok.title') }}</h3>
           <p class="mt-2 max-w-[40rem] text-sm leading-6 text-gray-600 dark:text-gray-300">{{ t('guide.manual.grok.ready') }}</p>
           <p class="mt-4 max-w-[40rem] text-sm leading-6 text-gray-600 dark:text-gray-300">{{ t('guide.manual.grok.install') }}</p>
@@ -130,12 +133,25 @@
           <GuideCommand class="mt-3" label="grok" :command="grokProbe" />
         </section>
 
-        <section v-show="selectedPurpose === 'experiment'" id="guide-experiment" class="mt-12 scroll-mt-24 border-t border-gray-100 pt-10 dark:border-dark-700">
-          <h3 class="text-lg font-semibold">{{ t('keys.providers.experiment') }}</h3>
-          <p class="mt-3 text-sm leading-7 text-gray-500">{{ t('keys.connection.experimentGuide') }}</p>
-          <router-link class="btn btn-secondary mt-4" to="/models">{{ t('models.title') }}</router-link>
+        <section id="guide-experiment" tabindex="-1" data-testid="guide-client" class="mt-12 scroll-mt-28 border-t border-gray-100 pt-10 focus:outline-none dark:border-dark-700">
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('keys.providers.experiment') }}</h3>
+          <p class="mt-2 text-sm leading-6 text-gray-600 dark:text-gray-300">{{ t('guide.manual.experiment.lead') }}</p>
+          <ol class="mt-4 list-decimal space-y-3 pl-5 text-sm leading-6 text-gray-600 dark:text-gray-300">
+            <li>{{ t('guide.manual.experiment.key') }}</li>
+            <li>{{ t('guide.manual.experiment.model') }}</li>
+            <li>{{ t('guide.manual.experiment.configure') }}</li>
+          </ol>
+          <div class="mt-4 flex flex-wrap gap-3">
+            <router-link class="btn btn-primary" to="/keys?purpose=experiment&create=1">{{ t('guide.manual.experiment.create') }}</router-link>
+            <router-link class="btn btn-secondary" to="/models">{{ t('models.title') }}</router-link>
+          </div>
+          <details class="mt-6 rounded-xl border border-gray-200 p-4 dark:border-dark-600">
+            <summary class="min-h-11 cursor-pointer text-sm font-medium text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40 dark:text-gray-100">{{ t('guide.manual.experiment.exampleTitle') }}</summary>
+            <p class="mt-2 text-sm leading-6 text-gray-500 dark:text-gray-400">{{ t('guide.manual.experiment.exampleHint') }}</p>
+            <GuideFile v-for="file in experimentFiles" :key="file.path" class="mt-4" :filename="file.path" :code="file.content" :copy-label="t('guide.copy')" :copied-label="t('guide.copied')" :copied="copiedId === `experiment-${file.path}`" @copy="copyText(file.content, `experiment-${file.path}`)" />
+          </details>
         </section>
-        <section id="guide-check" data-testid="guide-step" class="mt-12 scroll-mt-24 border-t border-gray-100 pt-10 dark:border-dark-700">
+        <section id="guide-check" tabindex="-1" data-testid="guide-step" class="mt-12 scroll-mt-28 border-t border-gray-100 pt-10 focus:outline-none dark:border-dark-700">
           <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('guide.manual.check.title') }}</h3>
           <p class="mt-2 max-w-[40rem] text-sm leading-6 text-gray-600 dark:text-gray-300">{{ t('guide.manual.check.body') }}</p>
           <div class="mt-3 flex flex-wrap gap-x-4 gap-y-2">
@@ -150,18 +166,20 @@
       </article>
 
       <aside class="hidden xl:sticky xl:top-24 xl:block">
-        <nav :aria-label="t('guide.tocLabel')" class="card space-y-1 p-3">
-          <a
+        <nav data-guide-toc :aria-label="t('guide.tocLabel')" class="card space-y-1 p-3">
+          <router-link
             v-for="item in toc"
             :key="`rail-${item.id}`"
-            :href="`#${item.id}`"
-            class="block rounded-xl px-3 py-2 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40"
+            :to="sectionLocation(item)"
+            :aria-current="activeStep === item.id ? 'location' : undefined"
+            @click="focusRepeatedChapter(item, $event)"
+            class="flex min-h-11 items-center rounded-xl px-3 py-2 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40"
             :class="activeStep === item.id
               ? 'bg-primary-50 font-medium text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
               : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-dark-700 dark:hover:text-white'"
           >
             {{ item.title }}
-          </a>
+          </router-link>
         </nav>
         <div class="card mt-4 p-4">
           <GuideTroubleshoot :title="t('guide.troubleshoot.title')" :items="troubleItems" />
@@ -174,14 +192,14 @@
 <script setup lang="ts">
 import { watch, nextTick, computed, defineComponent, h, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { KEY_GROUP_PROVIDERS, type KeyGroupProvider } from '@/utils/keyGroupProviders'
+import { GUIDE_SECTIONS, guidePurpose, type GuideSection } from '@/utils/guideNavigation'
 import { useI18n } from 'vue-i18n'
 import PageHeader from '@/components/common/PageHeader.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import ApiBaseUrl from '@/components/keys/ApiBaseUrl.vue'
 import { useClipboard } from '@/composables/useClipboard'
 import { useAppStore } from '@/stores/app'
-import { generateCodexFiles, generateGrokFiles, DEFAULT_GROK_MODEL } from '@/utils/connectionConfig'
+import { generateCodexFiles, generateGrokFiles, generateExperimentFiles, DEFAULT_GROK_MODEL } from '@/utils/connectionConfig'
 
 const GuideCommand = defineComponent({
   props: {
@@ -257,22 +275,25 @@ const appStore = useAppStore()
 const { copyToClipboard } = useClipboard()
 
 const route = useRoute()
-const selectedPurpose = ref<KeyGroupProvider>('codex')
-function selectFromLocation() {
-  const purpose = route?.query?.purpose
-  if (KEY_GROUP_PROVIDERS.includes(purpose as KeyGroupProvider)) selectedPurpose.value = purpose as KeyGroupProvider
-  const hash = route?.hash || window.location.hash
-  if (hash === '#guide-grok') selectedPurpose.value = 'grok_build'
-  if (hash === '#guide-codex') selectedPurpose.value = 'codex'
-  if (hash === '#guide-experiment') selectedPurpose.value = 'experiment'
-  void nextTick(() => { if (hash) document.getElementById(hash.slice(1))?.scrollIntoView?.() })
+const selectedPurpose = computed(() => guidePurpose(route.hash, route.query.purpose))
+function sectionLocation(section: GuideSection) {
+  return { path: '/guide', query: { ...route.query, purpose: section.purpose || selectedPurpose.value }, hash: `#${section.id}` }
 }
-watch(() => [route?.hash, route?.query?.purpose], selectFromLocation, { immediate: true })
 
-const activeStep = ref('guide-prep')
+const activeStep = computed(() => GUIDE_SECTIONS.find(section => `#${section.id}` === route.hash)?.id || 'guide-prep')
 const copiedId = ref('')
 let copiedTimer: number | undefined
-let stepObserver: IntersectionObserver | undefined
+async function focusChapter() {
+  const section = GUIDE_SECTIONS.find(item => `#${item.id}` === route.hash)
+  if (!section) return
+  await nextTick()
+  document.getElementById(section.id)?.focus({ preventScroll: true })
+}
+function focusRepeatedChapter(section: GuideSection, event: MouseEvent) {
+  if (route.hash !== `#${section.id}` || event.button !== 0 || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return
+  void nextTick(() => document.getElementById(section.id)?.focus({ preventScroll: true }))
+}
+watch(() => route.hash, focusChapter, { flush: 'post' })
 
 const apiV1 = computed(() => {
   const raw = (appStore.cachedPublicSettings?.api_base_url || window.location.origin).replace(/\/+$/, '')
@@ -288,13 +309,10 @@ const codexConfig = computed(() => codexFiles.value[0]!.content)
 const authJson = computed(() => codexFiles.value[1]!.content)
 const grokFiles = computed(() => generateGrokFiles({ baseUrl: apiV1.value, apiKey: keyPlaceholder.value }))
 const grokConfig = computed(() => grokFiles.value[0]!.content)
+const experimentFiles = computed(() => generateExperimentFiles({ baseUrl: apiV1.value, apiKey: keyPlaceholder.value, platform: 'openai' }))
 
-const toc = computed(() => [
-  { id: 'guide-prep', title: t('guide.manual.prep.title') },
-  { id: 'guide-codex', title: t('guide.manual.codex.title') },
-  { id: 'guide-grok', title: t('guide.manual.grok.title') },
-  { id: 'guide-check', title: t('guide.manual.check.title') },
-])
+const toc = computed(() => GUIDE_SECTIONS.map(section => ({ ...section, title: t(section.titleKey) })))
+const entryPaths = computed(() => toc.value.filter(section => section.purpose))
 
 const codexFieldNames = [
   'model',
@@ -347,23 +365,10 @@ async function copyText(value: string, id: string) {
 }
 
 onMounted(() => {
-  window.addEventListener('hashchange', selectFromLocation)
-  if (typeof IntersectionObserver === 'undefined') return
-  stepObserver = new IntersectionObserver((entries) => {
-    const visible = entries
-      .filter((entry) => entry.isIntersecting)
-      .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0]
-    if (visible?.target?.id) activeStep.value = visible.target.id
-  }, { rootMargin: '-20% 0px -55% 0px', threshold: [0.15, 0.4] })
-  for (const item of toc.value) {
-    const node = document.getElementById(item.id)
-    if (node) stepObserver.observe(node)
-  }
+  void focusChapter()
 })
 
 onBeforeUnmount(() => {
-  window.removeEventListener('hashchange', selectFromLocation)
-  stepObserver?.disconnect()
   if (copiedTimer !== undefined) window.clearTimeout(copiedTimer)
 })
 </script>

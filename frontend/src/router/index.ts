@@ -14,6 +14,7 @@ import { getSetupStatus } from '@/api/setup'
 import { resolveCompletedSetupRedirectPath } from './setupRedirect'
 import { registrationEmailGateRedirect } from './registrationEmailGate'
 import { resolveRouteDocumentTitle } from './title'
+import { scrollBehavior } from './scrollBehavior'
 
 /**
  * Route definitions with lazy loading
@@ -801,14 +802,7 @@ if (import.meta.env.DEV) {
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes,
-  scrollBehavior(_to, _from, savedPosition) {
-    // Scroll to saved position when using browser back/forward
-    if (savedPosition) {
-      return savedPosition
-    }
-    // Scroll to top for new routes
-    return { top: 0 }
-  }
+  scrollBehavior,
 })
 
 /**
