@@ -31,7 +31,7 @@ GET /api/v1/admin/users/:id/purpose-quota-resets 返回用途周期和最近记�
 
 独立审查发现的三项 Important 均已写测试复现后修复：实际 API 错误的顶层 reason；补录全体重置后的跨事件请求关联；排队准入按当前时刻应用个人重置。
 
-保留的次要项：弹窗关闭后的旧请求可能显示通用结果提示（不会重置其他用户）；用量监控旧字段 stored_used_amount 及修改实验上限的即时响应存在原始／有效口径显示差异，刷新后显示有效用量。数据库原始值保留。真实并发计费与新增审计表保留会在升级测试中单独核对。
+保留的次要项：弹窗关闭后的旧请求可能显示通用结果提示（不会重置其他用户）；用量监控旧字段 stored_used_amount 及修改实验上限的即时响应存在原始／有效口径显示差异，刷新后显示有效用量。数据库原始值保留。真实计费事务并发及新增审计表保留已分别通过数据库和升级工具测试。
 
 ## 验证
 
@@ -39,5 +39,40 @@ GET /api/v1/admin/users/:id/purpose-quota-resets 返回用途周期和最近记�
 - Chromium / WebKit 在最终产物核对三种用途、必填原因、取消、同编号重试、周期结束时间及手机确认界面，业务写入均 mock。
 - 隔离 PostgreSQL 额度竞态 74 项实际通过、0 跳过、0 失败；包含真实计费事务尚未提交时与重置重叠的用例。
 - 相关 Go 服务／管理员／权限检查 266 项通过，4 项既有外部夹具条件测试跳过；Go vet、增量 golangci-lint 0 issues。
-- 发布工具 46 项通过，包含真实临时 PostgreSQL 的两张新增审计表保留、迁移校验和、完整发布、已使用个人重置后阻止旧程序回退。
-- 服务包完整 unit 测试未全绿：既有定价和平台目录测试失败正在与未修改基线逐项核对；没有把它记作通过。
+- 发布工具最终 49 项通过，包含真实临时 PostgreSQL 的两张新增审计表保留、迁移校验和、完整发布、已使用个人重置后阻止旧程序回退，以及 Compose 指纹兼容核对。
+- service 包完整 unit 测试：18,766 个测试节点通过、10 跳过、145 失败节点，归属 11 个失败根；11 根均已在未修改基线 `6ccfa3720` 复现。没有把它记作通过，也没有运行整个 Go 仓库的默认全量。
+
+完整 service unit 的既有失败根：`TestResolveContextPricingSchedule_Scenarios`、`TestMatchingPlatforms`、`TestCompositeGroupSchedulerHasAllCanonicalPlatformBuckets`、`TestRecordUsage_ImageReasoningPricing`、`TestRecordUsage_ReasoningPricingUsesForwardedEffort`、`TestGatewayServiceRecordUsage_GeminiFlashThinkingTierUsesCatalogPrice`、`TestGeminiNativeReasoningPricingUsesExplicitForwardedLevel`、`TestOpenAIGatewayServiceRecordUsage_AggregatorClaudeUsesDefaultPricing`、`TestOpenAIGatewayServiceRecordUsage_CNAndOpenCodeClaudeHonorExplicitPricing`、`TestPlatformListDerivedListsMatchLegacy`、`TestOllamaProbeCallback_StaleLongDoesNotOverrideNewShort`。最后一项首次基线单次运行通过，但基线 `-count=20` 的 20 次均复现失败；本次未修改其实现、测试或相关调用路径。
+
+## 发布与线上验收
+
+已于 **2026-11-13 03:36:25 北京时间**部署，并同步 fork 的 `lab/0.2.17`。未合并上游，上游基线仍为 `e2c9812190dd71bb309c8ad020a1211da1e0d3b4`。
+
+- 版本：`0.2.20-mile.20261113.quota1`。
+- 程序源码：`d0322099cb9d47f80c21fa24d1000f12b82c6739`；后续提交为发布工具和记录，不重复构建程序。
+- 程序 SHA-256：`be7772155e2463c05538518c8570fcd8002228406e364031d71ccb9bb37bfca6`。
+- 发布目录：`/opt/sub2api/releases/mile-20261113-quota1-r4`。
+- 发布前完整备份：`/opt/sub2api/backups/before-mile-20261113-quota1-r4-20261112T193513731058Z`；数据库归档 25,009,438 字节，已用 pg_restore 列表核对。
+- 固定参考时刻 `2026-11-12T19:36:15.507118Z`：保留全部 33,754 条原请求及其中 32,101 条 settled/imported 记录、3 条已确认全体事件、1 条容量事件和原钱包／个人周期。30,709 条预留、122,792 条预留事件、30,659 条计费任务及异步任务集合完整保留。只新增迁移 260，迁移数 316 → 317；Codex/Grok 继续 shadow，运行环境指纹保持一致。
+- 五名普通用户、15 条用途周期读取与学员页面一致；普通用户访问管理员重置接口均被拒绝；新增显式管理密钥权限已在真实接口核对。
+- 线上 194 个 assets 文件哈希一致，合计检查 201 个公开资源／端点；Chromium 与 WebKit 再次完成三种用途的重置交互回归，所有业务写入均 mock。真实个人重置事件仍为 0。
+- 应用、PostgreSQL、Redis、Caddy、MemSlides 保留且健康。新容器无启动失败；验收时有 2 条账户 15 的上游 400：gpt-5-2025-08-07 不接受 reasoning effort `none`，属于模型调用错误，已记录，未改动转发路径或混入本次修复。
+
+服务器发布前仅余约 365MB。用户在本次对话明确授权清理过期备份；先验证最近两份备份，再删除更早的备份。发布后再次保留最新两份完整备份（本次发布前、2026-11-11 指南发布前），磁盘可用约 **2.8GB**。未删除业务数据或历史账本。预检失败的诊断目录仍保留。
+
+## 处理时间与效率复盘
+
+计时起点 **02:21:01**，部署完成 **03:36:25**，共 **75 分 25 秒**；包括线上验收和证据收集至 **03:38:43**，共 **77 分 43 秒**。下表为墙钟时间；实现、测试与审查存在并行，不代表纯编码时长。
+
+| 阶段 | 时段（北京时间） | 耗时 |
+| --- | --- | --- |
+| 需求、规则和调用链梳理 | 02:21:01–02:34:08 | 13 分 07 秒 |
+| 实现、测试及审查修复 | 02:34:08–03:13:38 | 39 分 30 秒 |
+| 程序构建、打包、发布工具修复与部署 | 03:13:38–03:36:25 | 22 分 48 秒 |
+| 线上验收及证据收集 | 03:36:25–03:38:43 | 2 分 18 秒 |
+
+本次**没有达到**此前待校准的 15–25 分钟目标。主要新增成本为额度并发／周期审查及首次执行含后端迁移的发布通道；流程自身也有明确返工：审查期间过早启动全量验证，造成一次前端构建输入失效；服务全量首轮日志没有落盘，重复定位既有失败；发布工具第一次实战暴露 Compose config-model／运行／冻结指纹差异，以及 Go 迁移去首尾空白后的数据库校验和口径。均已补回归并固化到 tools。
+
+实际前端构建两次（首次作废、最终一次通过），后端程序仅构建一次并始终复用同一 SHA。首版约 1.98MB 差量包已生成；后续为快速复用程序选择了约 39.95MB gzip，上传实际较慢，这个传输选择也增加了耗时；再后的脚本修复复用服务器已有 payload，没有继续重复上传程序。
+
+后续完整升级应在编码早期并行运行线上只读预检，先确认冻结配置与迁移校验约定；审查结束后再冻结源码做全量检查，所有 Go 运行统一保存 JSON 日志。此次额度改动的测试与发布工具可以直接复用，但不能据本次记录宣称交付目标已经达成。
