@@ -22,6 +22,8 @@ def verify(base_url, dist, *, total_timeout=60, attempts=3):
         raise DeliveryError('Positive deadline and at most three attempts required')
     base_url = base_url.rstrip('/')
     dist = Path(dist).resolve()
+    if not (dist / 'index.html').is_file():
+        raise DeliveryError('Selected frontend build is missing index.html')
     deadline = time.monotonic() + total_timeout
     result = {'base_url': base_url, 'checked_at': utcnow(), 'ok': False, 'resources': {}}
     # No Authorization headers, cookies, or business API POSTs are ever sent.
@@ -41,6 +43,8 @@ def verify(base_url, dist, *, total_timeout=60, attempts=3):
                         raise DeliveryError('cross-origin redirect')
                     chunks = []
                     while True:
+                        if response.fp is None:
+                            break
                         remaining = deadline - time.monotonic()
                         if remaining <= 0:
                             raise TimeoutError('global deadline exceeded')

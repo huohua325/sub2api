@@ -1,0 +1,2 @@
+# Optional: validation and server execution otherwise use only the Python standard library.
+bsdiff4==1.4.1

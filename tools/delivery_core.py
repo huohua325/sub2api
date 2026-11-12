@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import signal
 import subprocess
 import threading
 import time
@@ -57,17 +58,27 @@ def tree_hash(root, paths, *, inputs=False):
                 raise DeliveryError('Missing artifact: ' + str(relative))
             result[str(relative)] = None
             continue
-        files = sorted(path.rglob('*')) if path.is_dir() else [path]
+        is_directory = path.is_dir()
+        files = []
+        if is_directory:
+            for folder, directories, names in os.walk(path, followlinks=False):
+                # Prune before traversal: filtering after rglob still walks all pnpm dependencies.
+                if inputs:
+                    directories[:] = [name for name in directories if name not in ignored]
+                for name in directories:
+                    if (Path(folder) / name).is_symlink():
+                        raise DeliveryError('Symlink directory is not an immutable input/artifact')
+                files.extend(Path(folder) / name for name in names if not inputs or not name.endswith('.tsbuildinfo'))
+        else:
+            files = [path]
         entries = {}
         for file in files:
             rel = file.relative_to(root)
-            if inputs and path.is_dir() and (set(rel.parts) & ignored or file.name.endswith('.tsbuildinfo')):
-                continue
             if file.is_symlink():
                 raise DeliveryError('Symlink is not an immutable input/artifact: ' + str(rel))
             if file.is_file():
                 entries[rel.as_posix()] = digest(file)
-        result[str(relative)] = json_hash(entries) if path.is_dir() else entries[path.relative_to(root).as_posix()]
+        result[str(relative)] = json_hash(entries) if is_directory else entries[path.relative_to(root).as_posix()]
     return result
 
 
@@ -84,6 +95,23 @@ def exclusive(directory):
         yield
     finally:
         lock.rmdir()
+
+
+def run_owned(argv, *, cwd, env, stdout, timeout):
+    """A timed-out pnpm/go wrapper must not leave its child build writing artifacts."""
+    options = {'creationflags': subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW} if os.name == 'nt' else {'start_new_session': True}
+    process = subprocess.Popen(argv, cwd=cwd, env=env, stdout=stdout, stderr=subprocess.STDOUT, **options)
+    try:
+        return process.wait(timeout=timeout)
+    except BaseException:
+        if os.name == 'nt':
+            subprocess.run(['taskkill', '/PID', str(process.pid), '/T', '/F'],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10, check=False)
+        else:
+            try: os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError: pass
+        process.wait(timeout=10)
+        raise
 
 
 class Runner:
@@ -133,11 +161,10 @@ class Runner:
         error = None
         try:
             with log.open('wb') as stream:
-                process = subprocess.run(argv, cwd=work, env=self.env, stdout=stream,
-                                         stderr=subprocess.STDOUT, timeout=timeout, check=False)
-            record['exit_code'] = process.returncode
-            if process.returncode:
-                raise DeliveryError(f'{name} exited {process.returncode}; see {log}')
+                returncode = run_owned(argv, cwd=work, env=self.env, stdout=stream, timeout=timeout)
+            record['exit_code'] = returncode
+            if returncode:
+                raise DeliveryError(f'{name} exited {returncode}; see {log}')
             if tree_hash(self.root, inputs, inputs=True) != before:
                 raise DeliveryError(name + ': inputs changed while command was running')
             record['artifacts'] = tree_hash(self.root, artifacts)

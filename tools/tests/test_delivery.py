@@ -4,6 +4,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -93,6 +94,30 @@ class RunnerTests(unittest.TestCase):
         metadata.write_text('version: 2')
         run.run('build', self.command(), ['node_modules/.modules.yaml'])
         self.assertEqual((self.root / 'count').read_text(), '2')
+
+    def test_timeout_terminates_owned_child_process_tree(self):
+        run = self.runner()
+        child = "import time; from pathlib import Path; time.sleep(.5); Path('rogue-artifact').write_text('late')"
+        parent = "import subprocess,sys,time; subprocess.Popen([sys.executable,'-c'," + repr(child) + "]); time.sleep(3)"
+        with self.assertRaises(DeliveryError):
+            run.run('timeout-tree', [sys.executable, '-c', parent], ['source.txt'], timeout=.2)
+        time.sleep(.7)
+        self.assertFalse((self.root / 'rogue-artifact').exists(), 'Timed-out build child kept running')
+
+    def test_dependency_directories_are_pruned_before_filesystem_traversal(self):
+        from delivery_core import tree_hash
+        folder = self.root / 'frontend'; (folder / 'node_modules/heavy').mkdir(parents=True)
+        (folder / 'source.ts').write_text('source')
+        enabled = [True]
+        def audit(event, args):
+            if enabled[0] and event == 'os.scandir' and 'node_modules' in Path(args[0]).parts:
+                raise AssertionError('Traversed excluded dependency tree')
+        sys.addaudithook(audit)
+        try:
+            result = tree_hash(self.root, ['frontend'], inputs=True)
+        finally:
+            enabled[0] = False
+        self.assertEqual(len(result['frontend']), 64)
 
 
 if __name__ == '__main__':

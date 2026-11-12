@@ -22,6 +22,7 @@ class PublicReleaseTests(unittest.TestCase):
         (self.dist / 'assets').mkdir()
         (self.dist / 'assets/app.js').write_bytes(b'correct-script')
         self.html = b'<html><script src="/assets/app.js"></script></html>'
+        (self.dist / 'index.html').write_bytes(self.html)
         self.count = Counter(); self.mode = 'normal'
         owner = self
         class Handler(BaseHTTPRequestHandler):
@@ -33,7 +34,9 @@ class PublicReleaseTests(unittest.TestCase):
                     if owner.mode == 'mismatch': body = b'wrong-script'
                     if owner.mode == 'missing': status = 404
                     if owner.mode == 'slow': time.sleep(.4)
-                self.send_response(status); self.end_headers()
+                self.send_response(status)
+                if owner.mode == 'content-length': self.send_header('Content-Length', str(len(body)))
+                self.end_headers()
                 try: self.wfile.write(body)
                 except OSError: pass
             def log_message(self, *args): pass
@@ -71,6 +74,15 @@ class PublicReleaseTests(unittest.TestCase):
         result = self.check(total_timeout=.15)
         self.assertFalse(result['ok'])
         self.assertLess(time.monotonic() - start, .7)
+
+    def test_missing_dist_rejected_before_network(self):
+        from delivery_core import DeliveryError
+        self.assertIsNotNone(verify)
+        with self.assertRaises(DeliveryError): verify(self.base, self.dist / 'missing')
+        self.assertEqual(self.count['/'], 0)
+    def test_content_length_response_can_close_after_last_chunk(self):
+        self.mode = 'content-length'
+        self.assertTrue(self.check()['ok'])
 
 
 if __name__ == '__main__': unittest.main()
