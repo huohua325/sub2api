@@ -1,4 +1,4 @@
-import bz2, hashlib, os, pathlib, re, sys
+import bz2, hashlib, os, pathlib, re, sys, tempfile
 
 source, delta, target, before_hash, after_hash = sys.argv[1:]
 old = pathlib.Path(source).read_bytes()
@@ -38,9 +38,15 @@ while newpos < result_size:
     oldpos += z
 assert hashlib.sha256(result).hexdigest() == after_hash, 'target hash mismatch'
 dst = pathlib.Path(target)
-assert dst.parent == pathlib.Path(delta).parent, 'target outside release directory'
-temporary = dst.with_name(dst.name+'.reconstructed')
-temporary.write_bytes(result)
-os.chmod(temporary, 0o755)
-os.replace(temporary, dst)
+assert dst.parent.resolve() == pathlib.Path(delta).parent.resolve(), 'target outside release directory'
+# Never truncate a predictable path: it may link to the live program or a backup.
+descriptor, temporary_name = tempfile.mkstemp(prefix='.'+dst.name+'-', dir=dst.parent)
+temporary = pathlib.Path(temporary_name)
+try:
+    with os.fdopen(descriptor, 'wb') as stream:
+        stream.write(result)
+    os.chmod(temporary, 0o755)
+    os.replace(temporary, dst)
+finally:
+    temporary.unlink(missing_ok=True)
 print('verified_target='+str(dst)+' sha256='+after_hash)

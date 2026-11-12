@@ -152,6 +152,16 @@ class DockerRuntime:
     def preflight(self):
         info = self.inspect(self.app)
         env = dict(value.split('=', 1) for value in info['Config']['Env'] if '=' in value)
+        labels = info['Config'].get('Labels') or {}
+        configured_hash = subprocess.check_output(['docker', 'compose', 'config', '--hash', self.app],
+                                                  cwd=self.root, timeout=20, text=True).strip().split()
+        if len(configured_hash) != 2 or configured_hash[0] != self.app or configured_hash[1] != labels.get('com.docker.compose.config-hash'):
+            raise DeliveryError('Effective Compose configuration differs from the running container')
+        self.configuration_hash = configured_hash[1]
+        self.project = labels.get('com.docker.compose.project')
+        if not self.project: raise DeliveryError('Running container is not managed by the expected Compose project')
+        self.resolved_compose = json.loads(subprocess.check_output(['docker', 'compose', 'config', '--format', 'json'],
+                                                                  cwd=self.root, timeout=20, text=True))
         self.destination = next((m['Destination'] for m in info['Mounts'] if m['Source'] == str(self.root / 'bin/sub2api')), None)
         if not self.destination: raise DeliveryError('Active program bind mount not found')
         self.check_health('http://127.0.0.1:8790/healthz')
@@ -168,6 +178,14 @@ class DockerRuntime:
                 'env_file_sha256': digest(self.root / '.env'),
                 'modes': [env.get('SUB2API_CODING_QUOTA_' + purpose + '_MODE', 'shadow') for purpose in ['OPENAI', 'GROK']]}
     def backup(self, folder):
+        # Recovery uses the exact resolved configuration verified against the original container.
+        self.frozen_file = folder / 'frozen-compose.json'
+        write_json(self.frozen_file, self.resolved_compose)
+        os.chmod(self.frozen_file, 0o600)
+        frozen_hash = subprocess.check_output(self.compose() + ['config', '--hash', self.app],
+                                             cwd=self.root, text=True, timeout=20).strip().split()
+        if frozen_hash != [self.app, self.configuration_hash]:
+            raise DeliveryError('Frozen configuration does not reproduce the running configuration')
         for name in ['docker-compose.yml', '.env']:
             shutil.copy2(self.root / name, folder / name)
         db = ['-U', self.db_env['POSTGRES_USER'], '-d', self.db_env['POSTGRES_DB']]
@@ -177,8 +195,10 @@ class DockerRuntime:
         with (folder / 'database.dump').open('rb') as src, (folder / 'database-contents.txt').open('wb') as out:
             self.command(['docker', 'exec', '-i', self.database, 'pg_restore', '--list'], stdin=src, stdout=out)
         self.command(['tar', '-czf', str(folder / 'data.tar.gz'), 'data'])
-    def stop(self): self.command(['docker', 'compose', 'stop', '-t', '120', self.app], timeout=150)
-    def start(self): self.command(['docker', 'compose', 'up', '-d', '--no-deps', '--force-recreate', self.app])
+    def compose(self):
+        return ['docker', 'compose', '-f', str(self.frozen_file), '--project-name', self.project]
+    def stop(self): self.command(self.compose() + ['stop', '-t', '120', self.app], timeout=150)
+    def start(self): self.command(self.compose() + ['up', '-d', '--no-deps', '--no-build', '--pull', 'never', '--force-recreate', self.app])
     @staticmethod
     def check_health(url):
         with urllib.request.urlopen(url, timeout=3) as response:

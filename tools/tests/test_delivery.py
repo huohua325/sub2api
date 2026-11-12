@@ -97,12 +97,14 @@ class RunnerTests(unittest.TestCase):
 
     def test_timeout_terminates_owned_child_process_tree(self):
         run = self.runner()
-        child = "import time; from pathlib import Path; time.sleep(.5); Path('rogue-artifact').write_text('late')"
+        child = "import time; from pathlib import Path\nfor i in range(30):\n Path('rogue-artifact').write_text(str(i))\n time.sleep(.1)"
         parent = "import subprocess,sys,time; subprocess.Popen([sys.executable,'-c'," + repr(child) + "]); time.sleep(3)"
         with self.assertRaises(DeliveryError):
             run.run('timeout-tree', [sys.executable, '-c', parent], ['source.txt'], timeout=.2)
-        time.sleep(.7)
-        self.assertFalse((self.root / 'rogue-artifact').exists(), 'Timed-out build child kept running')
+        path = self.root / 'rogue-artifact'
+        final_value = path.read_text() if path.exists() else None
+        time.sleep(.5)
+        self.assertEqual(path.read_text() if path.exists() else None, final_value, 'Timed-out child kept writing after cleanup returned')
 
     def test_dependency_directories_are_pruned_before_filesystem_traversal(self):
         from delivery_core import tree_hash
@@ -118,6 +120,15 @@ class RunnerTests(unittest.TestCase):
         finally:
             enabled[0] = False
         self.assertEqual(len(result['frontend']), 64)
+
+    def test_generated_vite_outputs_are_not_source_edits(self):
+        folder = self.root / 'frontend'; folder.mkdir()
+        (folder / 'vite.config.ts').write_text('actual config source')
+        run = self.runner()
+        generated = "from pathlib import Path; Path('frontend/vite.config.js').write_text('generated'); Path('frontend/vite.config.d.ts').write_text('generated types')"
+        self.assertEqual(run.run('types', [sys.executable, '-c', generated], ['frontend'])['status'], 'passed')
+        with self.assertRaisesRegex(DeliveryError, 'changed'):
+            run.run('bad-config-edit', [sys.executable, '-c', "from pathlib import Path; Path('frontend/vite.config.ts').write_text('changed')"], ['frontend'])
 
 
 if __name__ == '__main__':

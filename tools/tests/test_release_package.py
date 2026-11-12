@@ -34,7 +34,7 @@ class PackageTests(unittest.TestCase):
             artifacts = ['out/app'] if name == 'backend-build' else ['backend/internal/web/dist'] if name == 'frontend-build' else ['out/artifact-browser/result.json'] if name == 'artifact-browser' else []
             record = self.runner.run(name, [sys.executable, '-c', "print('verified')"], ['src.txt'], artifacts=artifacts)
             if name == 'quota-race': record['quota_tests'] = {'passed': 1, 'skipped': 0, 'failed': 0}
-            if name == 'backend-build': record['version'] = 'test1'
+            if name == 'backend-build': record.update(version='test1', source_commit=self.commit)
         from delivery_core import write_json
         write_json(self.out / 'manifest.json', self.runner.manifest)
     def package(self):
@@ -60,6 +60,28 @@ class PackageTests(unittest.TestCase):
         next(s for s in data['steps'] if s['name'] == 'backend-build')['version'] = 'different'
         (self.out / 'manifest.json').write_text(json.dumps(data))
         with self.assertRaises(DeliveryError): self.package()
+
+    def test_untracked_backend_production_file_cannot_enter_frontend_lane(self):
+        (self.root / 'backend/extra.go').write_text('package main')
+        with self.assertRaises(DeliveryError): self.package()
+
+    def test_untracked_migration_cannot_enter_frontend_lane(self):
+        folder = self.root / 'backend/migrations'; folder.mkdir()
+        (folder / '999.sql').write_text('SELECT 1;')
+        with self.assertRaises(DeliveryError): self.package()
+
+    def test_build_provenance_cannot_reference_another_source_tree(self):
+        (self.root / 'frontend').mkdir()
+        (self.root / 'frontend/source.ts').write_text('new source')
+        self.git('add', 'frontend/source.ts')
+        self.git('-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'new source')
+        with self.assertRaises(DeliveryError): self.package()
+
+    def test_documentation_followup_can_preserve_original_runtime_source(self):
+        (self.root / 'notes.md').write_text('release record')
+        self.git('add', 'notes.md')
+        self.git('-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'documentation only')
+        self.assertEqual(self.package()['source_commit'], self.commit)
 
 
 if __name__ == '__main__': unittest.main()

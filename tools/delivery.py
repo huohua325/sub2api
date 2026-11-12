@@ -15,7 +15,8 @@ import threading
 from delivery_core import DeliveryError, Runner, digest, exclusive, tree_hash, write_json
 
 ROOT = Path(__file__).resolve().parents[1]
-FRONTEND_INPUTS = ['frontend', 'tools', 'AGENTS.md']
+FRONTEND_INPUTS = ['frontend', 'tools/delivery.py', 'tools/delivery_core.py', 'tools/review_guide.py',
+                   'tools/review_guide.cjs', 'tools/browser_fixtures.cjs', 'AGENTS.md']
 
 
 def version(command):
@@ -62,7 +63,7 @@ def validate(args):
                 raise DeliveryError('; '.join(errors))
         if snapshot != tree_hash(ROOT, inputs, inputs=True):
             raise DeliveryError('Inputs changed during validation; rerun on a stable snapshot')
-        runner.run('frontend-build', [pnpm, 'exec', 'vite', 'build'], inputs,
+        runner.run('frontend-build', [pnpm, 'exec', 'vite', 'build', '--config', 'vite.config.ts'], inputs,
                    artifacts=['backend/internal/web/dist'], cwd='frontend', cache=not args.fresh)
         runner.manifest['source_commit'] = version(['git', 'rev-parse', 'HEAD'])
         runner.manifest['validated_inputs'] = snapshot
@@ -80,7 +81,7 @@ def quota(args):
     command += ['test', '-json', '-race', './internal/repository', '-run', 'TestCodingQuotaDB', '-count=1']
     with exclusive(args.output):
         runner = Runner(ROOT, args.output, tools={'go': version(json.loads(args.go_command) + ['version'])})
-        result = runner.run('quota-race', command, ['backend', 'tools'], cwd='backend', cache=False, timeout=1800)
+        result = runner.run('quota-race', command, ['backend', 'tools/delivery.py', 'tools/delivery_core.py', 'AGENTS.md'], cwd='backend', cache=False, timeout=1800)
         actions = []
         for line in (runner.output / result['log']).read_text(encoding='utf-8', errors='replace').splitlines():
             try:
@@ -125,6 +126,8 @@ def artifact_review(args):
 
 
 def build_backend(args):
+    from release_package import require_committed_inputs
+    require_committed_inputs(ROOT)
     if not __import__('re').fullmatch(r'[a-zA-Z0-9][a-zA-Z0-9._-]{0,95}', args.version):
         raise DeliveryError('Invalid version')
     output = args.output.resolve()
@@ -140,7 +143,7 @@ def build_backend(args):
         runner = Runner(ROOT, output, tools={'go': version(prefix + ['version'])}, env=env)
         flags = f'-s -w -X main.Version={args.version} -X main.Commit={source} -X main.Date={date} -X main.BuildType=release'
         record = runner.run('backend-build', prefix + ['build', '-tags', 'embed', '-trimpath', '-ldflags', flags,
-                            '-o', str(binary), './cmd/server'], ['backend', 'tools'],
+                            '-o', str(binary), './cmd/server'], ['backend', 'tools/delivery.py', 'tools/delivery_core.py', 'tools/release_package.py', 'AGENTS.md'],
                             artifacts=[binary.relative_to(ROOT).as_posix()], cwd='backend')
         record['source_commit'] = source
         record['version'] = args.version

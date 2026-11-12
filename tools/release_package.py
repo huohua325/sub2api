@@ -10,6 +10,13 @@ import subprocess
 from delivery_core import DeliveryError, contained, digest, tree_hash, utcnow, write_json
 
 
+def require_committed_inputs(root):
+    status = subprocess.check_output(['git', 'status', '--porcelain', '--untracked-files=all', '--',
+                                      'frontend', 'backend', 'tools', 'AGENTS.md'], cwd=root, text=True, timeout=30)
+    if status.strip():
+        raise DeliveryError('Release inputs must be committed, including untracked files. Use a clean release checkout; preserve user-owned files.')
+
+
 def package_release(root, evidence, destination, binary, version, baseline_sha256, baseline_commit, *, full_upload=False, baseline_binary=None):
     root = Path(root).resolve(); evidence = Path(evidence).resolve(); destination = Path(destination).resolve(); binary = Path(binary).resolve()
     if destination.exists(): raise DeliveryError('Release directory already exists; immutable packages are never overwritten')
@@ -21,8 +28,7 @@ def package_release(root, evidence, destination, binary, version, baseline_sha25
         raise DeliveryError('Explicit fixed baseline commit and SHA-256 required')
     def git(*args):
         return subprocess.check_output(['git', *args], cwd=root, text=True, timeout=30).strip()
-    if git('status', '--porcelain', '--untracked-files=no'):
-        raise DeliveryError('Commit tracked source changes before packaging')
+    require_committed_inputs(root)
     source = git('rev-parse', 'HEAD')
     if git('diff', '--name-only', baseline_commit, source, '--', 'backend'):
         raise DeliveryError('Backend changes require the full upgrade runbook; this lane is frontend-only')
@@ -42,6 +48,15 @@ def package_release(root, evidence, destination, binary, version, baseline_sha25
         raise DeliveryError('Real quota tests with zero skips are required')
     if stages['backend-build'].get('version') != version:
         raise DeliveryError('Package version differs from the verified program build')
+    built_source = stages['backend-build'].get('source_commit', '')
+    if not re.fullmatch(r'[0-9a-f]{40}', built_source):
+        raise DeliveryError('Build must record its committed source')
+    try:
+        git('merge-base', '--is-ancestor', built_source, source)
+    except subprocess.CalledProcessError:
+        raise DeliveryError('Build source is not an ancestor of the selected release') from None
+    if git('diff', '--name-only', built_source, source, '--', 'frontend', 'backend'):
+        raise DeliveryError('Program build source differs from current application source')
     browser = stages['artifact-browser']
     results = [contained(root, name) for name in browser['artifacts'] if name.endswith('/artifact-browser/result.json')]
     if len(results) != 1:
@@ -75,7 +90,7 @@ def package_release(root, evidence, destination, binary, version, baseline_sha25
     else:
         (destination / 'app.bsdiff').write_bytes(delta); payload = 'app.bsdiff'
     files = {p.relative_to(dist).as_posix(): digest(p) for p in sorted(dist.rglob('*')) if p.is_file()}
-    manifest = {'schema': 1, 'version': version, 'source_commit': stages['backend-build'].get('source_commit', source),
+    manifest = {'schema': 1, 'version': version, 'source_commit': built_source,
                 'baseline_commit': baseline_commit, 'baseline_sha256': baseline_sha256, 'sha256': digest(binary),
                 'bytes': binary.stat().st_size, 'payload': payload, 'payload_sha256': digest(destination / payload),
                 'payload_bytes': (destination / payload).stat().st_size, 'backend_unchanged': True,

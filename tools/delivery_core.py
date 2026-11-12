@@ -74,6 +74,8 @@ def tree_hash(root, paths, *, inputs=False):
         entries = {}
         for file in files:
             rel = file.relative_to(root)
+            if inputs and rel.as_posix() in {'frontend/vite.config.js', 'frontend/vite.config.d.ts'}:
+                continue  # vue-tsc composite outputs; vite.config.ts remains an input.
             if file.is_symlink():
                 raise DeliveryError('Symlink is not an immutable input/artifact: ' + str(rel))
             if file.is_file():

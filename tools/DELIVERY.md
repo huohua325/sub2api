@@ -26,7 +26,7 @@
 
 同一个 `--output` 下保留历史 `manifest.json` 和每次原始日志。只有输入文件内容（含锁文件/配置）、完整参数、运行目录、环境摘要、工具版本、执行文件，以及产物/日志哈希都匹配，lint/tests/types/build 才会复用。新增/删除文件、产物损坏、执行失败、运行中编辑输入都会导致失效或失败。环境只存摘要，不把 DSN 和密钥写入 manifest；原始命令输出仍需按敏感证据管理，留在忽略的 output 内。
 
-这是本地可信工作区的效率工具，不是防篡改签名系统。不可把其他人的手写 manifest 当作验证证据。依赖安装每轮执行 frozen 检查；浏览器和额度竞态每次实际执行。`--fresh` 强制重跑前端检查。只读预检可并行准备，不能并行修改同一输出目录；锁存在时先确认持有进程状态，工具不会自动删锁。
+这是本地可信工作区的效率工具，不是防篡改签名系统。不可把其他人的手写 manifest 当作验证证据。依赖目录在扫描前剪枝，仅锁文件和依赖元数据参与指纹；编译生成的 vite.config.js/.d.ts 和 tsbuildinfo 不当作源文件，构建明确使用 vite.config.ts。依赖安装每轮执行 frozen 检查；浏览器和额度竞态每次实际执行。`--fresh` 强制重跑前端检查。只读预检可并行准备，不能并行修改同一输出目录；锁存在时先确认持有进程状态，工具不会自动删锁。
 
 ```powershell
 & D:/Programs/anaconda3/python.exe tools/delivery.py summary --output output/delivery/my-change
@@ -36,7 +36,7 @@
 
 ## 准备一次纯前端程序发布
 
-需要 Go 项目要求的工具链、真实隔离 PostgreSQL、前述前端验证及产物回归。环境变量从本地安全配置取得，不放到 Git、命令参数或文档。
+需要 Go 项目要求的工具链、真实隔离 PostgreSQL、前述前端验证及产物回归。**先提交应用源码，再运行 Go 编译和打包**；不能先编译脏源码、再提交并沿用旧 HEAD 标识。构建/打包也会拒绝未跟踪的应用输入。若根目录有用户原有未跟踪文件，应在对应提交的干净 worktree 中构建，保留原目录和文件，不能删除或擅自提交它们。环境变量从本地安全配置取得，不放到 Git、命令参数或文档。
 
 ```powershell
 # 先在当前进程配置 SUB2API_QUOTA_TEST_DSN，且必须是隔离测试库。
@@ -46,7 +46,7 @@
 
 `quota` 固定执行 `go test -json -race ./internal/repository -run TestCodingQuotaDB -count=1`，解析实际测试事件，至少一项通过、零跳过、零失败才会生成可放行的证据；从不复用旧额度竞态结果。`--go-command` 可传 JSON 参数数组，指定实际 Go 可执行文件或受控包装器；不会把参数拼为 shell。包装器必须原样传递 JSON 事件和退出码，并正确继承隔离 DSN。缺少本机工具链不是通过。
 
-Linux/amd64 程序使用 embed、固定版本/源码/提交时间，产物哈希归入证据。发布前提交源码，再打包：
+Linux/amd64 程序使用 embed、固定版本/源码/提交时间，产物哈希归入证据。源码已提交且构建通过后打包；后续只有发布记录等应用源码未变的提交可以沿用原运行时 SHA：
 
 ```powershell
 & D:/Programs/anaconda3/python.exe tools/delivery.py package --output output/delivery/my-change --destination output/releases/<发布名> --version <新版本> --baseline-commit <当前线上源码SHA> --baseline-sha256 <当前线上程序SHA256> --baseline-binary <本地已验证的当前线上程序>
@@ -67,7 +67,7 @@ python3 /opt/sub2api/releases/<发布名>/release_server.py --root /opt/sub2api 
 python3 /opt/sub2api/releases/<发布名>/release_server.py --root /opt/sub2api --release /opt/sub2api/releases/<发布名> --apply
 ```
 
-默认预检不停止服务、不创建备份；`--stage` 仅重建发布目录中的候选程序。`--apply` 验证当前基线与候选哈希，先备份并通过 `pg_restore --list` 检查 dump，再以 120 秒 grace 停应用、取固定参考时刻快照、硬链接原子切换、只重建 sub2api，检查应用和 MemSlides 及持久数据。
+默认预检不停止服务、不创建备份；`--stage` 仅重建发布目录中的候选程序。预检将有效 Compose 配置哈希与运行容器的 Compose 标签对照，已有配置漂移直接拒绝；经核实的完整解析配置保存在权限受限的备份目录。正常重建和失败回退都使用这份冻结配置，不重新读取可能已变化的 .env/override，也不构建或拉取新镜像。`--apply` 验证当前基线与候选哈希，先备份并通过 `pg_restore --list` 检查 dump，再以 120 秒 grace 停应用、取固定参考时刻快照、硬链接原子切换、只重建 sub2api，检查应用和 MemSlides 及持久数据。
 
 守卫保留原始请求和已结算扣点、确认事件、原钱包起点、纠正/对账/扩容审计、持久预留与计费/异步任务、迁移集合及运行环境。允许后台结算推进已有任务；不允许删除原任务或改写旧已结算请求。程序切换后任何校验失败都会尝试只回退程序并保留当前数据库；即使健康检查已成功也不会跳过回退。不会恢复旧库、清空数据、删历史备份或自动改 enforce。原程序有硬链接时只能新建文件并替换路径，不能原地覆盖。
 
