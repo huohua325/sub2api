@@ -26,6 +26,15 @@ class FullUpgradeTests(unittest.TestCase):
         self.after['migrations'][-1]['checksum'] = 'different'
         with self.assertRaises(DeliveryError): self.contract.assert_preserved(self.before, self.after)
 
+    def test_database_checksum_is_distinct_from_file_checksum(self):
+        contract = PersonalQuotaUpgrade({'name': 'personal-quota-reset-v1',
+            'migrations': {'260_personal_quota_resets.sql': 'a' * 64},
+            'database_migrations': {'260_personal_quota_resets.sql': 'b' * 64}})
+        self.after['migrations'][-1]['checksum'] = 'b' * 64
+        contract.assert_preserved(self.before, self.after)
+        self.after['migrations'][-1]['checksum'] = 'a' * 64
+        with self.assertRaises(DeliveryError): contract.assert_preserved(self.before, self.after)
+
     def test_prior_migrations_and_audits_cannot_be_changed(self):
         self.before['immutable']['personal_resets'] = [{'id': 'retained'}]
         self.after['immutable']['personal_resets'] = []

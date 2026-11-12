@@ -4,6 +4,7 @@ The frontend-only entry point continues rejecting backend/schema changes.
 """
 import argparse
 import copy
+import hashlib
 import json
 from pathlib import Path
 import re
@@ -19,6 +20,9 @@ class PersonalQuotaUpgrade:
             raise DeliveryError('Only the reviewed personal-reset additive upgrade is supported')
         if not re.fullmatch('[0-9a-f]{64}', migrations['260_personal_quota_resets.sql']):
             raise DeliveryError('Fixed migration SHA-256 required')
+        database = contract.get('database_migrations', migrations)
+        if set(database) != set(migrations) or not all(re.fullmatch('[0-9a-f]{64}', v) for v in database.values()):
+            raise DeliveryError('Fixed database migration checksums required')
         self.contract = contract
 
     def validate(self, manifest):
@@ -26,7 +30,7 @@ class PersonalQuotaUpgrade:
             raise DeliveryError('Explicit full-upgrade manifest required')
 
     def assert_preserved(self, before, after):
-        expected = self.contract['migrations']
+        expected = self.contract.get('database_migrations', self.contract['migrations'])
         prior = {m['filename'] for m in before['migrations']}
         added = [m for m in after['migrations'] if m['filename'] not in prior]
         if {m['filename']: m['checksum'] for m in added} != expected:
@@ -62,6 +66,10 @@ def main():
         root = Path(__file__).resolve().parents[1]
         contract = {'name': 'personal-quota-reset-v1', 'migrations': {
             '260_personal_quota_resets.sql': digest(root / 'backend/migrations/260_personal_quota_resets.sql')}}
+        # The Go migration runner hashes strings.TrimSpace(content), while
+        # payload integrity uses the complete file bytes, including final LF.
+        contract['database_migrations'] = {'260_personal_quota_resets.sql': hashlib.sha256(
+            (root / 'backend/migrations/260_personal_quota_resets.sql').read_bytes().strip()).hexdigest()}
         result = package_release(root, args.output, args.destination, args.output / 'sub2api-linux-amd64',
                                  args.version, args.baseline_sha256, args.baseline_commit,
                                  baseline_binary=args.baseline_binary, full_upload=args.full_upload, upgrade_contract=contract)
