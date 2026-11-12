@@ -140,6 +140,25 @@ class ReleaseServerTests(unittest.TestCase):
         for plan in ['Container sub2api Recreate', 'Container sub2api Running\nContainer postgres Recreate', '', '1']:
             with self.assertRaises(DeliveryError): verify_unchanged_compose_plan(plan, 'sub2api')
 
+    def test_freeze_uses_running_hash_after_config_model_disagreement(self):
+        from release_server import DockerRuntime
+        (self.root / '.env').write_text('mode=shadow')
+        (self.root / 'docker-compose.yml').write_text('services: {}')
+        (self.root / 'data').mkdir()
+        runtime = DockerRuntime.__new__(DockerRuntime)
+        runtime.root = self.root; runtime.release = self.release; runtime.app = 'sub2api'; runtime.database = 'test'
+        runtime.db_env = {'POSTGRES_USER': 'test', 'POSTGRES_DB': 'test'}; runtime.budget_checked = False
+        info = {'Config': {'Env': [], 'Labels': {'com.docker.compose.config-hash': 'running-canonical', 'com.docker.compose.project': 'mile'}},
+                'Mounts': [{'Source': str(self.active), 'Destination': '/app/sub2api'}]}
+        def output(argv, **kwargs):
+            if '--dry-run' in argv: return ' DRY-RUN MODE - Container sub2api Running\n'
+            if '--hash' in argv: return 'sub2api config-model\n'
+            if '--format' in argv: return '{"services":{"sub2api":{}}}'
+            return b'1'
+        with patch.object(runtime, 'inspect', return_value=info), patch.object(runtime, 'check_health'), patch.object(runtime, 'command'), patch('release_server.subprocess.check_output', side_effect=output):
+            runtime.preflight()
+        self.assertEqual(runtime.configuration_hash, 'running-canonical')
+
     def test_restart_and_rollback_use_frozen_configuration(self):
         from release_server import DockerRuntime
         frozen = self.root / 'original.json'

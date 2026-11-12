@@ -182,7 +182,9 @@ class DockerRuntime:
                                             '--no-build', '--pull', 'never', self.app], cwd=self.root,
                                            stderr=subprocess.STDOUT, timeout=30, text=True)
             verify_unchanged_compose_plan(plan, self.app)
-        self.configuration_hash = configured_hash[1]
+        # The normalized frozen model reproduces up's container hash. The CLI
+        # config-model hash can disagree before that normalization (Compose 2.40).
+        self.configuration_hash = labels.get('com.docker.compose.config-hash')
         self.project = labels.get('com.docker.compose.project')
         if not self.project: raise DeliveryError('Running container is not managed by the expected Compose project')
         self.resolved_compose = json.loads(subprocess.check_output(['docker', 'compose', 'config', '--format', 'json'],
