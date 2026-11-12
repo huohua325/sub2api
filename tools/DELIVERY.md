@@ -20,7 +20,7 @@
    & D:/Programs/anaconda3/python.exe tools/delivery.py review-artifact --output output/delivery/my-change
    ```
 
-   临时本机 SPA server 自动启动和关闭，Chromium/WebKit 验证 16 次导航、历史/深链接/刷新/焦点、375/768/1440px、复制。接口共用 mock fixtures，真实业务写入和推理请求被拦截。页面等待 DOM 及业务元素就绪，不等完整 `load`。首次需准备 Node、npx、`@playwright/cli` 和浏览器；工具使用 `npx --no-install`，缺失会失败，不会暗中安装新依赖。
+   临时本机 SPA server 自动启动和关闭，Chromium/WebKit 验证 16 次导航、历史/深链接/刷新/焦点、375/768/1440px、复制。接口共用 mock fixtures，真实业务写入和推理请求被拦截。普通导航等待 DOM、字体和业务元素，并确认滚动稳定；尾部短章节检查标题实际可见。WebKit 新文档深链接及刷新会在 load 阶段完成原生 hash 恢复，仅这两处使用最多 15 秒的 load 等待，避免 DOM 阶段探测干扰原生滚动。首次需准备 Node、npx、`@playwright/cli` 和浏览器；工具使用 `npx --no-install`，缺失会失败，不会暗中安装新依赖。
 
 ## 结果复用与计时
 
@@ -52,7 +52,7 @@ Linux/amd64 程序使用 embed、固定版本/源码/提交时间，产物哈希
 & D:/Programs/anaconda3/python.exe tools/delivery.py package --output output/delivery/my-change --destination output/releases/<发布名> --version <新版本> --baseline-commit <当前线上源码SHA> --baseline-sha256 <当前线上程序SHA256> --baseline-binary <本地已验证的当前线上程序>
 ```
 
-默认生成差量包并在本地重建验证；需要 `bsdiff4==1.4.1`。只有显式 `--full-upload` 才选择完整 gzip，不会因缺依赖自动扩大上传量。包内包括程序/payload 哈希、前端文件清单、验证证据摘要及服务器工具，目录不可覆盖。打包不重跑编译。**后端或迁移相对基线有变化时，这条发布通道拒绝执行，改走完整升级 runbook。** 不自动从旧的 exit.txt、固定日期或固定测试数量生成通过结论。
+默认生成差量包并在本地重建验证；需要 `bsdiff4==1.4.1`。只有显式 `--full-upload` 才选择完整 gzip，不会因缺依赖自动扩大上传量。包内包括程序/payload 哈希、前端文件清单、验证证据摘要及服务器工具，目录不可覆盖。打包不重跑编译。**后端生产文件或迁移相对基线有变化时，这条发布通道拒绝执行，改走完整升级 runbook；已提交且不进入当前生产构建的 `_test.go` 变更保留真实测试要求，不据此判为生产后端变化。** 未跟踪测试同样拒绝。不自动从旧的 exit.txt、固定日期或固定测试数量生成通过结论。
 
 ## 上传、预检和发布
 

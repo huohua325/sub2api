@@ -20,5 +20,24 @@
     if (path.includes('notifications')) return { items: [], unread_count: 0 };
     return {};
   }
-  return { auth, resolve };
+  // Serialized into the page by Playwright; only browser globals may be referenced.
+  function alignment(id) {
+    const el = document.getElementById(id);
+    if (!el || !el.getClientRects().length) return false;
+    const now = performance.now();
+    const previous = window.__mileScrollReadiness;
+    const moved = !previous || previous.id !== id || Math.abs(scrollY - previous.position) > .5;
+    if (moved) window.__mileScrollReadiness = {id, position: scrollY, since: now};
+    const top = el.getBoundingClientRect().top;
+    const maximum = document.documentElement.scrollHeight - innerHeight;
+    const requested = Math.max(top + scrollY - 112, 0);
+    const heading = (el.querySelector?.('h2,h3') || el).getBoundingClientRect();
+    // A short final chapter cannot always sit at the header offset. Verify the
+    // actual user requirement: its heading is visible, below the fixed header.
+    const positionReady = requested > maximum
+      ? heading.top >= 108 && heading.bottom <= innerHeight
+      : Math.abs(scrollY - requested) < 4;
+    return location.hash === '#' + id && positionReady && now - window.__mileScrollReadiness.since >= 120;
+  }
+  return { auth, resolve, alignment };
 }

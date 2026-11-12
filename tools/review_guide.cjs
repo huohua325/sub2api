@@ -37,17 +37,13 @@ async page => {
  await page.setViewportSize({width:1440,height:1000});
  await page.goto(base+'/guide',{waitUntil:'domcontentloaded'});
  await page.locator('a[data-guide-path="codex"]').waitFor();
- await page.evaluate(()=>Promise.race([document.fonts.ready,new Promise(resolve=>setTimeout(resolve,2000))]));
+ await page.waitForFunction(()=>document.fonts.status==='loaded',null,{timeout:10000});
  const observations=[];
  async function aligned(id){
-  try { await page.waitForFunction(id=>{
-   const el=document.getElementById(id);if(!el||el.getClientRects().length===0)return false;
-   const desired=Math.min(Math.max(el.getBoundingClientRect().top+scrollY-112,0),document.documentElement.scrollHeight-innerHeight);
-   return location.hash==='#'+id && Math.abs(scrollY-desired)<4;
-  },id,{timeout:10000}); } catch (error) {
+  try { await page.waitForFunction(fixtures.alignment,id,{timeout:10000}); } catch (error) {
    const state = await page.evaluate(id=>({id,hash:location.hash,scrollY,focus:document.activeElement.id,top:document.getElementById(id)?.getBoundingClientRect().top,height:document.documentElement.scrollHeight,viewport:innerHeight}),id);
    await page.screenshot({path:dir+'failure.png'});
-   throw new Error(error.message+'; '+JSON.stringify(state));
+   throw new Error(error.message+'; '+JSON.stringify({state,completed:observations.map(item=>item.id)}));
   }
   const active=await page.locator('aside a[aria-current="location"]').getAttribute('href');
   if(!active.endsWith('#'+id))throw Error('Directory differs from hash '+id);
@@ -70,8 +66,11 @@ async page => {
  for(const id of ['guide-prep','guide-codex','guide-grok','guide-experiment','guide-check']){
   await page.locator('aside a[href$="#'+id+'"]').click();await aligned(id);
  }
- await page.goto(base+'/guide?purpose=codex#guide-experiment',{waitUntil:'domcontentloaded'});await aligned('guide-experiment');
- await page.reload({waitUntil:'domcontentloaded'});await aligned('guide-experiment');
+ // WebKit finishes native fragment restoration at load on a fresh document.
+ // Keep that bounded wait local to deep-link/reload; ordinary navigation uses DOM readiness.
+ const fragmentWait=page.context().browser().browserType().name()==='webkit'?'load':'domcontentloaded';
+ await page.goto(base+'/guide?purpose=codex#guide-experiment',{waitUntil:fragmentWait});await aligned('guide-experiment');
+ await page.reload({waitUntil:fragmentWait});await aligned('guide-experiment');
  await page.locator('#guide-experiment summary').click();
  const file=page.locator('#guide-experiment .lab-guide-file').first();
  await page.locator('#guide-experiment pre').first().waitFor();

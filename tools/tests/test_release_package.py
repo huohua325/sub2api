@@ -83,5 +83,14 @@ class PackageTests(unittest.TestCase):
         self.git('-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'documentation only')
         self.assertEqual(self.package()['source_commit'], self.commit)
 
+    def test_committed_backend_test_only_change_does_not_change_production_lane(self):
+        (self.root / 'backend/source_test.go').write_text('package example')
+        self.git('add', 'backend/source_test.go')
+        self.git('-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'test fixture only')
+        data = json.loads((self.out / 'manifest.json').read_text())
+        next(s for s in data['steps'] if s['name']=='backend-build')['source_commit']=self.git('rev-parse','HEAD')
+        (self.out / 'manifest.json').write_text(json.dumps(data))
+        self.assertTrue(self.package()['backend_unchanged'])
+
 
 if __name__ == '__main__': unittest.main()

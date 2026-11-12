@@ -30,7 +30,8 @@ def package_release(root, evidence, destination, binary, version, baseline_sha25
         return subprocess.check_output(['git', *args], cwd=root, text=True, timeout=30).strip()
     require_committed_inputs(root)
     source = git('rev-parse', 'HEAD')
-    if git('diff', '--name-only', baseline_commit, source, '--', 'backend'):
+    backend_changes = git('diff', '--name-only', baseline_commit, source, '--', 'backend').splitlines()
+    if any(not path.endswith('_test.go') for path in backend_changes):
         raise DeliveryError('Backend changes require the full upgrade runbook; this lane is frontend-only')
     data = json.loads((evidence / 'manifest.json').read_text())
     if data.get('schema') != 1 or data.get('root') != str(root): raise DeliveryError('Evidence belongs to another checkout')

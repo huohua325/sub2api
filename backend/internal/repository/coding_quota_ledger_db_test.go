@@ -106,6 +106,15 @@ func quotaUsed(t *testing.T, r *UsageMonitorRepository, user int64, at time.Time
 	return service.CodingQuotaReading{}
 }
 
+func quotaDBNow(t *testing.T, db *sql.DB) time.Time {
+	t.Helper()
+	var now time.Time
+	// Queue deadlines use PostgreSQL NOW(); a container and its Windows host
+	// can differ by milliseconds, so queue tests must use the database clock.
+	require.NoError(t, db.QueryRowContext(t.Context(), `SELECT clock_timestamp()`).Scan(&now))
+	return now
+}
+
 func TestCodingQuotaDBEmptyLedgerHasNoInventedUpdateTime(t *testing.T) {
 	db, r, base := quotaTestDB(t, "")
 	_, err := db.Exec(`DELETE FROM coding_quota_requests`)
@@ -404,7 +413,7 @@ func TestCodingQuotaDBExperimentDelayedChargeAndClosedMonth(t *testing.T) {
 	state, err := r.ExperimentQuotaState(ctx, 1, time.Now())
 	require.NoError(t, err)
 	require.Equal(t, "pending", state)
-	items, err := r.ListPendingExperimentCharges(ctx, time.Now())
+	items, err := r.ListPendingExperimentCharges(ctx, quotaDBNow(t, db))
 	require.NoError(t, err)
 	require.Len(t, items, 2)
 	for _, item := range items {
@@ -443,7 +452,7 @@ func TestCodingQuotaDBDeferredKeyCountersKeepClosedWindows(t *testing.T) {
 		_, err = repo.Apply(context.Background(), &service.UsageBillingCommand{RequestID: tc.id, APIKeyID: 1, UserID: 1, AccountID: 10, Purpose: "experiment", StartedAt: tc.at, ExperimentPending: true, ExperimentUpstreamRequestID: tc.id, ExperimentEffects: &service.ExperimentBillingEffects{KeyQuota: true, KeyRateLimits: true, SubscriptionID: &subscriptionID, AccountQuota: true, AccountMultiplier: 1.5}})
 		require.NoError(t, err)
 	}
-	items, err := r.ListPendingExperimentCharges(context.Background(), time.Now())
+	items, err := r.ListPendingExperimentCharges(context.Background(), quotaDBNow(t, db))
 	require.NoError(t, err)
 	for _, item := range items {
 		require.NoError(t, r.CompleteExperimentCharge(context.Background(), item.ID, 2))
@@ -470,7 +479,7 @@ func TestCodingQuotaDBDeferredKeyCountersKeepClosedWindows(t *testing.T) {
 	require.NoError(t, err)
 	_, err = repo.Apply(context.Background(), &service.UsageBillingCommand{RequestID: "first-pending", APIKeyID: 2, UserID: 1, AccountID: 10, Purpose: "experiment", StartedAt: time.Now().Add(-time.Minute), ExperimentPending: true, ExperimentUpstreamRequestID: "first-pending", ExperimentEffects: &service.ExperimentBillingEffects{KeyRateLimits: true}})
 	require.NoError(t, err)
-	items, err = r.ListPendingExperimentCharges(context.Background(), time.Now())
+	items, err = r.ListPendingExperimentCharges(context.Background(), quotaDBNow(t, db))
 	require.NoError(t, err)
 	require.Len(t, items, 1)
 	require.NoError(t, r.CompleteExperimentCharge(context.Background(), items[0].ID, 2))
