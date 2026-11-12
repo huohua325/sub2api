@@ -50,6 +50,7 @@ def main():
     package.add_argument('--baseline-commit', required=True)
     package.add_argument('--baseline-sha256', required=True)
     package.add_argument('--baseline-binary', type=Path, required=True)
+    package.add_argument('--full-upload', action='store_true', help='explicitly use gzip instead of computing a delta')
     server = commands.add_parser('deploy')
     server.add_argument('--root', type=Path, default=Path('/opt/sub2api'))
     server.add_argument('--release', type=Path, required=True)
@@ -63,7 +64,7 @@ def main():
             '260_personal_quota_resets.sql': digest(root / 'backend/migrations/260_personal_quota_resets.sql')}}
         result = package_release(root, args.output, args.destination, args.output / 'sub2api-linux-amd64',
                                  args.version, args.baseline_sha256, args.baseline_commit,
-                                 baseline_binary=args.baseline_binary, upgrade_contract=contract)
+                                 baseline_binary=args.baseline_binary, full_upload=args.full_upload, upgrade_contract=contract)
     else:
         manifest = json.loads((args.release / 'manifest.json').read_text())
         contract = PersonalQuotaUpgrade(manifest.get('upgrade_contract', {}))

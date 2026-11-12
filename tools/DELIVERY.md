@@ -84,6 +84,8 @@ python3 /opt/sub2api/releases/<发布名>/release_server.py --root /opt/sub2api 
 
 服务器使用包内入口 `python3 full_upgrade.py deploy --root /opt/sub2api --release <发布目录>`；先 `--stage`，再只读预检，最后按已获授权的发布执行 `--apply`。完整保留既有迁移，只允许新增该迁移；两张个人重置表加入持久数据核对。若新个人重置已实际使用，失败时禁止自动回退到不认识这些记录的旧程序，必须保留数据库并向前修复。
 
+完整升级打包可显式指定 `--full-upload` 复用同一程序生成 gzip，适合差量计算成本大于传输成本时。Compose 2.40 的 `config --hash` 与容器标签可能不一致；此时必须由 `compose --dry-run up --no-deps --no-build --pull never` 的真实变更检测确认唯一结果为当前应用 `Running`，任何创建／重建／其他服务变更都拒绝，冻结配置仍须再次核对。
+
 备份清理仅在用户明确授权后运行 `backup_retention.py --root /opt/sub2api/backups --keep 2` 审阅，再加 `--apply`；先验证保留备份的归档、配置与程序。该清理不属于发布自动步骤。
 
 ## 公开资源与记录

@@ -134,6 +134,12 @@ class ReleaseServerTests(unittest.TestCase):
         with patch.object(runtime, 'inspect', return_value=info), patch.object(runtime, 'check_health'), patch.object(runtime, 'command'), patch('release_server.subprocess.check_output', side_effect=output):
             with self.assertRaises(DeliveryError): runtime.preflight()
 
+    def test_compose_hash_disagreement_needs_an_unchanged_real_dry_run(self):
+        from release_server import verify_unchanged_compose_plan
+        verify_unchanged_compose_plan(' DRY-RUN MODE -  Container sub2api  Running\n', 'sub2api')
+        for plan in ['Container sub2api Recreate', 'Container sub2api Running\nContainer postgres Recreate', '', '1']:
+            with self.assertRaises(DeliveryError): verify_unchanged_compose_plan(plan, 'sub2api')
+
     def test_restart_and_rollback_use_frozen_configuration(self):
         from release_server import DockerRuntime
         frozen = self.root / 'original.json'

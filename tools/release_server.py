@@ -150,6 +150,15 @@ def deploy(root, release, runtime, *, apply=False, upgrade=None):
             raise
 
 
+def verify_unchanged_compose_plan(plan, app):
+    # Compose 2.40 can give config --hash a different model hash from up's
+    # container label even when up's actual change detector reports no changes.
+    lines = [line.strip() for line in plan.splitlines() if line.strip()]
+    pattern = r'(?:DRY-RUN MODE -\s*)?Container\s+' + re.escape(app) + r'\s+Running'
+    if len(lines) != 1 or not re.fullmatch(pattern, lines[0]):
+        raise DeliveryError('Effective Compose configuration would change the running container')
+
+
 class DockerRuntime:
     def __init__(self, root, release, app='sub2api', database='sub2api-postgres'):
         self.root = Path(root); self.release = Path(release); self.app = app; self.database = database
@@ -166,8 +175,13 @@ class DockerRuntime:
         labels = info['Config'].get('Labels') or {}
         configured_hash = subprocess.check_output(['docker', 'compose', 'config', '--hash', self.app],
                                                   cwd=self.root, timeout=20, text=True).strip().split()
-        if len(configured_hash) != 2 or configured_hash[0] != self.app or configured_hash[1] != labels.get('com.docker.compose.config-hash'):
+        if len(configured_hash) != 2 or configured_hash[0] != self.app:
             raise DeliveryError('Effective Compose configuration differs from the running container')
+        if configured_hash[1] != labels.get('com.docker.compose.config-hash'):
+            plan = subprocess.check_output(['docker', 'compose', '--dry-run', 'up', '-d', '--no-deps',
+                                            '--no-build', '--pull', 'never', self.app], cwd=self.root,
+                                           stderr=subprocess.STDOUT, timeout=30, text=True)
+            verify_unchanged_compose_plan(plan, self.app)
         self.configuration_hash = configured_hash[1]
         self.project = labels.get('com.docker.compose.project')
         if not self.project: raise DeliveryError('Running container is not managed by the expected Compose project')
