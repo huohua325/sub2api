@@ -29,6 +29,10 @@ def snapshot(container, env, as_of):
     }
     immutable_sql = ','.join("'" + name + "'," + rows(query) for name, query in immutable.items())
     immutable_sql += ",'capacity_events'," + (rows('SELECT * FROM coding_quota_capacity_events') if capacity else "'[]'::jsonb")
+    for key, table in [('personal_resets', 'personal_quota_resets'),
+                       ('personal_reset_requests', 'personal_quota_reset_requests')]:
+        exists = sql("SELECT to_regclass('" + table + "') IS NOT NULL") == 't'
+        immutable_sql += ",'" + key + "'," + (rows('SELECT * FROM ' + table) if exists else "'[]'::jsonb")
     # Same original wallet anchors and confirmed-reset formula as the runbook.
     clocks = f"""WITH anchors AS (
       SELECT u.id,p.purpose,GREATEST(COALESCE(a.window_start,u.created_at),

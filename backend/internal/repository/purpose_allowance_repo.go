@@ -23,8 +23,8 @@ func (r *purposeAllowanceRepository) List(ctx context.Context, userID int64) ([]
 		return nil, nil
 	}
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT purpose, limit_amount, used_amount, period, window_start
-		FROM user_purpose_allowances
+		SELECT purpose, limit_amount, `+personalExperimentUsageSQL("w")+`, period, window_start
+		FROM user_purpose_allowances w
 		WHERE user_id = $1
 		ORDER BY purpose
 	`, userID)

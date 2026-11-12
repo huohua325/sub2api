@@ -353,7 +353,7 @@ func (r *UsageMonitorRepository) ListLiveUsers(ctx context.Context) ([]service.U
 		       u.role,
 		       w.purpose,
 		       w.limit_amount::text,
-		       w.used_amount::text,
+		       `+personalExperimentUsageSQL("w")+`::text,
 		       w.period,
 		       w.window_start
 		FROM users u

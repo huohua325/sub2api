@@ -17,7 +17,7 @@ def require_committed_inputs(root):
         raise DeliveryError('Release inputs must be committed, including untracked files. Use a clean release checkout; preserve user-owned files.')
 
 
-def package_release(root, evidence, destination, binary, version, baseline_sha256, baseline_commit, *, full_upload=False, baseline_binary=None):
+def package_release(root, evidence, destination, binary, version, baseline_sha256, baseline_commit, *, full_upload=False, baseline_binary=None, upgrade_contract=None):
     root = Path(root).resolve(); evidence = Path(evidence).resolve(); destination = Path(destination).resolve(); binary = Path(binary).resolve()
     if destination.exists(): raise DeliveryError('Release directory already exists; immutable packages are never overwritten')
     if not destination.is_relative_to(root / 'output'):
@@ -31,8 +31,16 @@ def package_release(root, evidence, destination, binary, version, baseline_sha25
     require_committed_inputs(root)
     source = git('rev-parse', 'HEAD')
     backend_changes = git('diff', '--name-only', baseline_commit, source, '--', 'backend').splitlines()
-    if any(not path.endswith('_test.go') for path in backend_changes):
+    if upgrade_contract is None and any(not path.endswith('_test.go') for path in backend_changes):
         raise DeliveryError('Backend changes require the full upgrade runbook; this lane is frontend-only')
+    if upgrade_contract is not None:
+        from full_upgrade import PersonalQuotaUpgrade
+        PersonalQuotaUpgrade(upgrade_contract)
+        migration_changes = git('diff', '--name-only', baseline_commit, source, '--', 'backend/migrations').splitlines()
+        if migration_changes != ['backend/migrations/260_personal_quota_resets.sql']:
+            raise DeliveryError('Full personal-reset upgrade requires exactly the reviewed additive migration')
+        if upgrade_contract['migrations']['260_personal_quota_resets.sql'] != digest(root / migration_changes[0]):
+            raise DeliveryError('Reviewed migration checksum changed')
     data = json.loads((evidence / 'manifest.json').read_text())
     if data.get('schema') != 1 or data.get('root') != str(root): raise DeliveryError('Evidence belongs to another checkout')
     stages = {s['name']: s for s in data['steps']}
@@ -44,6 +52,15 @@ def package_release(root, evidence, destination, binary, version, baseline_sha25
             raise DeliveryError('Stale input evidence: ' + name)
         if stage['artifacts'] != tree_hash(root, list(stage['artifacts'])) or digest(contained(evidence, stage['log'])) != stage['log_sha256']:
             raise DeliveryError('Corrupt artifact or log evidence: ' + name)
+    if upgrade_contract is not None:
+        result = evidence / 'feature-browser/result.json'
+        feature = json.loads(result.read_text())
+        if not feature.get('ok') or not {'chromium', 'webkit'}.issubset(feature.get('engines', {})):
+            raise DeliveryError('Full upgrade requires the actual reset flow in both browser engines')
+        if feature.get('frontend_sha256') != tree_hash(root, ['backend/internal/web/dist'])['backend/internal/web/dist']:
+            raise DeliveryError('Feature browser evidence is for another frontend artifact')
+        if feature.get('script_sha256') != digest(root / 'tools/review_personal_quota.cjs'):
+            raise DeliveryError('Feature browser scenario changed after verification')
     quota = stages['quota-race'].get('quota_tests', {})
     if not quota.get('passed') or quota.get('skipped') != 0 or quota.get('failed') != 0:
         raise DeliveryError('Real quota tests with zero skips are required')
@@ -94,11 +111,14 @@ def package_release(root, evidence, destination, binary, version, baseline_sha25
     manifest = {'schema': 1, 'version': version, 'source_commit': built_source,
                 'baseline_commit': baseline_commit, 'baseline_sha256': baseline_sha256, 'sha256': digest(binary),
                 'bytes': binary.stat().st_size, 'payload': payload, 'payload_sha256': digest(destination / payload),
-                'payload_bytes': (destination / payload).stat().st_size, 'backend_unchanged': True,
+                'payload_bytes': (destination / payload).stat().st_size, 'backend_unchanged': upgrade_contract is None,
                 'quota_tests': quota, 'created_at': utcnow(), 'frontend_files': files,
                 'evidence_sha256': digest(evidence / 'manifest.json')}
     kit = Path(__file__).resolve().parent
     for name in ['release_server.py', 'delivery_core.py', 'quota_snapshot.py', 'apply_delta.py']:
         shutil.copyfile(kit / name, destination / name)
+    if upgrade_contract is not None:
+        manifest['upgrade_contract'] = upgrade_contract
+        shutil.copyfile(kit / 'full_upgrade.py', destination / 'full_upgrade.py')
     write_json(destination / 'manifest.json', manifest)
     return manifest

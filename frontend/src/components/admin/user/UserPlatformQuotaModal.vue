@@ -6,6 +6,7 @@
     @close="$emit('close')"
   >
     <div v-if="user" class="space-y-4">
+      <PersonalQuotaResetPanel v-if="show && user.role === 'user'" :user-id="user.id" :email="user.email" @success="emit('success')" />
       <div
         v-if="hasActiveSubscription"
         class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200"
@@ -122,6 +123,7 @@ import { adminAPI } from '@/api/admin'
 import { platformQuotaPlatforms } from '@/api/admin/users'
 import type { AdminUser, PlatformQuotaItem, PlatformQuotaPlatform, PlatformQuotaWindow } from '@/types'
 import BaseDialog from '@/components/common/BaseDialog.vue'
+import PersonalQuotaResetPanel from './PersonalQuotaResetPanel.vue'
 
 const props = defineProps<{ show: boolean; user: AdminUser | null }>()
 const emit = defineEmits(['close', 'success'])

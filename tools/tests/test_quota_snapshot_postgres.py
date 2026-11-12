@@ -70,6 +70,12 @@ class SnapshotPostgresTests(unittest.TestCase):
         with self.assertRaises(DeliveryError): assert_preserved(before, snapshot(self.name, self.env, at))
         self.sql('CREATE TABLE coding_quota_capacity_events(id text);')
         self.assertEqual(snapshot(self.name, self.env, at)['immutable']['capacity_events'], [])
+        self.sql("CREATE TABLE personal_quota_resets(id text); CREATE TABLE personal_quota_reset_requests(request_row_id bigint,reset_id text); INSERT INTO personal_quota_resets VALUES('retained-personal'); INSERT INTO personal_quota_reset_requests VALUES(1,'retained-personal');")
+        personal = snapshot(self.name, self.env, at)
+        self.assertEqual(personal['immutable']['personal_resets'], [{'id': 'retained-personal'}])
+        self.assertEqual(personal['immutable']['personal_reset_requests'], [{'request_row_id': 1, 'reset_id': 'retained-personal'}])
+        self.sql('DELETE FROM personal_quota_resets;')
+        with self.assertRaises(DeliveryError): assert_preserved(personal, snapshot(self.name, self.env, at))
 
 
 if __name__ == '__main__': unittest.main()

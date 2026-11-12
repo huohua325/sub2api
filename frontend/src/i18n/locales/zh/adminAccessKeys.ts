@@ -78,6 +78,8 @@ export default {
   "fullAccessPhraseHint": "请输入“{phrase}”以确认：",
   "unknownPermission": "未知权限（{id}）",
   "permissions": {
+    "users_dpurpose_uquotas_dread": { "label": "读取普通用户用途额度与重置记录", "category": "用户" },
+    "users_dpurpose_uquotas_dreset": { "label": "重置普通用户当前周期用途额度", "category": "用户" },
     "accounts_didentity_dread": {
       "label": "读取账户邮箱、套餐及创建时间（不含令牌）",
       "category": "账户"

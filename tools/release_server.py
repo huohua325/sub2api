@@ -66,15 +66,20 @@ def assert_preserved(before, after):
             raise DeliveryError('Original settled/imported charge changed')
 
 
-def deploy(root, release, runtime, *, apply=False):
+def deploy(root, release, runtime, *, apply=False, upgrade=None):
     root = Path(root).resolve(); release = Path(release).resolve()
     if root == Path(root.anchor) or not release.is_relative_to(root / 'releases') or release == root / 'releases':
         raise DeliveryError('Release must be a child of the deployment releases directory')
     active = contained(root, 'bin/sub2api'); candidate = contained(release, 'sub2api')
     manifest = json.loads((release / 'manifest.json').read_text())
     quota = manifest.get('quota_tests', {})
-    if manifest.get('schema') != 1 or not manifest.get('backend_unchanged') or not quota.get('passed') or quota.get('skipped') != 0 or quota.get('failed') != 0:
+    if manifest.get('schema') != 1 or not quota.get('passed') or quota.get('skipped') != 0 or quota.get('failed') != 0:
         raise DeliveryError('Frontend-only release and real zero-skip quota proof required')
+    if upgrade is None:
+        if not manifest.get('backend_unchanged'):
+            raise DeliveryError('Backend changes require the explicit full upgrade entry point')
+    else:
+        upgrade.validate(manifest)
     if not re.fullmatch(r'[0-9a-f]{40}', manifest.get('source_commit', '')):
         raise DeliveryError('Fixed source commit required')
     if digest(active) != manifest['baseline_sha256'] or digest(candidate) != manifest['sha256']:
@@ -119,7 +124,10 @@ def deploy(root, release, runtime, *, apply=False):
             runtime.start(); runtime.health()
             after = runtime.snapshot(as_of)
             write_json(backup / 'after.json', after)
-            assert_preserved(before, after)
+            if upgrade is None:
+                assert_preserved(before, after)
+            else:
+                upgrade.assert_preserved(before, after)
             if runtime.preflight() != preflight:
                 raise DeliveryError('Runtime configuration changed during deployment')
             record.update(status='deployed', as_of=as_of, finished_at=utcnow())
@@ -129,6 +137,9 @@ def deploy(root, release, runtime, *, apply=False):
             record.update(status='failed', error=type(error).__name__, finished_at=utcnow())
             try:
                 if switched:
+                    if upgrade is not None and not upgrade.can_rollback(runtime):
+                        record['program_rollback_blocked'] = 'New personal resets exist; old program cannot interpret them. Keep the database and fix forward.'
+                        raise DeliveryError(record['program_rollback_blocked']) from error
                     replace(backup / 'sub2api.previous')
                     runtime.start(); runtime.health()
                     record['program_rolled_back'] = True

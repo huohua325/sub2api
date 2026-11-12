@@ -455,6 +455,45 @@ export async function resetPlatformQuotaWindow(
   return data
 }
 
+export interface PersonalQuota {
+  purpose: 'openai' | 'grok' | 'experiment'
+  used: string
+  pending: string
+  period_start: string
+  period_end: string
+}
+
+export interface PersonalQuotaReset {
+  id: string
+  actor_user_id: number
+  target_user_id: number
+  purpose: PersonalQuota['purpose']
+  period_start: string
+  period_end: string
+  note: string
+  created_at: string
+}
+
+export interface PersonalQuotaResetInput {
+  id: string
+  purpose: PersonalQuota['purpose']
+  period_end: string
+  note: string
+  confirm: true
+}
+
+export async function getPurposeQuotaResets(id: number) {
+  const { data } = await apiClient.get<{ quotas: PersonalQuota[]; events: PersonalQuotaReset[] }>(
+    `/admin/users/${id}/purpose-quota-resets`
+  )
+  return data
+}
+
+export async function resetPurposeQuota(id: number, input: PersonalQuotaResetInput) {
+  const { data } = await apiClient.post<PersonalQuotaReset>(`/admin/users/${id}/purpose-quota-resets`, input)
+  return data
+}
+
 export const usersAPI = {
   list,
   getById,
@@ -475,6 +514,8 @@ export const usersAPI = {
   getPlatformQuotas,
   updatePlatformQuotas,
   resetPlatformQuotaWindow,
+  getPurposeQuotaResets,
+  resetPurposeQuota,
 }
 
 export default usersAPI

@@ -7,6 +7,8 @@ const apiMocks = vi.hoisted(() => ({
   getPlatformQuotas: vi.fn(),
   updatePlatformQuotas: vi.fn(),
   resetPlatformQuotaWindow: vi.fn(),
+  getPurposeQuotaResets: vi.fn(),
+  resetPurposeQuota: vi.fn(),
 }))
 
 vi.mock('@/api/admin', () => ({
@@ -15,6 +17,8 @@ vi.mock('@/api/admin', () => ({
       getPlatformQuotas: apiMocks.getPlatformQuotas,
       updatePlatformQuotas: apiMocks.updatePlatformQuotas,
       resetPlatformQuotaWindow: apiMocks.resetPlatformQuotaWindow,
+      getPurposeQuotaResets: apiMocks.getPurposeQuotaResets,
+      resetPurposeQuota: apiMocks.resetPurposeQuota,
     },
   },
 }))
@@ -72,9 +76,85 @@ beforeEach(() => {
   apiMocks.getPlatformQuotas.mockResolvedValue({ platform_quotas: [] })
   apiMocks.updatePlatformQuotas.mockResolvedValue({ platform_quotas: [] })
   apiMocks.resetPlatformQuotaWindow.mockResolvedValue({ platform_quotas: [] })
+  apiMocks.getPurposeQuotaResets.mockResolvedValue({ quotas: [], events: [] })
 })
 
 describe('UserPlatformQuotaModal', () => {
+  it('refreshes and requires confirmation again when the shared API client reports a changed period', async () => {
+    const quota = { purpose: 'openai', used: '30', pending: '0', period_start: '2026-11-11T06:35:59Z', period_end: '2026-11-18T06:35:59Z' }
+    apiMocks.getPurposeQuotaResets.mockResolvedValue({ quotas: [quota], events: [] })
+    apiMocks.resetPurposeQuota.mockRejectedValue({ status: 409, reason: 'PERSONAL_PERIOD_CHANGED', message: 'changed' })
+    const w = await mountAndOpen({ user: makeUser({ role: 'user' } as any) })
+    await w.find('[data-testid="purpose-reset-openai"]').trigger('click')
+    await w.find('[data-testid="purpose-reset-reason"]').setValue('reason')
+    await w.find('form').trigger('submit')
+    await flushPromises()
+    expect(w.find('form').exists()).toBe(false)
+    expect(apiMocks.getPurposeQuotaResets).toHaveBeenCalledTimes(2)
+    expect(apiMocks.showError).toHaveBeenCalledWith('admin.users.personalQuota.periodChanged')
+    w.unmount()
+  })
+
+  it('retries an uncertain result with the same operation ID and locked reason', async () => {
+    apiMocks.getPurposeQuotaResets.mockResolvedValue({ quotas: [
+      { purpose: 'openai', used: '30', pending: '0', period_start: '2026-11-11T06:35:59Z', period_end: '2026-11-18T06:35:59Z' },
+    ], events: [] })
+    apiMocks.resetPurposeQuota.mockRejectedValueOnce(new Error('lost response')).mockResolvedValueOnce({ id: 'ok' })
+    const w = await mountAndOpen({ user: makeUser({ role: 'user' } as any) })
+    await w.find('[data-testid="purpose-reset-openai"]').trigger('click')
+    await w.find('[data-testid="purpose-reset-reason"]').setValue('support request')
+    await w.find('form').trigger('submit')
+    await flushPromises()
+    expect(w.find('[role="alert"]').exists()).toBe(true)
+    expect(w.find('[data-testid="purpose-reset-reason"]').attributes('disabled')).toBeDefined()
+    await w.find('form').trigger('submit')
+    await flushPromises()
+    expect(apiMocks.resetPurposeQuota).toHaveBeenCalledTimes(2)
+    expect(apiMocks.resetPurposeQuota.mock.calls[1]).toEqual(apiMocks.resetPurposeQuota.mock.calls[0])
+    expect(w.find('form').exists()).toBe(false)
+    w.unmount()
+  })
+
+  it('discards quota responses from the previously selected user', async () => {
+    let finishOld!: (value: unknown) => void
+    apiMocks.getPurposeQuotaResets.mockReturnValueOnce(new Promise(resolve => { finishOld = resolve }))
+      .mockResolvedValueOnce({ quotas: [
+        { purpose: 'experiment', used: '10', pending: '0', period_start: '2026-11-01T00:00:00Z', period_end: '2026-12-01T00:00:00Z' },
+      ], events: [] })
+    const w = await mountAndOpen({ user: makeUser({ role: 'user' } as any) })
+    await w.setProps({ user: { ...makeUser({ role: 'user' } as any), id: 100 } })
+    await flushPromises()
+    finishOld({ quotas: [{ purpose: 'openai' }], events: [] })
+    await flushPromises()
+    expect(w.find('[data-testid="purpose-reset-experiment"]').exists()).toBe(true)
+    expect(w.find('[data-testid="purpose-reset-openai"]').exists()).toBe(false)
+    w.unmount()
+  })
+
+  it('restores one purpose only after a reason and confirmation, preserving the displayed period', async () => {
+    const end = '2026-11-18T06:35:59Z'
+    apiMocks.getPurposeQuotaResets.mockResolvedValue({ quotas: [
+      { purpose: 'openai', used: '30', pending: '0', period_start: '2026-11-11T06:35:59Z', period_end: end },
+    ], events: [] })
+    apiMocks.resetPurposeQuota.mockResolvedValue({ id: 'reset-a' })
+    const w = await mountAndOpen({ user: makeUser({ role: 'user' } as any) })
+    const reset = w.find('[data-testid="purpose-reset-openai"]')
+    expect(reset.exists()).toBe(true)
+    await reset.trigger('click')
+    const confirm = w.find('[data-testid="purpose-reset-confirm"]')
+    expect(confirm.attributes('disabled')).toBeDefined()
+    await w.find('[data-testid="purpose-reset-reason"]').setValue('support request')
+    expect(apiMocks.resetPurposeQuota).not.toHaveBeenCalled()
+    await w.find('form').trigger('submit')
+    await flushPromises()
+    expect(apiMocks.resetPurposeQuota).toHaveBeenCalledWith(99, expect.objectContaining({
+      purpose: 'openai', period_end: end, note: 'support request', confirm: true,
+      id: expect.stringMatching(/^[0-9a-f-]{36}$/),
+    }))
+    expect(w.find('[data-testid="purpose-reset-confirm"]').exists()).toBe(false)
+    w.unmount()
+  })
+
   it.each([0, 4, 14, 17])('does not turn a negative limit in input %s into unlimited', async (index) => {
     const w = await mountAndOpen()
     await w.findAll('input[type=number]')[index].setValue('-1')

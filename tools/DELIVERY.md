@@ -73,6 +73,19 @@ python3 /opt/sub2api/releases/<发布名>/release_server.py --root /opt/sub2api 
 
 这里只接受当前部署布局（sub2api、sub2api-postgres，应用 8080、独立 MemSlides 8790）。布局或业务规则变化时先调整和验证工具；不能为绕过预检修改线上配置。数据库备份和原始快照只在服务器受限备份目录保存，不下载到 Git。
 
+## 个人额度完整升级通道
+
+`full_upgrade.py` 是独立的、限定范围的完整升级入口：只接受本次审查的 `260_personal_quota_resets.sql` 及固定校验和，原前端通道仍拒绝后端／迁移变更。完整升级同样需要已提交源码、全部前端证据、实际零跳过额度竞态、最终程序，以及两引擎的实际重置操作回归。
+
+```powershell
+& D:/Programs/anaconda3/python.exe tools/review_personal_quota.py --artifact --output output/<本次证据>/feature-browser
+& D:/Programs/anaconda3/python.exe tools/full_upgrade.py package --output output/<本次证据> --destination output/releases/<发布名> --version <版本> --baseline-commit <线上源码SHA> --baseline-sha256 <线上程序SHA256> --baseline-binary <已验证旧程序>
+```
+
+服务器使用包内入口 `python3 full_upgrade.py deploy --root /opt/sub2api --release <发布目录>`；先 `--stage`，再只读预检，最后按已获授权的发布执行 `--apply`。完整保留既有迁移，只允许新增该迁移；两张个人重置表加入持久数据核对。若新个人重置已实际使用，失败时禁止自动回退到不认识这些记录的旧程序，必须保留数据库并向前修复。
+
+备份清理仅在用户明确授权后运行 `backup_retention.py --root /opt/sub2api/backups --keep 2` 审阅，再加 `--apply`；先验证保留备份的归档、配置与程序。该清理不属于发布自动步骤。
+
 ## 公开资源与记录
 
 ```powershell

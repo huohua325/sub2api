@@ -75,6 +75,9 @@ func quotaTestDB(t *testing.T, seed string) (*sql.DB, *UsageMonitorRepository, t
 	capacity, err := migrations.FS.ReadFile("259_coding_quota_capacity_events.sql")
 	require.NoError(t, err)
 	require.NoError(t, applyMigrationsFS(context.Background(), db, fstest.MapFS{"259_coding_quota_capacity_events.sql": &fstest.MapFile{Data: capacity}}))
+	personal, err := migrations.FS.ReadFile("260_personal_quota_resets.sql")
+	require.NoError(t, err)
+	require.NoError(t, applyMigrationsFS(context.Background(), db, fstest.MapFS{"260_personal_quota_resets.sql": &fstest.MapFile{Data: personal}}))
 	var base time.Time
 	require.NoError(t, db.QueryRow(`SELECT window_start FROM user_purpose_allowances WHERE user_id=1 AND purpose='openai'`).Scan(&base))
 	return db, NewUsageMonitorRepository(db), base

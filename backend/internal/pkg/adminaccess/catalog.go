@@ -54,6 +54,8 @@ var definitions = []permissionDefinition{
 	{Permission{"users.balance.write", "增减任意用户余额", "财务", "global"}, []string{"POST /users/:id/balance"}},
 	{Permission{"users.quotas.read", "读取全站用户平台额度", "用户", "global"}, []string{"GET /users/:id/platform-quotas"}},
 	{Permission{"users.quotas.write", "修改与重置全站用户平台额度", "用户", "global"}, []string{"PUT /users/:id/platform-quotas", "POST /users/:id/platform-quotas/reset"}},
+	{Permission{"users.purpose_quotas.read", "读取普通用户用途额度与重置记录", "用户", "global"}, []string{"GET /users/:id/purpose-quota-resets"}},
+	{Permission{"users.purpose_quotas.reset", "重置普通用户当前周期用途额度", "用户", "global"}, []string{"POST /users/:id/purpose-quota-resets"}},
 	{Permission{"groups.read", "读取所有分组配置", "分组", "global"}, []string{"GET /groups", "GET /groups/all", "GET /groups/:id", "GET /groups/:id/rate-multipliers", "GET /groups/:id/composite-routes", "GET /groups/:id/model-allowlist-candidates"}},
 	{Permission{"usage.read", "读取全站用量明细及用户用量", "报表", "global"}, []string{"GET /usage", "GET /usage/stats", "GET /users/:id/usage"}},
 	{Permission{"payment.read", "读取全站支付订单与报表", "财务", "global"}, []string{"GET /payment/dashboard", "GET /payment/orders", "GET /payment/orders/:id"}},

@@ -12,7 +12,7 @@ from delivery_core import DeliveryError, digest, utcnow, write_json
 TOOLS = Path(__file__).resolve().parent
 
 
-def run(args):
+def run(args, *, scenario='review_guide.cjs'):
     origin = urllib.parse.urlsplit(args.base_url)
     if origin.scheme not in ('http', 'https') or not origin.netloc or origin.path not in ('', '/') or origin.query or origin.fragment or origin.username:
         raise DeliveryError('Browser base URL must be an HTTP(S) origin')
@@ -22,9 +22,9 @@ def run(args):
     if not npx:
         raise DeliveryError('npx is required; install @playwright/cli and its browsers first')
     fixture = (TOOLS / 'browser_fixtures.cjs').read_text(encoding='utf-8')
-    template = (TOOLS / 'review_guide.cjs').read_text(encoding='utf-8')
+    template = (TOOLS / scenario).read_text(encoding='utf-8')
     result = {'base_url': args.base_url, 'checked_at': utcnow(), 'engines': {}, 'ok': False,
-              'script_sha256': digest(TOOLS / 'review_guide.cjs'), 'fixtures_sha256': digest(TOOLS / 'browser_fixtures.cjs')}
+              'script_sha256': digest(TOOLS / scenario), 'fixtures_sha256': digest(TOOLS / 'browser_fixtures.cjs')}
     write_json(output / 'result.json', result)
     try:
         for engine in args.engines:

@@ -61,6 +61,10 @@ FROM windows w LEFT JOIN LATERAL(
  FROM coding_quota_requests q LEFT JOIN coding_quota_corrections c ON c.request_row_id=q.id
  LEFT JOIN coding_quota_meters m ON m.account_id=q.account_id AND m.purpose=q.purpose
  WHERE q.user_id=w.id AND q.purpose=w.purpose AND q.started_at>=w.start AND q.started_at<w.start+INTERVAL '168 hours'
+ AND NOT EXISTS (SELECT 1 FROM personal_quota_reset_requests pr
+ JOIN personal_quota_resets pe ON pe.id=pr.reset_id
+ WHERE pr.request_row_id=q.id AND pe.target_user_id=w.id AND pe.purpose=w.purpose
+ AND pe.period_start=w.start AND pe.period_end=w.start+INTERVAL '168 hours' AND pe.created_at<=$3)
  GROUP BY q.account_id) a
 ) q ON TRUE ORDER BY w.id,w.purpose`, pq.Array(users), periodAt.UTC(), capacityAt.UTC())
 	if err != nil {
