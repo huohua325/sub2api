@@ -85,6 +85,15 @@ class RunnerTests(unittest.TestCase):
             run.run('timeout', [sys.executable, '-c', 'import time; time.sleep(3)'], ['source.txt'], timeout=.1)
         self.assertEqual(run.manifest['steps'][-1]['status'], 'failed')
 
+    def test_explicit_dependency_metadata_is_hashed_even_inside_ignored_directory(self):
+        folder = self.root / 'node_modules'; folder.mkdir()
+        metadata = folder / '.modules.yaml'; metadata.write_text('version: 1')
+        run = self.runner()
+        run.run('build', self.command(), ['node_modules/.modules.yaml'])
+        metadata.write_text('version: 2')
+        run.run('build', self.command(), ['node_modules/.modules.yaml'])
+        self.assertEqual((self.root / 'count').read_text(), '2')
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -61,7 +61,7 @@ def tree_hash(root, paths, *, inputs=False):
         entries = {}
         for file in files:
             rel = file.relative_to(root)
-            if inputs and (set(rel.parts) & ignored or file.name.endswith('.tsbuildinfo')):
+            if inputs and path.is_dir() and (set(rel.parts) & ignored or file.name.endswith('.tsbuildinfo')):
                 continue
             if file.is_symlink():
                 raise DeliveryError('Symlink is not an immutable input/artifact: ' + str(rel))
