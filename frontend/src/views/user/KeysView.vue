@@ -509,7 +509,7 @@
 
         <fieldset v-if="!showEditModal" data-tour="key-form-provider">
           <legend class="input-label">{{ t('keys.providerLabel') }}</legend>
-          <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <div class="grid grid-cols-1 gap-2" :class="createProviderOptions.length === 4 ? 'sm:grid-cols-4' : 'sm:grid-cols-3'">
             <label
               v-for="provider in createProviderOptions"
               :key="provider.value"
@@ -530,14 +530,19 @@
                 :class="provider.count > 0 && 'hover:border-primary-300 dark:hover:border-primary-700'"
               >
                 <span class="flex h-8 items-center justify-center gap-1.5" aria-hidden="true">
-                  <span
-                    v-for="platform in KEY_GROUP_PROVIDER_ICONS[provider.value]"
-                    :key="platform"
-                    class="flex h-8 w-8 items-center justify-center rounded-lg"
-                    :class="platformBadgeLightClass(platform)"
-                  >
-                    <PlatformIcon :platform="platform" size="lg" />
+                  <span v-if="provider.value === 'coding'" class="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-50 text-primary-600 dark:bg-primary-500/10 dark:text-primary-400" data-testid="unified-coding-icon">
+                    <Icon name="code" size="lg" />
                   </span>
+                  <template v-else>
+                    <span
+                      v-for="platform in KEY_GROUP_PROVIDER_ICONS[provider.value]"
+                      :key="platform"
+                      class="flex h-8 w-8 items-center justify-center rounded-lg"
+                      :class="platformBadgeLightClass(platform)"
+                    >
+                      <PlatformIcon :platform="platform" size="lg" />
+                    </span>
+                  </template>
                 </span>
                 <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">{{ provider.label }}</span>
               </span>

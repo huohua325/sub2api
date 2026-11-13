@@ -28,13 +28,12 @@
           <div><span>API Key</span><code data-testid="connection-key">{{ revealKey ? apiKey : 'sk-••••••••••••' }}</code><button type="button" class="btn btn-secondary btn-sm" data-testid="reveal-connection-key" :aria-pressed="revealKey" @click="revealKey = !revealKey">{{ t(revealKey ? 'keys.connection.hide' : 'keys.connection.reveal') }}</button><button type="button" class="btn btn-secondary btn-sm" @click="copyCredential(apiKey)">{{ t('common.copy') }}</button></div>
         </section>
         <!-- Description -->
-        <p class="text-sm text-gray-600 dark:text-gray-400">
+        <p v-if="!isUnifiedCoding" class="text-sm text-gray-600 dark:text-gray-400">
           {{ platformDescription }}
         </p>
         <section v-if="isUnifiedCoding" data-testid="unified-coding-setup" class="rounded-lg border border-primary-200 bg-primary-50 p-3 text-sm leading-6 text-primary-900 dark:border-primary-800 dark:bg-primary-950/30 dark:text-primary-100">
-          <p>{{ t('keys.connection.unifiedSetup') }}</p>
-          <p class="mt-2">{{ t('keys.connection.unifiedAuthCompatibility') }}</p>
-          <p class="mt-2">{{ t('keys.connection.unifiedModels') }}</p>
+          <p>{{ t('keys.connection.unifiedModels') }}</p>
+          <p class="mt-1">{{ t('keys.connection.unifiedAuthCompatibility') }}</p>
         </section>
 
         <!-- Client Tabs -->
@@ -186,7 +185,7 @@
         </div>
 
         <section
-          v-if="showCodexModelCatalog"
+          v-if="showCodexModelCatalog && !isUnifiedCoding"
           data-testid="codex-model-catalog"
           class="overflow-hidden rounded-lg border border-gray-200 bg-gray-50 dark:border-dark-700 dark:bg-dark-800/50"
         >
@@ -261,11 +260,11 @@
           <p v-if="activeClientTab === 'api'">{{ t('keys.connection.modelPlaceholder') }}</p>
           <p>{{ t(isUnifiedCoding ? 'keys.connection.unifiedSetup' : 'keys.connection.localInstructions') }}</p>
           <pre translate="no">{{ startupCommand }}</pre>
-          <p>{{ t('keys.connection.templateScope') }}</p>
+          <p v-if="!isUnifiedCoding">{{ t('keys.connection.templateScope') }}</p>
           <details><summary>{{ t('keys.connection.troubleshooting') }}</summary><p>{{ t(isUnifiedCoding ? 'keys.connection.unifiedMergeHint' : 'keys.connection.troubleshootingHint') }}</p></details>
         </section>
         <!-- Usage Note -->
-        <div v-if="showPlatformNote" class="flex items-start gap-3 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800">
+        <div v-if="showPlatformNote && !isUnifiedCoding" class="flex items-start gap-3 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800">
           <Icon name="infoCircle" size="md" class="text-blue-500 flex-shrink-0 mt-0.5" />
           <p class="text-sm text-blue-700 dark:text-blue-300">
             {{ platformNote }}
@@ -1257,19 +1256,22 @@ function generateRoutedCodexFiles(
   if (isUnifiedCoding.value) {
     return [{
       path: joinConfigPath(configDir, 'config.toml', isWindows),
-      hint: t('keys.connection.unifiedMergeHint'),
       content: `model_provider = "milelab"
 model = "${escapeTomlBasicString(model)}"
 review_model = "${escapeTomlBasicString(model)}"
 disable_response_storage = true
-${codexLocalCatalogToml.value}
+
 [model_providers.milelab]
 name = "MILE Lab"
 base_url = "${escapeTomlBasicString(baseUrl)}"
-${codexModelCatalogMode.value === 'remote' ? `model_catalog_url = "${escapeTomlBasicString(buildCodexModelCatalogUrl(baseUrl))}"\n` : ''}wire_api = "responses"
+model_catalog_url = "${escapeTomlBasicString(buildCodexModelCatalogUrl(baseUrl))}"
+wire_api = "responses"
 requires_openai_auth = false
 experimental_bearer_token = ${JSON.stringify(apiKey)}
-supports_websockets = false${codexModelCatalogMode.value === 'remote' ? '\n\n[features]\napi_key_model_discovery = true' : ''}`
+supports_websockets = false
+
+[features]
+api_key_model_discovery = true`
     }]
   }
   const envContent = isWindows

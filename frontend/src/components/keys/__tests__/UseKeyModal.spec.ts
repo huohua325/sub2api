@@ -56,8 +56,22 @@ describe('UseKeyModal', () => {
     expect(config.model_providers.milelab).toMatchObject({ base_url: 'https://example.test/v1', wire_api: 'responses', experimental_bearer_token: 'sk-unified-fixture', requires_openai_auth: false, supports_websockets: false })
     expect(config.model_providers.milelab).not.toHaveProperty('env_key')
     expect(config.features.api_key_model_discovery).toBe(true)
-    expect(wrapper.find('[data-testid="codex-model-catalog"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="codex-model-catalog"]').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('keys.useKeyModal.composite.codexNote')
+    wrapper.unmount()
+  })
+
+  it('uses automatic remote discovery for unified coding after a legacy Key used a local catalog', async () => {
+    const wrapper = mount(UseKeyModal, { props: { show: true, apiKey: 'sk-legacy', baseUrl: 'https://example.test/v1', platform: 'openai' }, global: { stubs: connectionStubs } })
+    await wrapper.get('[data-testid="codex-model-catalog-mode"]').setValue('file')
+    expect(wrapper.find('pre code').text()).toContain('model_catalog_json')
+    await wrapper.setProps({ platform: 'composite', purpose: 'coding', apiKey: 'sk-unified' })
+    expect(wrapper.find('[data-testid="codex-model-catalog"]').exists()).toBe(false)
+    await wrapper.get('[data-testid="download-config-0"]').trigger('click')
+    const config = parse(await readBlobAsText(saveAsMock.mock.calls.at(-1)![0])) as unknown as { model_providers: { milelab: Record<string, unknown> }, features: Record<string, unknown> }
+    expect(config).not.toHaveProperty('model_catalog_json')
+    expect(config.model_providers.milelab.model_catalog_url).toBe('https://example.test/v1/models')
+    expect(config.features.api_key_model_discovery).toBe(true)
     wrapper.unmount()
   })
 

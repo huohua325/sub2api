@@ -180,13 +180,13 @@ export default {
     providerLabel: 'Use',
     providers: {
       codex: 'Codex',
-      coding: 'Unified coding · OpenAI / Grok',
+      coding: 'Unified coding',
       grok_build: 'Grok Build',
       experiment: 'API experiments'
     },
     providerHints: {
       codex: 'For Codex. This is the GPT coding-agent group, not the API group.',
-      coding: 'One Key for OpenAI or Grok in Codex CLI / VS Code, with separate coding allowances.',
+      coding: 'Switch OpenAI / Grok in Codex, with separate allowances.',
       grok_build: 'For Grok Build. This is the Grok coding-agent group, not the API group.',
       experiment: 'Call API models for experiments. Includes DeepSeek, Kimi, GLM, Qwen, GPT, Grok, and Claude.'
     },
@@ -218,9 +218,9 @@ export default {
     useKey: 'Use Key',
     connection: {
       codexSharedClient: 'Codex CLI / VS Code',
-      unifiedAuthCompatibility: 'Keep your existing auth.json. This milelab configuration uses the MILE Key directly; merge the relevant config.toml entries without clearing or rewriting existing login credentials.',
-      unifiedSetup: 'Save this configuration to .codex/config.toml in your user directory. Codex CLI and the official VS Code Codex extension share it; no terminal environment variable is needed. Restart the CLI or reload the extension after saving.',
-      unifiedModels: 'Refresh the model catalog, then use /model in the CLI or the VS Code model menu to select OpenAI / Grok. Grok uses your Grok coding allowance; OpenAI uses your Codex allowance. Available models depend on administrator authorization.',
+      unifiedAuthCompatibility: 'Merge config.toml; keep your existing auth.json and other settings.',
+      unifiedSetup: 'Save to .codex/config.toml in your user directory, then restart Codex CLI or reload the VS Code extension.',
+      unifiedModels: 'Codex CLI / VS Code loads models automatically. Switch with /model or the model menu; allowances are separate.',
       unifiedMergeHint: 'Merge into an existing config.toml and preserve other settings. Configure WSL / Remote SSH in their own runtime environments. This file contains your Key; keep it private.',
       modelPlaceholder: 'Replace YOUR_MODEL_ID with a model allowed by your group. Save the request script, request body and headers.txt together, then run the script manually; usage may be charged. Store headers.txt as a credential.',
       copyFallback: 'Copy failed. Select Show to copy the code manually, or download the file.',
