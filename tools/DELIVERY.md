@@ -4,15 +4,29 @@
 
 ## 日常修改
 
+先生成范围清单，并在编码期间并行运行只读预检：
+
+```powershell
+& D:/Programs/anaconda3/python.exe tools/delivery.py plan --base <开始修改前的固定SHA> --output output/delivery/my-change
+& D:/Programs/anaconda3/python.exe tools/delivery.py preflight --host root@172.104.117.114 --expected-sha256 <线上程序SHA256> --output output/delivery/my-change/preflight
+```
+
+`plan` 按路径提供建议范围，不是自动免检凭据；依赖影响仍需审查。仅工具／文档改动不发布应用；涉及前端或后端的实际应用升级仍要求完整前端证据、真实额度竞态及持久数据核对。普通额度改动运行相关包／用例，公共计费、鉴权或上游升级扩大 Go 覆盖；CI 保持全量。新增迁移单独要求隔离迁移验证，不因单独 SQL 文件就运行无关模型定价全量。
+
+`preflight` 把当前工具通过 SSH 送入服务器私有临时目录，仅执行只读命令、临时生成并核对冻结配置；不要求已有发布包、不停止或重建服务、不备份或清理业务目录。日志及报告写入本地 output，不保存环境明文或密钥。核对程序基线、备份空间、应用和 MemSlides、shadow、Compose 实际计划及冻结后的 canonical hash；临时目录自动回收。部署仍执行自己的即时预检，早期报告不能替代部署检查。
+
 1. 先写清本次用户操作和预期结果，修改后先测相关用例及真实页面交互。
 2. 启动开发服务器：`pnpm.cmd --dir frontend dev --host 127.0.0.1`。检查输出中的实际端口。
-3. 执行完整前端验证及一次最终构建：
+3. 先完成本次路径和相关用例及审查，冻结应用源码，再执行完整前端验证及一次最终构建：
 
    ```powershell
+   & D:/Programs/anaconda3/python.exe tools/delivery.py freeze --reviewed --output output/delivery/my-change
    & D:/Programs/anaconda3/python.exe tools/delivery.py validate --review-url http://127.0.0.1:3000 --output output/delivery/my-change
    ```
 
    顺序为 frozen install → 指南核心路径 Chromium 快验 → lint/full Vitest/`vue-tsc -b`（最多两项并行）→ Vite 构建。全量 Vitest 已含 i18n，故不再额外调用一次；日常 `pnpm build` 完整入口保持原样。默认指南场景是公共导航基线，**不替代本次变更特有的用户路径**；例如密钥权限、支付和管理操作必须补充相应已有回归。
+
+   缺少冻结记录或应用源码在冻结后变化，验证在安装、测试和构建开始前拒绝；生成的 dist、vite.config.js/.d.ts、tsbuildinfo 不使冻结失效。冻结记录只证明声明审查后的源码快照，不能代替用例、审查或检查证据。实际改源码后完成相关测试／审查并重新 freeze，按内容指纹重跑受影响的完整检查。
 
 4. 对最终构建执行真实产物回归：
 
@@ -34,6 +48,14 @@
 
 摘要直接使用证据生成，不会重新构建。源码提交和后续发布记录提交各自保留，文档提交本身不触发程序构建。
 
+Go 检查统一保留 UTF-8 JSON 原始日志及 go-summary.json；命令非零、JSON 失败、编译失败或没有实际通过的测试均不能标为通过。已知基线失败只是解释证据，不提供忽略失败或跳过检查的参数。
+
+```powershell
+& D:/Programs/anaconda3/python.exe tools/delivery.py go-check --go-executable D:/Project/sub2api/output/quota-review/go.exe --packages ./internal/repository ./internal/handler/admin --run 'TestPersonalQuota|TestCodingQuota' --output output/delivery/my-change/go-targeted
+```
+
+`--race` 和 `--tags` 按改动选择；`go-check` 不替代固定的 `quota` 零跳过竞态检查。`quota`、`go-check`、`build-backend` 都支持 `--go-executable` 单一路径，避免 PowerShell JSON 引号问题；多参数包装器仍可用原 `--go-command`。
+
 ## 准备一次纯前端程序发布
 
 需要 Go 项目要求的工具链、真实隔离 PostgreSQL、前述前端验证及产物回归。**先提交应用源码，再运行 Go 编译和打包**；不能先编译脏源码、再提交并沿用旧 HEAD 标识。构建/打包也会拒绝未跟踪的应用输入。若根目录有用户原有未跟踪文件，应在对应提交的干净 worktree 中构建，保留原目录和文件，不能删除或擅自提交它们。环境变量从本地安全配置取得，不放到 Git、命令参数或文档。
@@ -53,6 +75,8 @@ Linux/amd64 程序使用 embed、固定版本/源码/提交时间，产物哈希
 ```
 
 默认生成差量包并在本地重建验证；需要 `bsdiff4==1.4.1`。只有显式 `--full-upload` 才选择完整 gzip，不会因缺依赖自动扩大上传量。包内包括程序/payload 哈希、前端文件清单、验证证据摘要及服务器工具，目录不可覆盖。打包不重跑编译。**后端生产文件或迁移相对基线有变化时，这条发布通道拒绝执行，改走完整升级 runbook；已提交且不进入当前生产构建的 `_test.go` 变更保留真实测试要求，不据此判为生产后端变化。** 未跟踪测试同样拒绝。不自动从旧的 exit.txt、固定日期或固定测试数量生成通过结论。
+
+已验证差量缓存保存在 `output/delivery-cache/deltas/<旧SHA>-<新SHA>/`。发布工具或记录提交后的重新打包会复用差量；每次仍核对缓存哈希并用旧程序重建到目标程序，损坏缓存重算并验证，绝不直接相信缓存 metadata。应用和版本未变时，build-backend 保留已有成功构建的源码 SHA，让文档提交不再仅因 HEAD 改变而触发重编；源码、构建输入、参数、工具、环境或产物改变仍会使对应缓存失效。
 
 ## 上传、预检和发布
 
@@ -99,6 +123,8 @@ python3 /opt/sub2api/releases/<发布名>/release_server.py --root /opt/sub2api 
 ## 工具自身验证
 
 ```powershell
+$env:PYTHONDONTWRITEBYTECODE='1' # 避免工作树出现未跟踪的工具字节码
+& D:/Programs/anaconda3/python.exe -m pip install -r tools/requirements-delivery.txt
 $env:RUN_DELIVERY_POSTGRES='1' # Docker Desktop 已运行；只创建自己的临时 PostgreSQL，无生产 DSN
 & D:/Programs/anaconda3/python.exe -m unittest discover -s tools/tests -v
 node tools/tests/test_browser_fixtures.cjs

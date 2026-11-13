@@ -2,12 +2,45 @@
 import gzip
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import shutil
 import subprocess
 
-from delivery_core import DeliveryError, contained, digest, tree_hash, utcnow, write_json
+from delivery_core import DeliveryError, contained, digest, exclusive, tree_hash, utcnow, write_json
+
+
+def verified_delta(root, baseline_binary, binary):
+    try:
+        import bsdiff4
+    except ImportError:
+        raise DeliveryError('Install tools/requirements-delivery.txt for delta packaging') from None
+    old, new = Path(baseline_binary).read_bytes(), Path(binary).read_bytes()
+    before, after = hashlib.sha256(old).hexdigest(), hashlib.sha256(new).hexdigest()
+    cache = Path(root) / 'output/delivery-cache/deltas' / (before + '-' + after)
+    with exclusive(cache):
+        payload = cache / 'app.bsdiff'
+        metadata = cache / 'manifest.json'
+        if payload.exists() and metadata.exists():
+            try:
+                info = json.loads(metadata.read_text())
+                delta = payload.read_bytes()
+                if (info == {'schema': 1, 'baseline_sha256': before, 'sha256': after,
+                             'payload_sha256': hashlib.sha256(delta).hexdigest()}
+                        and bsdiff4.patch(old, delta) == new):
+                    return delta
+            except (OSError, ValueError):
+                pass  # A corrupt cache is recomputed, never treated as proof.
+        delta = bsdiff4.diff(old, new)
+        if bsdiff4.patch(old, delta) != new:
+            raise DeliveryError('Local delta reconstruction failed')
+        temporary = cache / 'app.bsdiff.tmp'
+        temporary.write_bytes(delta)
+        os.replace(temporary, payload)
+        write_json(metadata, {'schema': 1, 'baseline_sha256': before, 'sha256': after,
+                              'payload_sha256': hashlib.sha256(delta).hexdigest()})
+        return delta
 
 
 def require_committed_inputs(root):
@@ -92,13 +125,7 @@ def package_release(root, evidence, destination, binary, version, baseline_sha25
     if not full_upload:
         if baseline_binary is None or digest(baseline_binary) != baseline_sha256:
             raise DeliveryError('Verified old binary is required for delta packaging; full upload must be explicit')
-        try:
-            import bsdiff4
-        except ImportError:
-            raise DeliveryError('Install tools/requirements-delivery.txt for delta packaging') from None
-        old = Path(baseline_binary).read_bytes(); new = binary.read_bytes()
-        delta = bsdiff4.diff(old, new)
-        if bsdiff4.patch(old, delta) != new: raise DeliveryError('Local delta reconstruction failed')
+        delta = verified_delta(root, baseline_binary, binary)
     destination.mkdir(parents=True)
     if delta is None:
         with (destination / 'sub2api.gz').open('wb') as out:

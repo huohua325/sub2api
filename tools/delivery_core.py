@@ -130,7 +130,7 @@ class Runner:
         if self.manifest.get('schema') != 1 or self.manifest.get('root') != str(self.root):
             raise DeliveryError('Manifest belongs to a different checkout or format')
 
-    def run(self, name, argv, inputs, *, artifacts=(), cwd='.', cache=True, timeout=1200):
+    def run(self, name, argv, inputs, *, artifacts=(), cwd='.', cache=True, timeout=1200, log_validator=None):
         if not re.fullmatch(r'[a-zA-Z0-9_-]+', name):
             raise DeliveryError('Invalid step name')
         argv = [str(arg) for arg in argv]
@@ -167,6 +167,8 @@ class Runner:
             record['exit_code'] = returncode
             if returncode:
                 raise DeliveryError(f'{name} exited {returncode}; see {log}')
+            if log_validator is not None:
+                log_validator(log)
             if tree_hash(self.root, inputs, inputs=True) != before:
                 raise DeliveryError(name + ': inputs changed while command was running')
             record['artifacts'] = tree_hash(self.root, artifacts)

@@ -204,8 +204,8 @@ class DockerRuntime:
         return {'environment_hash': json_hash(env), 'compose_sha256': digest(self.root / 'docker-compose.yml'),
                 'env_file_sha256': digest(self.root / '.env'),
                 'modes': [env.get('SUB2API_CODING_QUOTA_' + purpose + '_MODE', 'shadow') for purpose in ['OPENAI', 'GROK']]}
-    def backup(self, folder):
-        # Recovery uses the exact resolved configuration verified against the original container.
+    def verify_frozen_configuration(self, folder):
+        # Early checks use a private temporary folder; deployment uses its backup.
         self.frozen_file = folder / 'frozen-compose.json'
         write_json(self.frozen_file, self.resolved_compose)
         os.chmod(self.frozen_file, 0o600)
@@ -213,6 +213,9 @@ class DockerRuntime:
                                              cwd=self.root, text=True, timeout=20).strip().split()
         if frozen_hash != [self.app, self.configuration_hash]:
             raise DeliveryError('Frozen configuration does not reproduce the running configuration')
+    def backup(self, folder):
+        # Recovery uses the exact resolved configuration verified against the original container.
+        self.verify_frozen_configuration(folder)
         for name in ['docker-compose.yml', '.env']:
             shutil.copy2(self.root / name, folder / name)
         db = ['-U', self.db_env['POSTGRES_USER'], '-d', self.db_env['POSTGRES_DB']]

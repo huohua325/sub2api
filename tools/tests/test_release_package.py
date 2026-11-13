@@ -4,6 +4,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from delivery_core import DeliveryError, Runner, digest
@@ -47,6 +48,32 @@ class PackageTests(unittest.TestCase):
         self.assertTrue(manifest['backend_unchanged'])
         self.assertEqual(manifest['quota_tests']['passed'], 1)
         self.assertTrue((self.out / 'release/sub2api.gz').exists())
+
+    def test_verified_delta_is_reused_across_release_tool_repackaging(self):
+        import bsdiff4
+        old = self.out / 'previous'; old.write_bytes(b'old program')
+        from delivery_core import digest
+        args = [self.root, self.out, None, self.binary, 'test1', digest(old), self.commit]
+        with patch.object(bsdiff4, 'diff', wraps=bsdiff4.diff) as diff:
+            args[2] = self.out / 'release-one'
+            first = package_release(*args, baseline_binary=old)
+            args[2] = self.out / 'release-two'
+            second = package_release(*args, baseline_binary=old)
+            self.assertEqual(diff.call_count, 1)
+        self.assertEqual(first['payload_sha256'], second['payload_sha256'])
+        self.assertEqual(bsdiff4.patch(old.read_bytes(), (args[2] / 'app.bsdiff').read_bytes()), self.binary.read_bytes())
+
+    def test_corrupt_cached_delta_is_recomputed_and_target_is_reverified(self):
+        import bsdiff4
+        from release_package import verified_delta
+        old = self.out / 'previous'; old.write_bytes(b'old program')
+        with patch.object(bsdiff4, 'diff', wraps=bsdiff4.diff) as diff:
+            verified_delta(self.root, old, self.binary)
+            cache = next((self.root / 'output/delivery-cache/deltas').rglob('app.bsdiff'))
+            cache.write_bytes(b'corrupt')
+            delta = verified_delta(self.root, old, self.binary)
+            self.assertEqual(diff.call_count, 2)
+        self.assertEqual(bsdiff4.patch(old.read_bytes(), delta), self.binary.read_bytes())
     def test_changed_input_and_all_skipped_quota_are_rejected(self):
         data = json.loads((self.out / 'manifest.json').read_text())
         next(s for s in data['steps'] if s['name'] == 'quota-race')['quota_tests'] = {'passed': 0, 'skipped': 1, 'failed': 0}
@@ -82,6 +109,21 @@ class PackageTests(unittest.TestCase):
         self.git('add', 'notes.md')
         self.git('-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'documentation only')
         self.assertEqual(self.package()['source_commit'], self.commit)
+
+    def test_build_identity_survives_docs_but_changes_with_app_or_version(self):
+        from delivery_workflow import select_build_source
+        previous = {'source_commit': self.commit, 'version': 'test1'}
+        (self.root / 'notes.md').write_text('release notes')
+        self.git('add', 'notes.md')
+        self.git('-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'notes')
+        current = self.git('rev-parse', 'HEAD')
+        self.assertEqual(select_build_source(self.root, current, 'test1', previous), self.commit)
+        self.assertEqual(select_build_source(self.root, current, 'test2', previous), current)
+        (self.root / 'backend/source.go').write_text('application changed')
+        self.git('add', 'backend/source.go')
+        self.git('-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'app')
+        current = self.git('rev-parse', 'HEAD')
+        self.assertEqual(select_build_source(self.root, current, 'test1', previous), current)
 
     def test_committed_backend_test_only_change_does_not_change_production_lane(self):
         (self.root / 'backend/source_test.go').write_text('package example')
