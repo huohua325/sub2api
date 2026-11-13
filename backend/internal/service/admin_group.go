@@ -586,7 +586,7 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 		I18n:                            i18n,
 		Platform:                        platform,
 		RateMultiplier:                  input.RateMultiplier,
-		IsExclusive:                     input.IsExclusive,
+		IsExclusive:                     input.IsExclusive || (platform == PlatformComposite && usageKind == UsageKindCoding),
 		Status:                          StatusActive,
 		SubscriptionType:                subscriptionType,
 		UsageKind:                       usageKind,
@@ -777,6 +777,17 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 	group, err := s.groupRepo.GetByID(ctx, id)
 	if err != nil {
 		return nil, err
+	}
+	wasUnifiedCoding := IsUnifiedCodingGroup(group)
+	targetPlatform, targetUsage := group.Platform, group.UsageKind
+	if strings.TrimSpace(input.Platform) != "" {
+		targetPlatform = input.Platform
+	}
+	if strings.TrimSpace(input.UsageKind) != "" {
+		targetUsage = input.UsageKind
+	}
+	if !wasUnifiedCoding && strings.EqualFold(strings.TrimSpace(targetPlatform), PlatformComposite) && strings.EqualFold(strings.TrimSpace(targetUsage), UsageKindCoding) {
+		return nil, infraerrors.BadRequest("UNIFIED_CODING_NEW_GROUP_REQUIRED", "Create a new unified coding group to preserve existing Keys and invitations")
 	}
 	if err := s.validateSimpleModeGroupAccess(group); err != nil {
 		return nil, err

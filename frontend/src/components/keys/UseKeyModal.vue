@@ -33,6 +33,7 @@
         </p>
         <section v-if="isUnifiedCoding" data-testid="unified-coding-setup" class="rounded-lg border border-primary-200 bg-primary-50 p-3 text-sm leading-6 text-primary-900 dark:border-primary-800 dark:bg-primary-950/30 dark:text-primary-100">
           <p>{{ t('keys.connection.unifiedSetup') }}</p>
+          <p class="mt-2">{{ t('keys.connection.unifiedAuthCompatibility') }}</p>
           <p class="mt-2">{{ t('keys.connection.unifiedModels') }}</p>
         </section>
 
@@ -1257,12 +1258,12 @@ function generateRoutedCodexFiles(
     return [{
       path: joinConfigPath(configDir, 'config.toml', isWindows),
       hint: t('keys.connection.unifiedMergeHint'),
-      content: `model_provider = "sub2api"
+      content: `model_provider = "milelab"
 model = "${escapeTomlBasicString(model)}"
 review_model = "${escapeTomlBasicString(model)}"
 disable_response_storage = true
 ${codexLocalCatalogToml.value}
-[model_providers.sub2api]
+[model_providers.milelab]
 name = "MILE Lab"
 base_url = "${escapeTomlBasicString(baseUrl)}"
 ${codexModelCatalogMode.value === 'remote' ? `model_catalog_url = "${escapeTomlBasicString(buildCodexModelCatalogUrl(baseUrl))}"\n` : ''}wire_api = "responses"

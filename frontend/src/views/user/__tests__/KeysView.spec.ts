@@ -632,9 +632,31 @@ describe('user KeysView column settings', () => {
       wrapper.unmount()
     })
 
+    it('does not expose the unified preview through a guessed purpose URL', async () => {
+      route.query = { purpose: 'coding' }
+      const wrapper = await openCreate()
+      expect(wrapper.find('input[name="key-provider"][value="coding"]').exists()).toBe(false)
+      expect(wrapper.get<HTMLInputElement>('input[name="key-provider"][value="codex"]').element.checked).toBe(true)
+      expect(optionIds(wrapper)).toEqual([2])
+      wrapper.unmount()
+    })
+
+    it('selects an authorized preview requested before groups finish loading', async () => {
+      let finishGroups!: (value: unknown) => void
+      getAvailableGroups.mockReturnValue(new Promise((resolve) => { finishGroups = resolve }))
+      route.query = { purpose: 'coding' }
+      const wrapper = await openCreate()
+      finishGroups([...availableGroups, { ...availableGroups[9], id: 13, platform: 'composite', usage_kind: 'coding' }])
+      await flushPromises()
+      expect(wrapper.get<HTMLInputElement>('input[name="key-provider"][value="coding"]').element.checked).toBe(true)
+      expect(optionIds(wrapper)).toEqual([13])
+      wrapper.unmount()
+    })
+
     it('classifies all configured platforms and retains the complete table filter', async () => {
       const wrapper = await openCreate()
-      expect(wrapper.findAll('input[name="key-provider"]')).toHaveLength(4)
+      expect(wrapper.findAll('input[name="key-provider"]')).toHaveLength(3)
+      expect(wrapper.find('input[name="key-provider"][value="coding"]').exists()).toBe(false)
       expect(optionIds(wrapper)).toEqual([2])
       await chooseProvider(wrapper, 'grok_build')
       expect(optionIds(wrapper)).toEqual([8])

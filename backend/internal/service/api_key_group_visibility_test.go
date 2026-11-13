@@ -82,7 +82,7 @@ func TestGetUserGroupVisibilityEmptyAndErrors(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			subs := &visibilitySubRepo{err: tc.subErr}
-			svc := &APIKeyService{userRepo: &visibilityUserRepo{user: &User{ID: 1}, err: tc.userErr}, userSubRepo: subs}
+			svc := &APIKeyService{userRepo: &visibilityUserRepo{user: &User{ID: 1}, err: tc.userErr}, userSubRepo: subs, groupRepo: &visibilityGroupRepo{}}
 			got, _, err := svc.GetUserGroupVisibility(context.Background(), 1)
 			if tc.userErr != nil || tc.subErr != nil {
 				require.ErrorIs(t, err, failure)

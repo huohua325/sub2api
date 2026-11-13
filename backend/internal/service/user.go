@@ -99,6 +99,18 @@ func (u *User) CanBindGroup(groupID int64, isExclusive bool) bool {
 	return false
 }
 
+// CanBindLabGroup preserves existing group rules. Unified coding previews also
+// admit administrators, so a new private group can be tested before invitations.
+func (u *User) CanBindLabGroup(group *Group) bool {
+	if u == nil || group == nil {
+		return false
+	}
+	if IsUnifiedCodingGroup(group) && u.IsAdmin() {
+		return true
+	}
+	return u.CanBindGroup(group.ID, group.IsExclusive)
+}
+
 func (u *User) SetPassword(password string) error {
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {

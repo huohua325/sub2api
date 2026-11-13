@@ -551,6 +551,7 @@
           <p class="input-hint">
             {{ codingUsageAllowed(createForm.platform) ? t("admin.groups.usageKind.hint") : t("admin.groups.usageKind.codingOnly") }}
           </p>
+          <p v-if="createForm.platform === 'composite' && createForm.usage_kind === 'coding'" data-testid="unified-preview-create" class="input-hint">{{ t('admin.groups.usageKind.previewCreate') }}</p>
         </div>
         <!-- 从分组复制账号 -->
         <div v-if="!authStore.isSimpleMode && copyAccountsGroupOptions.length > 0">
@@ -726,7 +727,7 @@
             </div>
           </div>
           <div class="flex items-center gap-3">
-            <Toggle v-model="createForm.is_exclusive" />
+            <Toggle v-model="createForm.is_exclusive" :disabled="createForm.platform === 'composite' && createForm.usage_kind === 'coding'" />
             <span class="text-sm text-gray-500 dark:text-gray-400">
               {{
                 createForm.is_exclusive
@@ -2210,8 +2211,8 @@
               type="button"
               class="rounded-xl border px-3 py-3 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40"
               :class="editForm.usage_kind === 'coding' ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-950/40 dark:text-primary-300' : 'border-gray-200 text-gray-700 dark:border-dark-600 dark:text-gray-200'"
-              :disabled="!codingUsageAllowed(editForm.platform)"
-              @click="editForm.usage_kind = 'coding'"
+              :disabled="!codingUsageAllowed(editForm.platform) || (editForm.platform === 'composite' && !editingUnifiedCoding)"
+              @click="selectEditCodingUsage"
             >
               {{ t("admin.groups.usageKind.coding") }}
             </button>
@@ -2225,6 +2226,8 @@
             </button>
           </div>
           <p class="input-hint">{{ t("admin.groups.usageKind.hint") }}</p>
+          <p v-if="editForm.platform === 'composite' && !editingUnifiedCoding" class="input-hint">{{ t('admin.groups.usageKind.previewNewGroupRequired') }}</p>
+          <p v-if="editForm.platform === 'composite' && editForm.usage_kind === 'coding'" data-testid="unified-preview-edit" class="input-hint">{{ t('admin.groups.usageKind.previewManage') }}</p>
         </div>
         <template v-if="!authStore.isSimpleMode">
         <!-- 从分组复制账号（编辑时） -->
@@ -5866,6 +5869,16 @@ const openCreateModal = () => {
 };
 
 const codingUsageAllowed = (platform: string) => ["openai", "grok", "composite"].includes(platform);
+const editingUnifiedCoding = computed(() => editingGroup.value?.platform === "composite" && editingGroup.value?.usage_kind === "coding");
+
+watch(() => [createForm.platform, createForm.usage_kind], () => {
+  if (createForm.platform === "composite" && createForm.usage_kind === "coding") createForm.is_exclusive = true;
+});
+
+const selectEditCodingUsage = () => {
+  if (editForm.platform === "composite" && !editingUnifiedCoding.value) return;
+  editForm.usage_kind = "coding";
+};
 
 const coerceCreateUsageKind = () => {
   if (!codingUsageAllowed(createForm.platform)) {
@@ -6337,6 +6350,10 @@ const closeEditModal = () => {
 
 const handleUpdateGroup = async () => {
   if (!editingGroup.value) return;
+  if (editForm.platform === "composite" && editForm.usage_kind === "coding" && !editingUnifiedCoding.value) {
+    appStore.showError(t("admin.groups.usageKind.previewNewGroupRequired"));
+    return;
+  }
   if (!editForm.name.trim()) {
     appStore.showError(t("admin.groups.nameRequired"));
     return;

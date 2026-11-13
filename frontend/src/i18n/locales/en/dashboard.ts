@@ -218,6 +218,7 @@ export default {
     useKey: 'Use Key',
     connection: {
       codexSharedClient: 'Codex CLI / VS Code',
+      unifiedAuthCompatibility: 'Keep your existing auth.json. This milelab configuration uses the MILE Key directly; merge the relevant config.toml entries without clearing or rewriting existing login credentials.',
       unifiedSetup: 'Save this configuration to .codex/config.toml in your user directory. Codex CLI and the official VS Code Codex extension share it; no terminal environment variable is needed. Restart the CLI or reload the extension after saving.',
       unifiedModels: 'Refresh the model catalog, then use /model in the CLI or the VS Code model menu to select OpenAI / Grok. Grok uses your Grok coding allowance; OpenAI uses your Codex allowance. Available models depend on administrator authorization.',
       unifiedMergeHint: 'Merge into an existing config.toml and preserve other settings. Configure WSL / Remote SSH in their own runtime environments. This file contains your Key; keep it private.',

@@ -94,7 +94,7 @@ func cloneGroupMessagesDispatchModelConfig(value OpenAIMessagesDispatchModelConf
 }
 
 func cloneGroupForDuplicate(source *Group, operationID string) *Group {
-	return &Group{
+	group := &Group{
 		Name:                            duplicateGroupName(source.Name, 1),
 		Description:                     source.Description,
 		I18n:                            cloneGroupI18nForDuplicate(source.I18n),
@@ -163,6 +163,11 @@ func cloneGroupForDuplicate(source *Group, operationID string) *Group {
 		MaxReasoningEffortOverLimit: source.MaxReasoningEffortOverLimit,
 		ReasoningEffortMappings:     append([]ReasoningEffortMapping(nil), source.ReasoningEffortMappings...),
 	}
+	if IsUnifiedCodingGroup(source) {
+		group.UsageKind = UsageKindCoding
+		group.IsExclusive = true
+	}
+	return group
 }
 
 // RecoverDuplicateGroup performs a read-only lookup for a copy that was already

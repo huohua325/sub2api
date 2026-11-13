@@ -286,8 +286,8 @@ describe("GroupsView Codex manifest binding", () => {
     wrapper.unmount();
   });
 
-  it("allows an administrator to opt a Composite group into coding", async () => {
-    listGroups.mockResolvedValue({ items: [{ ...sourceGroup, platform: "composite", usage_kind: "experiment" }], total: 1, page: 1, page_size: 20, pages: 1 });
+  it("explains preview access for an existing unified coding group", async () => {
+    listGroups.mockResolvedValue({ items: [{ ...sourceGroup, platform: "composite", usage_kind: "coding" }], total: 1, page: 1, page_size: 20, pages: 1 });
     const wrapper = mountView();
     await flushPromises();
     await wrapper.findAll("button").find(button => button.text().includes("common.edit"))!.trigger("click");
@@ -296,6 +296,19 @@ describe("GroupsView Codex manifest binding", () => {
     expect(coding.attributes("disabled")).toBeUndefined();
     await coding.trigger("click");
     expect(coding.classes()).toContain("border-primary-500");
+    expect(wrapper.find('[data-testid="unified-preview-edit"]').text()).toBe('admin.groups.usageKind.previewManage');
+    wrapper.unmount();
+  });
+
+  it("requires a new group instead of converting existing experiment Keys", async () => {
+    listGroups.mockResolvedValue({ items: [{ ...sourceGroup, platform: "composite", usage_kind: "experiment" }], total: 1, page: 1, page_size: 20, pages: 1 });
+    const wrapper = mountView();
+    await flushPromises();
+    await wrapper.findAll("button").find(button => button.text().includes("common.edit"))!.trigger("click");
+    await flushPromises();
+    const coding = wrapper.findAll("button").find(button => button.text() === "admin.groups.usageKind.coding")!;
+    expect(coding.attributes("disabled")).toBeDefined();
+    expect(wrapper.text()).toContain('admin.groups.usageKind.previewNewGroupRequired');
     wrapper.unmount();
   });
 });

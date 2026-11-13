@@ -1570,7 +1570,7 @@ const createProviderOptions = computed(() => KEY_GROUP_PROVIDERS.map((value) => 
   value,
   label: t(`keys.providers.${value}`),
   count: groups.value.filter((group) => getKeyGroupProvider(group) === value).length
-})))
+})).filter((provider) => provider.value !== 'coding' || provider.count > 0))
 
 const formGroupOptions = computed(() => showEditModal.value
   ? groupOptions.value
@@ -1579,6 +1579,7 @@ const formGroupOptions = computed(() => showEditModal.value
 
 const requestedProvider = computed(() => {
   const value = route?.query?.purpose
+  if (value === 'coding' && !createProviderOptions.value.some((provider) => provider.value === 'coding')) return null
   return KEY_GROUP_PROVIDERS.includes(value as KeyGroupProvider) ? value as KeyGroupProvider : null
 })
 
@@ -1591,7 +1592,7 @@ const selectCreateProvider = (provider: KeyGroupProvider) => {
 // Also handles groups arriving after the create dialog has already opened.
 watch([showCreateModal, createProviderOptions], ([isOpen, providers], [wasOpen]) => {
   if (!isOpen) return
-  if (!wasOpen || (!requestedProvider.value && !providers.some((provider) => provider.value === createProvider.value && provider.count > 0))) {
+  if (!wasOpen || (requestedProvider.value && createProvider.value !== requestedProvider.value) || (!requestedProvider.value && !providers.some((provider) => provider.value === createProvider.value && provider.count > 0))) {
     selectCreateProvider(requestedProvider.value ?? providers.find((provider) => provider.count > 0)?.value ?? 'codex')
   }
   if (!formGroupOptions.value.some((group) => group.value === formData.value.group_id)) {

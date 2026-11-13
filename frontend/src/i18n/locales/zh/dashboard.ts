@@ -218,6 +218,7 @@ export default {
     useKey: '使用密钥',
     connection: {
       codexSharedClient: 'Codex CLI / VS Code',
+      unifiedAuthCompatibility: '保留原有 auth.json 即可。当前 milelab 配置直接使用 MILE Key，无需清空或改写旧登录信息；只需合并 config.toml 中对应的配置。',
       unifiedSetup: '将配置保存到用户目录的 .codex/config.toml。Codex CLI 和官方 VS Code Codex 扩展共用这份配置，无需设置终端环境变量。保存后重启 CLI 或重载 VS Code 扩展。',
       unifiedModels: '刷新模型目录，在 CLI 的 /model 或 VS Code 模型菜单选择 OpenAI / Grok。选择 Grok 消耗 Grok 编程额度，选择 OpenAI 消耗 Codex 额度，互不挪用。可用模型以管理员授权的目录为准。',
       unifiedMergeHint: '已有 config.toml 请合并相关配置并保留其他设置；WSL / Remote SSH 需在各自运行环境配置。文件包含密钥，请妥善保管。',

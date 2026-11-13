@@ -51,9 +51,10 @@ describe('UseKeyModal', () => {
     await wrapper.get('[data-testid="download-config-0"]').trigger('click')
     const [blob, filename] = saveAsMock.mock.calls.at(-1)!
     expect(filename).toBe('config.toml')
-    const config = parse(await readBlobAsText(blob)) as unknown as { model_providers: { sub2api: Record<string, unknown> }, features: Record<string, unknown> }
-    expect(config.model_providers.sub2api).toMatchObject({ base_url: 'https://example.test/v1', wire_api: 'responses', experimental_bearer_token: 'sk-unified-fixture', requires_openai_auth: false, supports_websockets: false })
-    expect(config.model_providers.sub2api).not.toHaveProperty('env_key')
+    const config = parse(await readBlobAsText(blob)) as unknown as { model_provider: string, model_providers: { milelab: Record<string, unknown> }, features: Record<string, unknown> }
+    expect(config.model_provider).toBe('milelab')
+    expect(config.model_providers.milelab).toMatchObject({ base_url: 'https://example.test/v1', wire_api: 'responses', experimental_bearer_token: 'sk-unified-fixture', requires_openai_auth: false, supports_websockets: false })
+    expect(config.model_providers.milelab).not.toHaveProperty('env_key')
     expect(config.features.api_key_model_discovery).toBe(true)
     expect(wrapper.find('[data-testid="codex-model-catalog"]').exists()).toBe(true)
     expect(wrapper.text()).not.toContain('keys.useKeyModal.composite.codexNote')

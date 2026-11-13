@@ -976,6 +976,9 @@ export default {
       exclusive: '专属',
       exclusiveHint: '专属分组，可以手动指定给特定用户',
       usageKind: {
+        previewCreate: '统一编程新建后默认仅管理员可用，并设为专属分组。先保存，再在用户管理中把此分组授权给指定测试用户；不会自动切换普通用户的 Key。',
+        previewNewGroupRequired: '为保留旧 Key、用途和授权，请新建独立的统一编程分组，不支持直接把现有分组转换为统一编程。',
+        previewManage: '专属状态下管理员和已授权测试用户可用。通过用户管理授予或撤销此分组权限；验证完成后，管理员可明确将此分组设为公开。修改名称不改变开放范围。',
         label: '记账用途',
         coding: '编程助手',
         experiment: 'API 实验',

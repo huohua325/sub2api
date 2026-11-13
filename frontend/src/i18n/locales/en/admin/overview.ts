@@ -1010,6 +1010,9 @@ export default {
       rateMultiplierHint: 'Cost multiplier for this group (e.g., 1.5 = 150% of base cost)',
       exclusiveHint: 'Exclusive group, manually assign to specific users',
       usageKind: {
+        previewCreate: 'New unified coding groups start private for administrators. Save first, then grant this group to selected testers in user management. Existing user Keys are not moved automatically.',
+        previewNewGroupRequired: 'Create a separate unified coding group to preserve existing Keys, wallets and invitations. Existing groups cannot be converted to unified coding.',
+        previewManage: 'Private groups admit administrators and invited testers. Grant or revoke group access in user management. After validation, explicitly make the group public to release it. Renaming does not change access.',
         label: 'Quota use',
         coding: 'Coding assistant',
         experiment: 'API experiment',

@@ -476,10 +476,13 @@ func validateAPIKeyGroupAllowed(apiKey *service.APIKey) bool {
 		return true
 	}
 	group := apiKey.Group
+	if service.IsUnifiedCodingGroup(group) && !apiKey.User.CanBindLabGroup(group) {
+		return false
+	}
 	if group.IsSubscriptionType() {
 		return true
 	}
-	return apiKey.User.CanBindGroup(group.ID, group.IsExclusive)
+	return apiKey.User.CanBindLabGroup(group)
 }
 
 func validateAPIKeyGroupAvailable(apiKey *service.APIKey) (string, string, bool) {

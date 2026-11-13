@@ -3,8 +3,9 @@ async page => {
   const errors = [], apiMutations = [], checks = [], requests = []
   const user = { ...fixtures.auth, balance: 0 }
   const group = { id: 20, name: 'MILE Unified Coding', platform: 'composite', usage_kind: 'coding', subscription_type: 'standard', rate_multiplier: 1 }
+  const legacyGroup = { id: 21, name: 'Existing Codex', platform: 'openai', usage_kind: 'coding', subscription_type: 'standard', rate_multiplier: 1 }
   const key = { id: 90, name: 'Unified coding', key: 'sk-synthetic-unified-review', group_id: group.id, group, status: 'active', quota: 0, quota_used: 0, created_at: '2026-11-01T00:00:00Z', ip_whitelist: [], ip_blacklist: [], rate_limit_5h: 0, rate_limit_1d: 0, rate_limit_7d: 0 }
-  let created = 0, catalogs = 0
+  let created = 0, catalogs = 0, previewAccess = true
   page.setDefaultTimeout(15000)
   page.on('pageerror', error => errors.push(error.message))
   await page.context().addInitScript(user => {
@@ -32,14 +33,16 @@ async page => {
     let data = {}
     if (path.endsWith('/auth/me') || path.endsWith('/user/profile')) data = user
     else if (path.endsWith('/settings/public')) data = { site_name: 'MILE Lab', run_mode: 'standard', api_base_url: base + '/v1', hide_ccs_import_button: true, custom_menu_items: [] }
-    else if (path.endsWith('/groups/available')) data = [group]
+    else if (path.endsWith('/groups/available')) data = previewAccess ? [group, legacyGroup] : [legacyGroup]
     else if (path.endsWith('/groups/rates')) data = {}
     else if (path.endsWith('/keys') && method === 'POST') {
       const body = req.postDataJSON()
-      if (body.group_id !== group.id) throw Error('Wrong unified group')
-      created++
-      data = { ...key, name: body.name, group: undefined }
-    } else if (path.endsWith('/keys')) data = { items: [key], total: 1, page: 1, page_size: 20, pages: 1 }
+      if (body.group_id === group.id && previewAccess) {
+        created++
+        data = { ...key, name: body.name, group: undefined }
+      } else if (body.group_id === legacyGroup.id) data = { ...key, id: 91, name: body.name, group_id: legacyGroup.id, group: undefined }
+      else throw Error('Unauthorized group in synthetic create')
+    } else if (path.endsWith('/keys')) data = { items: previewAccess ? [key] : [], total: previewAccess ? 1 : 0, page: 1, page_size: 20, pages: 1 }
     else if (path.endsWith('/user/platform-quotas')) data = { platform_quotas: [], purpose_allowances: [], server_now: new Date().toISOString() }
     else if (/announcements|subscriptions/.test(path)) data = []
     else if (path.endsWith('/usage/dashboard/api-keys-usage')) data = { stats: {} }
@@ -63,6 +66,8 @@ async page => {
   check('secret-hidden', !(await dialog.innerText()).includes(key.key))
   check('no-env-step', !(await dialog.locator('pre code').innerText()).includes('env_key'))
   check('no-websocket', (await dialog.locator('pre code').innerText()).includes('supports_websockets = false'))
+  check('milelab-provider', (await dialog.locator('pre code').innerText()).includes('model_provider = "milelab"'))
+  check('keep-auth-json-guidance', (await setup.innerText()).includes('auth.json'))
   check('no-auto-fetch-or-inference', catalogs === 0)
   await page.getByTestId('codex-model-catalog-fetch').click()
   await page.getByTestId('codex-model-catalog').getByText(/2/).first().waitFor()
@@ -82,6 +87,19 @@ async page => {
     const overflow = await page.evaluate(() => ({ width: innerWidth, scroll: document.documentElement.scrollWidth, elements: [...document.querySelectorAll('body *')].filter(el => { const rect = el.getBoundingClientRect(); return rect.width && rect.right > innerWidth + 1 && getComputedStyle(el).position !== 'fixed' }).slice(0, 8).map(el => ({ tag: el.tagName, cls: el.className })) }))
     check(`no-page-overflow-${width}: ${JSON.stringify(overflow)}`, overflow.scroll <= width + 1)
   }
+  await page.keyboard.press('Escape')
+  await dialog.waitFor({ state: 'hidden' })
+  previewAccess = false
+  await page.goto(base + '/keys?purpose=coding&create=1')
+  await page.locator('[data-tour="key-form-name"]').fill('Existing user remains on Codex')
+  check('uninvited-preview-hidden', await page.locator('input[name="key-provider"][value="coding"]').count() === 0)
+  check('guessed-preview-url-keeps-legacy-purpose', await page.locator('input[name="key-provider"][value="codex"]').isChecked())
+  await page.locator('#key-form-group').click()
+  await page.getByRole('option').filter({ hasText: legacyGroup.name }).click()
+  await page.locator('[data-tour="key-form-submit"]').click()
+  await dialog.waitFor()
+  check('legacy-provider-preserved', (await dialog.locator('pre code').innerText()).includes('model_provider = "OpenAI"'))
+  check('no-preview-in-legacy-setup', await page.getByTestId('unified-coding-setup').count() === 0)
   check('no-real-mutations', apiMutations.length === 0)
   return { errors, apiMutations, checks, requests }
 }
