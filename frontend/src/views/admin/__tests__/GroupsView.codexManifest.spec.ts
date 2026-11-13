@@ -285,4 +285,17 @@ describe("GroupsView Codex manifest binding", () => {
 
     wrapper.unmount();
   });
+
+  it("allows an administrator to opt a Composite group into coding", async () => {
+    listGroups.mockResolvedValue({ items: [{ ...sourceGroup, platform: "composite", usage_kind: "experiment" }], total: 1, page: 1, page_size: 20, pages: 1 });
+    const wrapper = mountView();
+    await flushPromises();
+    await wrapper.findAll("button").find(button => button.text().includes("common.edit"))!.trigger("click");
+    await flushPromises();
+    const coding = wrapper.findAll("button").find(button => button.text() === "admin.groups.usageKind.coding")!;
+    expect(coding.attributes("disabled")).toBeUndefined();
+    await coding.trigger("click");
+    expect(coding.classes()).toContain("border-primary-500");
+    wrapper.unmount();
+  });
 });

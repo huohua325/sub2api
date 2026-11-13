@@ -2,6 +2,11 @@ import { describe, expect, it } from 'vitest'
 import { getKeyGroupProvider } from '@/utils/keyGroupProviders'
 
 describe('getKeyGroupProvider', () => {
+  it('classifies only opted-in composite coding groups as unified coding', () => {
+    expect(getKeyGroupProvider({ platform: 'composite', usage_kind: 'coding' })).toBe('coding')
+    expect(getKeyGroupProvider({ platform: 'composite', usage_kind: 'experiment' })).toBe('experiment')
+    expect(getKeyGroupProvider({ platform: 'composite' })).toBe('experiment')
+  })
   it('puts coding groups on Codex and Grok Build by platform', () => {
     expect(getKeyGroupProvider({ platform: 'openai', usage_kind: 'coding' })).toBe('codex')
     expect(getKeyGroupProvider({ platform: 'grok', usage_kind: 'coding' })).toBe('grok_build')

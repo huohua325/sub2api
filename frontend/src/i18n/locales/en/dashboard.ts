@@ -180,11 +180,13 @@ export default {
     providerLabel: 'Use',
     providers: {
       codex: 'Codex',
+      coding: 'Unified coding · OpenAI / Grok',
       grok_build: 'Grok Build',
       experiment: 'API experiments'
     },
     providerHints: {
       codex: 'For Codex. This is the GPT coding-agent group, not the API group.',
+      coding: 'One Key for OpenAI or Grok in Codex CLI / VS Code, with separate coding allowances.',
       grok_build: 'For Grok Build. This is the Grok coding-agent group, not the API group.',
       experiment: 'Call API models for experiments. Includes DeepSeek, Kimi, GLM, Qwen, GPT, Grok, and Claude.'
     },
@@ -215,6 +217,10 @@ export default {
     lastUsedIP: 'Last Used IP',
     useKey: 'Use Key',
     connection: {
+      codexSharedClient: 'Codex CLI / VS Code',
+      unifiedSetup: 'Save this configuration to .codex/config.toml in your user directory. Codex CLI and the official VS Code Codex extension share it; no terminal environment variable is needed. Restart the CLI or reload the extension after saving.',
+      unifiedModels: 'Refresh the model catalog, then use /model in the CLI or the VS Code model menu to select OpenAI / Grok. Grok uses your Grok coding allowance; OpenAI uses your Codex allowance. Available models depend on administrator authorization.',
+      unifiedMergeHint: 'Merge into an existing config.toml and preserve other settings. Configure WSL / Remote SSH in their own runtime environments. This file contains your Key; keep it private.',
       modelPlaceholder: 'Replace YOUR_MODEL_ID with a model allowed by your group. Save the request script, request body and headers.txt together, then run the script manually; usage may be charged. Store headers.txt as a credential.',
       copyFallback: 'Copy failed. Select Show to copy the code manually, or download the file.',
       chooseExisting: 'Choose an existing Key',

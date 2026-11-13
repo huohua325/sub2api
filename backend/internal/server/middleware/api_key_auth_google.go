@@ -136,6 +136,10 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 		}
 
 		// 简易模式：跳过余额和订阅检查
+		if service.IsUnifiedCodingGroup(apiKey.Group) {
+			abortWithGoogleError(c, 400, "Unified coding supports HTTP Responses only")
+			return
+		}
 		if cfg.RunMode == config.RunModeSimple {
 			c.Set(string(ContextKeyAPIKey), apiKey)
 			c.Set(string(ContextKeyUser), AuthSubject{

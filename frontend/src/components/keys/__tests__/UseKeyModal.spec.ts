@@ -42,6 +42,24 @@ describe('UseKeyModal', () => {
     Icon: { template: '<span />' },
   }
 
+  it('offers unified coding as one shared CLI / VS Code config with direct key auth and HTTP Responses', async () => {
+    const wrapper = mount(UseKeyModal, { props: { show: true, apiKey: 'sk-unified-fixture', baseUrl: 'https://example.test/v1', platform: 'composite', purpose: 'coding' }, global: { stubs: connectionStubs } })
+    expect(wrapper.find('[data-testid="unified-coding-setup"]').exists()).toBe(true)
+    expect(wrapper.get('nav[aria-label="Client"] button').text()).toContain('keys.connection.codexSharedClient')
+    expect(wrapper.findAll('pre code')).toHaveLength(1)
+    expect(wrapper.html()).not.toContain('sk-unified-fixture')
+    await wrapper.get('[data-testid="download-config-0"]').trigger('click')
+    const [blob, filename] = saveAsMock.mock.calls.at(-1)!
+    expect(filename).toBe('config.toml')
+    const config = parse(await readBlobAsText(blob)) as unknown as { model_providers: { sub2api: Record<string, unknown> }, features: Record<string, unknown> }
+    expect(config.model_providers.sub2api).toMatchObject({ base_url: 'https://example.test/v1', wire_api: 'responses', experimental_bearer_token: 'sk-unified-fixture', requires_openai_auth: false, supports_websockets: false })
+    expect(config.model_providers.sub2api).not.toHaveProperty('env_key')
+    expect(config.features.api_key_model_discovery).toBe(true)
+    expect(wrapper.find('[data-testid="codex-model-catalog"]').exists()).toBe(true)
+    expect(wrapper.text()).not.toContain('keys.useKeyModal.composite.codexNote')
+    wrapper.unmount()
+  })
+
   it.each(['legacy', 'api-key'] as const)('masks %s previews but copies and downloads real values; resets reveal when changing Keys', async (authMode) => {
     const secret = 'sk-fixture-$dollar'
     const wrapper = mount(UseKeyModal, { props: { show: true, apiKey: secret, baseUrl: 'https://example.test/prefix', platform: 'openai', keyId: 23 }, global: { stubs: connectionStubs } })

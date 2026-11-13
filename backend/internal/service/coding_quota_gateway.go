@@ -76,10 +76,7 @@ func CodingCalibrationLimits() (int, time.Duration) {
 }
 
 func prepareCodingRequest(ctx context.Context, c *gin.Context, points *OfficialPointService, billing *BillingService, account *Account, body []byte) (context.Context, error) {
-	if points == nil || c == nil || account == nil {
-		return ctx, nil
-	}
-	if c.Request != nil && c.Request.Method == http.MethodGet && strings.EqualFold(c.GetHeader("Upgrade"), "websocket") {
+	if c == nil || account == nil {
 		return ctx, nil
 	}
 
@@ -88,7 +85,20 @@ func prepareCodingRequest(ctx context.Context, c *gin.Context, points *OfficialP
 	if key == nil || key.Group == nil {
 		return ctx, nil
 	}
-	purpose := PurposeOfGroup(key.Group.Platform, key.Group.UsageKind)
+	purpose := PurposeForPlatform(key.Group, account.Platform)
+	if IsUnifiedCodingGroup(key.Group) {
+		resolved, ok := ResolvedTargetPlatformFromContext(ctx)
+		if !ok || resolved != account.Platform || purpose == "" || points == nil || points.store == nil || !account.IsOAuth() {
+			WriteCodingQuotaError(c, ErrCodingQuotaUnavailable)
+			return ctx, ErrCodingQuotaUnavailable
+		}
+	}
+	if points == nil {
+		return ctx, nil
+	}
+	if c.Request != nil && c.Request.Method == http.MethodGet && strings.EqualFold(c.GetHeader("Upgrade"), "websocket") {
+		return ctx, nil
+	}
 	if purpose != PurposeOpenAI && purpose != PurposeGrok {
 		return ctx, nil
 	}

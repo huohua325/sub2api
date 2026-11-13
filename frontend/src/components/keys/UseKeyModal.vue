@@ -31,6 +31,10 @@
         <p class="text-sm text-gray-600 dark:text-gray-400">
           {{ platformDescription }}
         </p>
+        <section v-if="isUnifiedCoding" data-testid="unified-coding-setup" class="rounded-lg border border-primary-200 bg-primary-50 p-3 text-sm leading-6 text-primary-900 dark:border-primary-800 dark:bg-primary-950/30 dark:text-primary-100">
+          <p>{{ t('keys.connection.unifiedSetup') }}</p>
+          <p class="mt-2">{{ t('keys.connection.unifiedModels') }}</p>
+        </section>
 
         <!-- Client Tabs -->
         <div v-if="clientTabs.length" class="overflow-x-auto border-b border-gray-200 dark:border-dark-700">
@@ -254,10 +258,10 @@
         <section class="connection-next">
           <h3>{{ t('keys.connection.next') }}</h3>
           <p v-if="activeClientTab === 'api'">{{ t('keys.connection.modelPlaceholder') }}</p>
-          <p>{{ t('keys.connection.localInstructions') }}</p>
+          <p>{{ t(isUnifiedCoding ? 'keys.connection.unifiedSetup' : 'keys.connection.localInstructions') }}</p>
           <pre translate="no">{{ startupCommand }}</pre>
           <p>{{ t('keys.connection.templateScope') }}</p>
-          <details><summary>{{ t('keys.connection.troubleshooting') }}</summary><p>{{ t('keys.connection.troubleshootingHint') }}</p></details>
+          <details><summary>{{ t('keys.connection.troubleshooting') }}</summary><p>{{ t(isUnifiedCoding ? 'keys.connection.unifiedMergeHint' : 'keys.connection.troubleshootingHint') }}</p></details>
         </section>
         <!-- Usage Note -->
         <div v-if="showPlatformNote" class="flex items-start gap-3 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800">
@@ -332,6 +336,7 @@ interface FileConfig {
 }
 
 const props = defineProps<Props>()
+const isUnifiedCoding = computed(() => props.platform === 'composite' && props.purpose === 'coding')
 const emit = defineEmits<Emits>()
 
 const { t } = useI18n()
@@ -404,6 +409,7 @@ const codexManifestContext = computed(() => {
 // Reset tabs when platform changes
 const defaultClientTab = computed(() => {
   if (props.claudeCodeOnly) return 'claude'
+  if (isUnifiedCoding.value) return 'codex'
   if (props.purpose === 'experiment' && ['openai', 'grok', 'anthropic', 'gemini'].includes(props.platform ?? '')) return 'api'
   switch (props.platform) {
     case 'openai':
@@ -515,6 +521,7 @@ const SparkleIcon = {
 
 const platformClientTabs = computed((): TabConfig[] => {
   if (!props.platform) return []
+  if (isUnifiedCoding.value) return [{ id: 'codex', label: t('keys.connection.codexSharedClient'), icon: TerminalIcon }]
   if (props.claudeCodeOnly) {
     return [{ id: 'claude', label: t('keys.useKeyModal.cliTabs.claudeCode'), icon: TerminalIcon }]
   }
@@ -606,6 +613,7 @@ const currentTabs = computed(() => {
 })
 
 const platformDescription = computed(() => {
+  if (isUnifiedCoding.value) return t('keys.providerHints.coding')
   if (activeClientTab.value === 'codex' &&
     props.platform !== 'openai' &&
     props.platform !== 'grok' &&
@@ -652,6 +660,7 @@ const platformDescription = computed(() => {
 })
 
 const platformNote = computed(() => {
+  if (isUnifiedCoding.value) return t('keys.connection.unifiedMergeHint')
   if (activeClientTab.value === 'codex' &&
     props.platform !== 'openai' &&
     props.platform !== 'grok' &&
@@ -1244,6 +1253,24 @@ function generateRoutedCodexFiles(
     composite: 'Composite'
   }
   const label = labels[platform]
+  if (isUnifiedCoding.value) {
+    return [{
+      path: joinConfigPath(configDir, 'config.toml', isWindows),
+      hint: t('keys.connection.unifiedMergeHint'),
+      content: `model_provider = "sub2api"
+model = "${escapeTomlBasicString(model)}"
+review_model = "${escapeTomlBasicString(model)}"
+disable_response_storage = true
+${codexLocalCatalogToml.value}
+[model_providers.sub2api]
+name = "MILE Lab"
+base_url = "${escapeTomlBasicString(baseUrl)}"
+${codexModelCatalogMode.value === 'remote' ? `model_catalog_url = "${escapeTomlBasicString(buildCodexModelCatalogUrl(baseUrl))}"\n` : ''}wire_api = "responses"
+requires_openai_auth = false
+experimental_bearer_token = ${JSON.stringify(apiKey)}
+supports_websockets = false${codexModelCatalogMode.value === 'remote' ? '\n\n[features]\napi_key_model_discovery = true' : ''}`
+    }]
+  }
   const envContent = isWindows
     ? `$env:SUB2API_API_KEY="${apiKey}"`
     : `export SUB2API_API_KEY="${apiKey}"`

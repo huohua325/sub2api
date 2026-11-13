@@ -99,8 +99,7 @@ func NormalizePurposeAllowancePolicy(in PurposeAllowancePolicy) (PurposeAllowanc
 }
 
 // NormalizeUsageKind checks the explicit group field. An empty value is the
-// experiment pool. Coding is only valid on the OpenAI and Grok platforms,
-// which select the Codex and Grok Build wallets.
+// experiment pool. Composite coding explicitly opts into per-request wallets.
 func NormalizeUsageKind(platform, kind string) (string, error) {
 	kind = strings.ToLower(strings.TrimSpace(kind))
 	if kind == "" {
@@ -110,8 +109,8 @@ func NormalizeUsageKind(platform, kind string) (string, error) {
 		return "", infraerrors.New(http.StatusBadRequest, "INVALID_USAGE_KIND", "usage_kind must be coding or experiment")
 	}
 	platform = strings.ToLower(strings.TrimSpace(platform))
-	if kind == UsageKindCoding && platform != PlatformOpenAI && platform != PlatformGrok {
-		return "", infraerrors.New(http.StatusBadRequest, "INVALID_USAGE_KIND", "coding usage is only available for OpenAI and Grok groups")
+	if kind == UsageKindCoding && platform != PlatformOpenAI && platform != PlatformGrok && platform != PlatformComposite {
+		return "", infraerrors.New(http.StatusBadRequest, "INVALID_USAGE_KIND", "coding usage is only available for OpenAI, Grok and Composite groups")
 	}
 	return kind, nil
 }
@@ -143,7 +142,31 @@ func groupHasPurposeWallet(group *Group) bool {
 	if group == nil {
 		return false
 	}
-	return PurposeOfGroup(group.Platform, group.UsageKind) != ""
+	return IsUnifiedCodingGroup(group) || PurposeOfGroup(group.Platform, group.UsageKind) != ""
+}
+
+func IsUnifiedCodingGroup(group *Group) bool {
+	return group != nil && group.Platform == PlatformComposite && group.UsageKind == UsageKindCoding
+}
+
+// PurposeForPlatform uses a concrete route/account platform only for an
+// explicitly opted-in unified group. It never guesses from a public model ID.
+func PurposeForPlatform(group *Group, platform string) string {
+	if group == nil {
+		return ""
+	}
+	if IsUnifiedCodingGroup(group) {
+		if platform != PlatformOpenAI && platform != PlatformGrok {
+			return ""
+		}
+		return PurposeOfGroup(platform, UsageKindCoding)
+	}
+	return PurposeOfGroup(group.Platform, group.UsageKind)
+}
+
+func PurposeForRequest(ctx context.Context, group *Group) string {
+	platform, _ := ResolvedTargetPlatformFromContext(ctx)
+	return PurposeForPlatform(group, platform)
 }
 
 // PurposePeriod is week for the coding wallets and month for API experiments.

@@ -5865,7 +5865,7 @@ const openCreateModal = () => {
   loadModelAllowlistCandidates("create", 0, createForm.platform);
 };
 
-const codingUsageAllowed = (platform: string) => platform === "openai" || platform === "grok";
+const codingUsageAllowed = (platform: string) => ["openai", "grok", "composite"].includes(platform);
 
 const coerceCreateUsageKind = () => {
   if (!codingUsageAllowed(createForm.platform)) {

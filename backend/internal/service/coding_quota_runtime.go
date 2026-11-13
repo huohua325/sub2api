@@ -37,7 +37,7 @@ func codingChargeForUsage(log *UsageLog, p *postUsageBillingParams) *CodingQuota
 	}
 	chargePurpose := "other"
 	if p.APIKey != nil && p.APIKey.Group != nil {
-		chargePurpose = PurposeOfGroup(p.APIKey.Group.Platform, p.APIKey.Group.UsageKind)
+		chargePurpose = PurposeForPlatform(p.APIKey.Group, p.Account.Platform)
 	}
 	if chargePurpose == "" {
 		chargePurpose = "other"

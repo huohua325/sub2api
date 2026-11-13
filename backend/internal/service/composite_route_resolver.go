@@ -95,6 +95,42 @@ func filterSystemOneRouteModels(routes []CompositeModelRoute, models []string, e
 }
 
 func (r *CompositeRouteResolver) Resolve(ctx context.Context, groupID int64, model, endpoint string) (CompositeRouteDecision, error) {
+	var routes []CompositeModelRoute
+	if r != nil && r.repo != nil && groupID > 0 && strings.TrimSpace(model) != "" {
+		var err error
+		routes, err = r.repo.ListByGroup(ctx, groupID, false)
+		if err != nil {
+			return CompositeRouteDecision{}, fmt.Errorf("list composite routes: %w", err)
+		}
+	}
+	return r.resolveWithRoutes(ctx, groupID, model, endpoint, routes)
+}
+
+// FilterCodingModels applies the same route priority and ownership rules as
+// inference, reading route configuration once for the whole catalog.
+func (r *CompositeRouteResolver) FilterCodingModels(ctx context.Context, groupID int64, models []string) ([]string, error) {
+	var routes []CompositeModelRoute
+	if r != nil && r.repo != nil && groupID > 0 {
+		var err error
+		routes, err = r.repo.ListByGroup(ctx, groupID, false)
+		if err != nil {
+			return nil, err
+		}
+	}
+	filtered := make([]string, 0, len(models))
+	for _, model := range models {
+		decision, err := r.resolveWithRoutes(ctx, groupID, model, CompositeRouteEndpointResponses, routes)
+		if err != nil {
+			return nil, err
+		}
+		if decision.Matched && (decision.TargetPlatform == PlatformOpenAI || decision.TargetPlatform == PlatformGrok) {
+			filtered = append(filtered, model)
+		}
+	}
+	return filtered, nil
+}
+
+func (r *CompositeRouteResolver) resolveWithRoutes(ctx context.Context, groupID int64, model, endpoint string, routes []CompositeModelRoute) (CompositeRouteDecision, error) {
 	model = strings.TrimSpace(model)
 	endpoint = normalizeCompositeRouteEndpoint(endpoint)
 	decision := CompositeRouteDecision{
@@ -107,11 +143,7 @@ func (r *CompositeRouteResolver) Resolve(ctx context.Context, groupID int64, mod
 		return decision, nil
 	}
 
-	if r != nil && r.repo != nil && groupID > 0 {
-		routes, err := r.repo.ListByGroup(ctx, groupID, false)
-		if err != nil {
-			return decision, fmt.Errorf("list composite routes: %w", err)
-		}
+	if len(routes) > 0 {
 		if route, ok := matchCompositeRoute(routes, model, endpoint); ok {
 			upstreamModel := strings.TrimSpace(route.UpstreamModel)
 			if upstreamModel == "" {

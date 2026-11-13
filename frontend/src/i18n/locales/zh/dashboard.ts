@@ -180,11 +180,13 @@ export default {
     providerLabel: '用途',
     providers: {
       codex: 'Codex',
+      coding: '统一编程 · OpenAI / Grok',
       grok_build: 'Grok Build',
       experiment: 'API 实验'
     },
     providerHints: {
       codex: '用于 Codex。这是 GPT 的编程助手分组，不是接口调用分组。',
+      coding: '一把 Key 在 Codex CLI / VS Code 中选择 OpenAI 或 Grok，分别消耗对应的编程额度。',
       grok_build: '用于 Grok Build。这是 Grok 的编程助手分组，不是接口调用分组。',
       experiment: '调用 API 模型做实验。包括 DeepSeek、Kimi、GLM、Qwen、GPT、Grok、Claude'
     },
@@ -215,6 +217,10 @@ export default {
     lastUsedIP: '最近使用 IP',
     useKey: '使用密钥',
     connection: {
+      codexSharedClient: 'Codex CLI / VS Code',
+      unifiedSetup: '将配置保存到用户目录的 .codex/config.toml。Codex CLI 和官方 VS Code Codex 扩展共用这份配置，无需设置终端环境变量。保存后重启 CLI 或重载 VS Code 扩展。',
+      unifiedModels: '刷新模型目录，在 CLI 的 /model 或 VS Code 模型菜单选择 OpenAI / Grok。选择 Grok 消耗 Grok 编程额度，选择 OpenAI 消耗 Codex 额度，互不挪用。可用模型以管理员授权的目录为准。',
+      unifiedMergeHint: '已有 config.toml 请合并相关配置并保留其他设置；WSL / Remote SSH 需在各自运行环境配置。文件包含密钥，请妥善保管。',
       modelPlaceholder: '将 YOUR_MODEL_ID 换成分组允许的模型。把请求、请求体和 headers.txt 保存在同一目录，再手动运行请求脚本；这会产生用量。headers.txt 含密钥，请按密钥保存。',
       copyFallback: '复制失败。可以点击“显示”，再手动选择代码复制，或下载文件。',
       chooseExisting: '选择现有 Key',

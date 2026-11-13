@@ -35,7 +35,7 @@ func RegisterGatewayRoutes(
 	clientRequestID := middleware.ClientRequestID()
 	opsErrorLogger := handler.OpsErrorLoggerMiddleware(opsService)
 	endpointNorm := handler.InboundEndpointMiddleware()
-	compositeTarget := compositeTargetPlatformMiddleware(compositeResolver)
+	compositeTarget := compositeTargetPlatformMiddleware(compositeResolver, apiKeyService)
 	compositeGeminiTarget := compositeGeminiTargetPlatformMiddleware(compositeResolver)
 
 	// 未分组 Key 拦截中间件（按协议格式区分错误响应）
@@ -546,7 +546,7 @@ func getGroupPlatform(c *gin.Context) string {
 	return apiKey.Group.Platform
 }
 
-func compositeTargetPlatformMiddleware(resolver *service.CompositeRouteResolver) gin.HandlerFunc {
+func compositeTargetPlatformMiddleware(resolver *service.CompositeRouteResolver, keyServices ...*service.APIKeyService) gin.HandlerFunc {
 	if resolver == nil {
 		resolver = service.NewCompositeRouteResolver(nil)
 	}
@@ -601,6 +601,20 @@ func compositeTargetPlatformMiddleware(resolver *service.CompositeRouteResolver)
 			}
 		}
 		requestmodel.ResetRequestBody(c.Request, body)
+		if service.IsUnifiedCodingGroup(apiKey.Group) {
+			if service.PurposeForRequest(c.Request.Context(), apiKey.Group) == "" {
+				c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": gin.H{"type": "invalid_request_error", "message": "Unified coding requires an unambiguous OpenAI or Grok model route"}})
+				return
+			}
+			if len(keyServices) == 0 || keyServices[0] == nil {
+				service.WriteCodingQuotaError(c, service.ErrCodingQuotaUnavailable)
+				return
+			}
+			if err := keyServices[0].CheckUnifiedCodingQuota(c.Request.Context(), apiKey.UserID, apiKey.Group); err != nil {
+				service.WriteCodingQuotaError(c, err)
+				return
+			}
+		}
 		c.Next()
 	}
 }

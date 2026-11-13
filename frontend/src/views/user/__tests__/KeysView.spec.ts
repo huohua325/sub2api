@@ -634,13 +634,28 @@ describe('user KeysView column settings', () => {
 
     it('classifies all configured platforms and retains the complete table filter', async () => {
       const wrapper = await openCreate()
-      expect(wrapper.findAll('input[name="key-provider"]')).toHaveLength(3)
+      expect(wrapper.findAll('input[name="key-provider"]')).toHaveLength(4)
       expect(optionIds(wrapper)).toEqual([2])
       await chooseProvider(wrapper, 'grok_build')
       expect(optionIds(wrapper)).toEqual([8])
       await chooseProvider(wrapper, 'experiment')
       expect(optionIds(wrapper)).toEqual([1, 3, 4, 5, 6, 7, 9, 10, 11, 12])
       expect(wrapper.findAllComponents({ name: 'Select' })[0].props('options')).toHaveLength(14)
+    })
+
+    it('offers authorized unified coding groups and passes that purpose to the connection panel', async () => {
+      const unified = { ...availableGroups[9], id: 13, platform: 'composite', usage_kind: 'coding' }
+      getAvailableGroups.mockResolvedValue([...availableGroups, unified])
+      route.query = { purpose: 'coding' }
+      const wrapper = await openCreate()
+      expect(optionIds(wrapper)).toEqual([13])
+      await wrapper.get('[data-tour="key-form-name"]').setValue('Unified coding')
+      await groupSelect(wrapper).vm.$emit('update:modelValue', 13)
+      vi.mocked(keysAPI.create).mockResolvedValue({ ...createApiKey(), id: 83, key: 'sk-unified-new', group_id: 13, group: undefined })
+      await wrapper.get('#key-form').trigger('submit')
+      await flushPromises()
+      expect(wrapper.findComponent({ name: 'UseKeyModal' }).props()).toMatchObject({ purpose: 'coding', platform: 'composite' })
+      wrapper.unmount()
     })
 
     it('clears the previous group on provider change and submits only the newly selected group', async () => {

@@ -348,7 +348,12 @@ func (s *APIKeyService) PurposeBlocks(ctx context.Context, userID int64, group *
 	if s == nil || group == nil || userID <= 0 {
 		return false, false
 	}
-	purpose := PurposeOfGroup(group.Platform, group.UsageKind)
+	purpose := PurposeForRequest(ctx, group)
+	if IsUnifiedCodingGroup(group) && purpose == "" {
+		// Authentication precedes route resolution. The gateway must recheck
+		// the resolved provider before forwarding; never fall back to balance.
+		return false, true
+	}
 	if purpose == "" {
 		return false, false
 	}
@@ -375,6 +380,21 @@ func (s *APIKeyService) PurposeBlocks(ctx context.Context, userID int64, group *
 		return row.LimitAmount >= 0 && used >= row.LimitAmount, true
 	}
 	return false, true
+}
+
+// CheckUnifiedCodingQuota must run after route resolution and before forwarding.
+// Discovery intentionally uses authentication without selecting either wallet.
+func (s *APIKeyService) CheckUnifiedCodingQuota(ctx context.Context, userID int64, group *Group) error {
+	if !IsUnifiedCodingGroup(group) {
+		return nil
+	}
+	if s == nil || s.officialPoints == nil || s.officialPoints.store == nil || userID <= 0 || PurposeForRequest(ctx, group) == "" {
+		return ErrCodingQuotaUnavailable
+	}
+	if blocked, checked := s.PurposeBlocks(ctx, userID, group); !checked || blocked {
+		return ErrCodingQuotaExhausted
+	}
+	return nil
 }
 
 func (s *APIKeyService) AuthLookupMetrics() APIKeyAuthLookupMetrics {

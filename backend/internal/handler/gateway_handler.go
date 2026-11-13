@@ -1168,6 +1168,16 @@ func (h *GatewayHandler) Models(c *gin.Context) {
 	}
 
 	if platform == service.PlatformComposite {
+		if apiKey != nil && service.IsUnifiedCodingGroup(apiKey.Group) {
+			models := h.codexModelIDsForGroup(c.Request.Context(), apiKey.Group, "")
+			models, err := h.gatewayService.FilterUnifiedCodingModels(c.Request.Context(), apiKey.Group, models)
+			if err != nil {
+				h.errorResponse(c, http.StatusServiceUnavailable, "api_error", "Failed to resolve coding model catalog")
+				return
+			}
+			writeOpenAIModelsList(c, models)
+			return
+		}
 		availableModels := h.compositeAvailableModels(c.Request.Context(), groupID, "", true)
 		if apiKey != nil && apiKey.Group != nil && apiKey.Group.ModelAllowlistEnabled() {
 			source := availableModels
@@ -1235,6 +1245,11 @@ func (h *GatewayHandler) CodexModels(c *gin.Context) {
 		forcedPlatform = strings.TrimSpace(value)
 	}
 	modelIDs := h.codexModelIDsForGroup(c.Request.Context(), apiKey.Group, forcedPlatform)
+	modelIDs, filterErr := h.gatewayService.FilterUnifiedCodingModels(c.Request.Context(), apiKey.Group, modelIDs)
+	if filterErr != nil {
+		h.errorResponse(c, http.StatusServiceUnavailable, "api_error", "Failed to resolve coding model catalog")
+		return
+	}
 	modelIDs = service.FilterCodexModelIDsForGroup(modelIDs, apiKey.Group)
 	body, err := h.gatewayService.BuildCodexModelsManifestForGroup(
 		c.Request.Context(),

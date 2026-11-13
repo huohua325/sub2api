@@ -355,7 +355,7 @@ func buildUsageBillingCommand(requestID string, usageLog *UsageLog, p *postUsage
 	// A classified group spends its own wallet. Subscription groups still record
 	// subscription usage, and they do not spend the shared balance.
 	if requestHasPurposeWallet(p) {
-		cmd.Purpose = PurposeOfGroup(p.APIKey.Group.Platform, p.APIKey.Group.UsageKind)
+		cmd.Purpose = PurposeForPlatform(p.APIKey.Group, p.Account.Platform)
 		cmd.PurposeCost = p.Cost.ActualCost
 	}
 	if p.IsSubscriptionBill && p.Subscription != nil && p.Cost.TotalCost > 0 {
@@ -384,6 +384,10 @@ func buildUsageBillingCommand(requestID string, usageLog *UsageLog, p *postUsage
 func applyUsageBilling(ctx context.Context, requestID string, usageLog *UsageLog, p *postUsageBillingParams, deps *billingDeps, repo UsageBillingRepository) (bool, error) {
 	if p == nil || deps == nil {
 		return false, nil
+	}
+	if p.APIKey != nil && IsUnifiedCodingGroup(p.APIKey.Group) &&
+		(p.Account == nil || PurposeForPlatform(p.APIKey.Group, p.Account.Platform) == "") {
+		return false, ErrCodingQuotaUnavailable
 	}
 
 	cmd := buildUsageBillingCommand(requestID, usageLog, p)

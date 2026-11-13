@@ -1013,8 +1013,8 @@ export default {
         label: 'Quota use',
         coding: 'Coding assistant',
         experiment: 'API experiment',
-        hint: 'Coding assistants are billed by platform: OpenAI is Codex and Grok is Grok Build, each with 100 yuan every 7 days. API experiments share 500 yuan and reset at 00:00 on the first day of each Beijing month. The group name is not used.',
-        codingOnly: 'Coding assistant is only available for OpenAI and Grok platforms.'
+        hint: 'OpenAI uses the Codex allowance; Grok uses the Grok coding allowance. Composite coding groups switch between both in one client and bill the actual platform separately; HTTP Responses only. Bind authorized subscription accounts, model routes and user access. Limits and cycles follow site settings; group names do not select wallets.',
+        codingOnly: 'Coding supports OpenAI, Grok and Composite unified coding groups.'
       },
       exclusiveTooltip: {
         title: 'What is an exclusive group?',

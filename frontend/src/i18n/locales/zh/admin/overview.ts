@@ -979,8 +979,8 @@ export default {
         label: '记账用途',
         coding: '编程助手',
         experiment: 'API 实验',
-        hint: '编程助手按平台分开记账：OpenAI 是 Codex，Grok 是 Grok Build，各每周 100 元，每 7 天清零。API 实验共用每月 500 元，北京时间每月 1 日清零。分组名字不参与判断。',
-        codingOnly: '编程助手只用于 OpenAI 和 Grok 平台。'
+        hint: 'OpenAI 使用 Codex 编程额度，Grok 使用 Grok 编程额度。Composite 编程分组可在同一客户端切换两者，按实际平台分别记账；仅支持 HTTP Responses。请绑定获准的订阅账号并配置模型路由及用户授权。额度和周期沿用站点配置，分组名字不参与判断。',
+        codingOnly: '编程助手适用于 OpenAI、Grok 和 Composite 统一编程分组。'
       },
       exclusiveTooltip: {
         title: '什么是专属分组？',
