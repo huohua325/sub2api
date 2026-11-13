@@ -56,6 +56,25 @@ Go 检查统一保留 UTF-8 JSON 原始日志及 go-summary.json；命令非零�
 
 `--race` 和 `--tags` 按改动选择；`go-check` 不替代固定的 `quota` 零跳过竞态检查。`quota`、`go-check`、`build-backend` 都支持 `--go-executable` 单一路径，避免 PowerShell JSON 引号问题；多参数包装器仍可用原 `--go-command`。
 
+## 第二阶段：一次准备发布产物
+
+完成真实功能路径、审查、冻结、`validate` 并提交应用源码后，优先用一条命令完成最终检查和编译：
+
+```powershell
+# DSN 和 Go 工具链仍从本机安全配置进入环境，不能写入命令参数或 Git。
+& D:/Programs/anaconda3/python.exe tools/delivery.py finalize --version <版本> --feature unified-coding --go-executable D:/Project/sub2api/output/quota-review/go.exe --output output/delivery/my-change
+```
+
+`--feature unified-coding` 核对统一编程；`--feature personal-quota` 核对管理员重置。多条真实路径可重复传入 `--feature`，新功能应先增加对应浏览器场景。仅指南导航变化可明确选择 `--feature guide-only`；它不能替代其它功能的验收。
+
+工具先检查已冻结、已提交的源码及全部前端证据，再调度真实额度竞态、双浏览器基线／所选功能路径和嵌入式程序编译。默认最多两项并行；资源充足时可明确用 `--jobs 3`，资源不足用 `--jobs 1`。前端 dist 此时已经稳定，不能在运行中继续编辑或重建。此命令不重复前端构建、不上传、不发布、不自动提交源码。
+
+每次并行任务使用独立证据目录，汇总时核对同一工作区、本轮开始时间、当前输入、产物和原日志哈希。额度结果再次解析 Go JSON，拒绝零执行、skip 和失败。原文件不改写，汇总记录保存来源清单及哈希；不再手工修改 manifest。任意任务失败都会等待其余任务完成并保留日志，`finalize.json` 标为失败；打包拒绝沿用这次失败前的旧成功。修改相应用例／审查后重跑同一命令即可，浏览器和竞态每次实际执行，已验证且输入未变的程序可复用。
+
+`finalize` 完成后继续使用原 `package` 和已授权发布流程。普通前端、个人重置及固定后端预览通道的原有范围守卫保留，新增工具不会把任意后端变化放入前端发布通道。
+
+`validate` 的只读 lint 额外使用 ESLint 原生 `--cache-strategy content`，缓存放在忽略的 `output/delivery-cache/eslint/`，按依赖及工具版本隔离。每轮仍扫描全部文件；变化文件重新检查，ESLint 配置变化由原生缓存失效机制处理，依赖变化切换缓存空间。`--fresh` 同时禁用这层 lint 缓存和命令结果复用。完整 Vitest、类型、国际化、产物浏览器和额度保护要求保持不变。
+
 ## 准备一次纯前端程序发布
 
 需要 Go 项目要求的工具链、真实隔离 PostgreSQL、前述前端验证及产物回归。**先提交应用源码，再运行 Go 编译和打包**；不能先编译脏源码、再提交并沿用旧 HEAD 标识。构建/打包也会拒绝未跟踪的应用输入。若根目录有用户原有未跟踪文件，应在对应提交的干净 worktree 中构建，保留原目录和文件，不能删除或擅自提交它们。环境变量从本地安全配置取得，不放到 Git、命令参数或文档。
@@ -127,6 +146,14 @@ python3 /opt/sub2api/releases/<发布名>/release_server.py --root /opt/sub2api 
 ```
 
 核对整个构建静态资源及公开 HTML 引用的入口哈希，同时检查 health/login/public settings。四个并行请求共享总时间预算；仅瞬时网络/过载错误最多三次尝试，哈希不匹配及 404 直接失败。保存每次尝试；浏览器断言失败不自动重试。客户端失败时用服务器同样核对，分别标明客户端网络和服务端结果，不把旧失败当作当前故障，也不以服务器单点通过替代客户端验收。
+
+网络中断后可补验失败资源，保留原报告并写入新文件：
+
+```powershell
+& D:/Programs/anaconda3/python.exe tools/check_public_release.py --base-url https://<站点> --dist backend/internal/web/dist --resume output/delivery/my-change/public.json --output output/delivery/my-change/public-resumed.json --timeout 180
+```
+
+只接受同一站点、同一构建且 30 分钟内的报告；成功资源须带原始匹配哈希及校验时间。过期资源重新下载，重复补验不能延长原资源的有效期。首页、健康、登录和公共配置每轮重新访问，首页中的资源引用也重新核对。站点／产物不符、原成功缺少匹配哈希时拒绝复用；旧版不含构建指纹的报告需完整核对一次。原失败记录不覆盖，不把服务端单点检查替代客户端核对。
 
 ## 工具自身验证
 

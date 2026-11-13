@@ -1,10 +1,72 @@
 """Scope, source freeze and structured test evidence for the delivery workflow."""
 import json
 import os
+import copy
+from datetime import datetime
 from pathlib import Path
 import subprocess
 
-from delivery_core import DeliveryError, digest, json_hash, tree_hash, utcnow, write_json
+from delivery_core import DeliveryError, contained, digest, exclusive, json_hash, tree_hash, utcnow, write_json
+
+
+def verify_record(root, evidence, record):
+    """Verify command evidence before importing it or scheduling dependent jobs."""
+    if record.get('status') not in ('passed', 'reused') or record.get('exit_code') != 0:
+        raise DeliveryError('Unsuccessful evidence: ' + record.get('name', '?'))
+    if record['inputs'] != tree_hash(root, list(record['inputs']), inputs=True):
+        raise DeliveryError('Stale input evidence: ' + record['name'])
+    if record['artifacts'] != tree_hash(root, list(record['artifacts'])):
+        raise DeliveryError('Corrupt artifact evidence: ' + record['name'])
+    if digest(contained(evidence, record['log'])) != record['log_sha256']:
+        raise DeliveryError('Corrupt log evidence: ' + record['name'])
+
+
+def collect_evidence(root, output, children, *, started_at):
+    """Atomically join this attempt's independent evidence; never rewrite raw logs."""
+    root, output = Path(root).resolve(), Path(output).resolve()
+    pending = []
+    for folder in children:
+        folder = Path(folder).resolve()
+        if folder == output or not folder.is_relative_to(output):
+            raise DeliveryError('Parallel evidence must stay inside this delivery')
+        path = folder / 'manifest.json'
+        data = json.loads(path.read_text(encoding='utf-8'))
+        if data.get('schema') != 1 or data.get('root') != str(root) or not data.get('steps'):
+            raise DeliveryError('Parallel evidence belongs to another checkout or is empty')
+        for original in data['steps']:
+            record = copy.deepcopy(original)
+            if datetime.fromisoformat(record['started_at']) < datetime.fromisoformat(started_at):
+                raise DeliveryError('Parallel evidence predates this attempt')
+            verify_record(root, folder, record)
+            if record['name'] == 'quota-race':
+                if record['status'] != 'passed':
+                    raise DeliveryError('Quota evidence must execute in this attempt')
+                summary = parse_go_events(contained(folder, record['log']).read_text(encoding='utf-8'))
+                counts = {key: summary[key] for key in ['passed', 'skipped', 'failed']}
+                if not counts['passed'] or counts['skipped'] or counts['failed'] or summary['failed_packages'] or counts != record.get('quota_tests'):
+                    raise DeliveryError('Quota raw log does not prove a zero-skip pass')
+            record['log'] = contained(folder, record['log']).relative_to(output).as_posix()
+            record['provenance'] = {'manifest': path.relative_to(output).as_posix(), 'sha256': digest(path)}
+            pending.append(record)
+    with exclusive(output):
+        from delivery_core import Runner
+        runner = Runner(root, output)
+        runner.manifest['steps'].extend(pending)
+        runner.manifest['updated_at'] = utcnow()
+        write_json(output / 'manifest.json', runner.manifest)
+    return pending
+
+
+def frontend_lint_command(root, pnpm, tools, *, fresh=False):
+    command = [pnpm, 'run', 'lint:check']
+    if fresh:
+        return command
+    dependencies = tree_hash(root, ['frontend/package.json', 'frontend/pnpm-lock.yaml',
+                                   'frontend/node_modules/.modules.yaml'], inputs=True)
+    namespace = json_hash({'dependencies': dependencies, 'tools': tools})
+    cache = Path(root) / 'output/delivery-cache/eslint' / (namespace + '.cache')
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    return command + ['--cache', '--cache-strategy', 'content', '--cache-location', str(cache)]
 
 
 def changed_files(root, base):

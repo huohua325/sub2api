@@ -62,6 +62,12 @@ def package_release(root, evidence, destination, binary, version, baseline_sha25
     def git(*args):
         return subprocess.check_output(['git', *args], cwd=root, text=True, timeout=30).strip()
     require_committed_inputs(root)
+    final_path = evidence / 'finalize.json'
+    if final_path.exists():
+        from delivery_workflow import application_snapshot
+        final = json.loads(final_path.read_text(encoding='utf-8'))
+        if final.get('status') != 'passed' or final.get('application') != application_snapshot(root) or final.get('version') != version:
+            raise DeliveryError('Finalization is incomplete, stale or for another version')
     source = git('rev-parse', 'HEAD')
     backend_changes = git('diff', '--name-only', baseline_commit, source, '--', 'backend').splitlines()
     if upgrade_contract is None and any(not path.endswith('_test.go') for path in backend_changes):
@@ -81,6 +87,25 @@ def package_release(root, evidence, destination, binary, version, baseline_sha25
     data = json.loads((evidence / 'manifest.json').read_text())
     if data.get('schema') != 1 or data.get('root') != str(root): raise DeliveryError('Evidence belongs to another checkout')
     stages = {s['name']: s for s in data['steps']}
+    if final_path.exists():
+        from delivery_workflow import verify_record
+        features = final.get('features', [])
+        scripts = {'unified-coding': 'review_unified_coding.cjs', 'personal-quota': 'review_personal_quota.cjs'}
+        if not features or any(f not in {*scripts, 'guide-only'} for f in features):
+            raise DeliveryError('Finalization must identify the actual feature path')
+        for name in features:
+            if name == 'guide-only': continue
+            stage = stages.get('artifact-feature-' + name)
+            if not stage: raise DeliveryError('Missing selected feature evidence: ' + name)
+            verify_record(root, evidence, stage)
+            results = [contained(root, path) for path in stage['artifacts'] if path.endswith('/result.json')]
+            if len(results) != 1: raise DeliveryError('One selected feature result is required')
+            result = json.loads(results[0].read_text())
+            if (not result.get('ok') or not {'chromium', 'webkit'}.issubset(result.get('engines', {}))
+                    or result.get('frontend_sha256') != tree_hash(root, ['backend/internal/web/dist'])['backend/internal/web/dist']
+                    or result.get('script_sha256') != digest(root / 'tools' / scripts[name])
+                    or result.get('fixtures_sha256') != digest(root / 'tools/browser_fixtures.cjs')):
+                raise DeliveryError('Selected feature evidence is stale or incomplete: ' + name)
     for name in ['lint', 'tests', 'types', 'frontend-build', 'artifact-browser', 'quota-race', 'backend-build']:
         stage = stages.get(name)
         if not stage or stage['status'] not in ('passed', 'reused'):
@@ -91,7 +116,15 @@ def package_release(root, evidence, destination, binary, version, baseline_sha25
             raise DeliveryError('Corrupt artifact or log evidence: ' + name)
     if upgrade_contract is not None:
         coding_preview = upgrade_contract.get('name') == 'unified-coding-preview-v1'
-        result = evidence / ('artifact-feature-browser/result.json' if coding_preview else 'feature-browser/result.json')
+        name = 'artifact-feature-' + ('unified-coding' if coding_preview else 'personal-quota')
+        if name in stages:
+            from delivery_workflow import verify_record
+            verify_record(root, evidence, stages[name])
+            results = [contained(root, p) for p in stages[name]['artifacts'] if p.endswith('/result.json')]
+            if len(results) != 1: raise DeliveryError('One actual feature browser result is required')
+            result = results[0]
+        else:
+            result = evidence / ('artifact-feature-browser/result.json' if coding_preview else 'feature-browser/result.json')
         feature = json.loads(result.read_text())
         if not feature.get('ok') or not {'chromium', 'webkit'}.issubset(feature.get('engines', {})):
             raise DeliveryError('Full upgrade requires the actual reset flow in both browser engines')

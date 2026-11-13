@@ -75,6 +75,13 @@ class PublicReleaseTests(unittest.TestCase):
         self.assertFalse(result['ok'])
         self.assertLess(time.monotonic() - start, .7)
 
+    def test_health_and_public_entry_checks_run_before_a_slow_large_asset(self):
+        self.mode = 'slow'
+        result = self.check(total_timeout=.15)
+        self.assertFalse(result['ok'])
+        for path in ['/health', '/login', '/api/v1/settings/public']:
+            self.assertTrue(result['resources'][path]['ok'])
+
     def test_missing_dist_rejected_before_network(self):
         from delivery_core import DeliveryError
         self.assertIsNotNone(verify)
@@ -83,6 +90,45 @@ class PublicReleaseTests(unittest.TestCase):
     def test_content_length_response_can_close_after_last_chunk(self):
         self.mode = 'content-length'
         self.assertTrue(self.check()['ok'])
+
+    def test_resume_only_fetches_failed_assets_but_rechecks_entry_and_health(self):
+        (self.dist / 'assets/keep.js').write_bytes(b'correct-script')
+        self.mode = 'transient'
+        first = self.check(attempts=1)
+        self.assertFalse(first['ok'])
+        original = json.dumps(first, sort_keys=True)
+        self.mode = 'normal'
+        result = self.check(resume=first)
+        self.assertTrue(result['ok'])
+        self.assertEqual(self.count['/assets/app.js'], 2)
+        self.assertEqual(self.count['/assets/keep.js'], 1)
+        for path in ['/', '/health', '/login', '/api/v1/settings/public']:
+            self.assertEqual(self.count[path], 2)
+        self.assertEqual(json.dumps(first, sort_keys=True), original)
+        self.assertTrue(result['resources']['/assets/keep.js']['reused'])
+
+    def test_resume_rejects_another_build_origin_or_expired_report(self):
+        from delivery_core import DeliveryError
+        first = self.check()
+        for change in ['origin', 'build', 'time']:
+            with self.subTest(change=change):
+                report = json.loads(json.dumps(first))
+                if change == 'origin': report['base_url'] = 'https://other.invalid'
+                if change == 'build': report['dist_sha256'] = '0' * 64
+                if change == 'time': report['checked_at'] = '2000-01-01T00:00:00+00:00'
+                with self.assertRaises(DeliveryError): self.check(resume=report)
+
+    def test_resume_success_needs_the_original_matching_asset_hash(self):
+        from delivery_core import DeliveryError
+        first = self.check()
+        first['resources']['/assets/app.js']['sha256'] = '0' * 64
+        with self.assertRaises(DeliveryError): self.check(resume=first)
+
+    def test_resume_chain_cannot_extend_the_original_asset_verification_age(self):
+        first = self.check()
+        first['resources']['/assets/app.js']['verified_at'] = '2000-01-01T00:00:00+00:00'
+        self.assertTrue(self.check(resume=first)['ok'])
+        self.assertEqual(self.count['/assets/app.js'], 2)
 
 
 if __name__ == '__main__': unittest.main()

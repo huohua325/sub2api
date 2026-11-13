@@ -11,12 +11,14 @@ import shutil
 import subprocess
 import sys
 import threading
+import time
 
 from delivery_core import DeliveryError, Runner, digest, exclusive, tree_hash, utcnow, write_json
 
 ROOT = Path(__file__).resolve().parents[1]
-FRONTEND_INPUTS = ['frontend', 'tools/delivery.py', 'tools/delivery_core.py', 'tools/review_guide.py',
+FRONTEND_INPUTS = ['frontend', 'tools/delivery.py', 'tools/delivery_core.py', 'tools/delivery_workflow.py', 'tools/review_guide.py',
                    'tools/review_guide.cjs', 'tools/browser_fixtures.cjs', 'AGENTS.md']
+FEATURE_REVIEWS = {'unified-coding': 'review_unified_coding', 'personal-quota': 'review_personal_quota'}
 
 
 def version(command):
@@ -25,7 +27,7 @@ def version(command):
 
 
 def validate(args):
-    from delivery_workflow import require_frozen
+    from delivery_workflow import require_frozen, frontend_lint_command
     require_frozen(ROOT, args.output)
     pnpm = shutil.which('pnpm.cmd' if os.name == 'nt' else 'pnpm')
     if not pnpm:
@@ -45,7 +47,7 @@ def validate(args):
                    '--engines', 'chromium'], inputs, cache=False, timeout=180)
         # Full tests already contain check:i18n. Use exactly the same -b typecheck as pnpm build.
         jobs = [
-            ('lint', [pnpm, 'run', 'lint:check']),
+            ('lint', frontend_lint_command(ROOT, pnpm, tools, fresh=args.fresh)),
             ('tests', [pnpm, 'run', 'test:run']),
             ('types', [pnpm, 'exec', 'vue-tsc', '-b']),
         ]
@@ -127,6 +129,70 @@ def artifact_review(args):
                        '--base-url', url, '--output', str(result_path.parent), '--engines', 'chromium', 'webkit'],
                        FRONTEND_INPUTS + ['backend/internal/web/dist'],
                        artifacts=[result_path.relative_to(ROOT).as_posix()], cache=False, timeout=360)
+        for feature in getattr(args, 'features', []) or []:
+            if feature == 'guide-only': continue
+            script = FEATURE_REVIEWS[feature]
+            result_path = output / ('feature-' + feature) / 'result.json'
+            runner.run('artifact-feature-' + feature, [sys.executable, 'tools/' + script + '.py',
+                       '--artifact', '--output', str(result_path.parent)],
+                       FRONTEND_INPUTS + ['backend/internal/web/dist', 'tools/' + script + '.py', 'tools/' + script + '.cjs'],
+                       artifacts=[result_path.relative_to(ROOT).as_posix()], cache=False, timeout=360)
+
+
+def finalize(args):
+    """Prepare one verified artifact; no upload, production change or implicit commit."""
+    from delivery_workflow import collect_evidence, require_frozen, verify_record, application_snapshot
+    from release_package import require_committed_inputs
+    output = args.output.resolve()
+    if not output.is_relative_to(ROOT): raise DeliveryError('Evidence must stay inside the checkout')
+    features = args.features
+    if not features or any(f not in {*FEATURE_REVIEWS, 'guide-only'} for f in features) or ('guide-only' in features and len(features) != 1):
+        raise DeliveryError('Select the actual feature review, or guide-only for a guide change')
+    with exclusive(output / 'finalize'):
+        started = utcnow(); timer = time.monotonic()
+        attempt = output / 'parallel' / str(time.time_ns())
+        report = {'status': 'running', 'started_at': started, 'features': features,
+                  'attempt': attempt.relative_to(output).as_posix(), 'version': args.version}
+        write_json(output / 'finalize.json', report)
+        try:
+            require_frozen(ROOT, output)
+            require_committed_inputs(ROOT)
+            manifest = json.loads((output / 'manifest.json').read_text(encoding='utf-8'))
+            if manifest.get('root') != str(ROOT) or manifest.get('schema') != 1:
+                raise DeliveryError('Frontend evidence belongs to another checkout')
+            stages = {s['name']: s for s in manifest['steps']}
+            for name in ['lint', 'tests', 'types', 'frontend-build']:
+                if name not in stages: raise DeliveryError('Missing full frontend evidence: ' + name)
+                verify_record(ROOT, output, stages[name])
+            snapshot = application_snapshot(ROOT)
+            def job(function, folder):
+                child = argparse.Namespace(**{**vars(args), 'output': folder})
+                return function(child)
+            errors = []
+            # Dist is stable now. Quota and browser get independent logs/manifests;
+            # the compiler retains the conventional root binary path for packaging.
+            with ThreadPoolExecutor(max_workers=args.jobs) as executor:
+                futures = [executor.submit(job, quota, attempt / 'quota'),
+                           executor.submit(job, artifact_review, attempt / 'browser'),
+                           executor.submit(job, build_backend, output)]
+                for future in futures:
+                    try: future.result()
+                    except Exception as error: errors.append(str(error))
+            if errors: raise DeliveryError('; '.join(errors))
+            require_frozen(ROOT, output)
+            if snapshot != application_snapshot(ROOT): raise DeliveryError('Application changed during finalization')
+            imported = collect_evidence(ROOT, output, [attempt / 'quota', attempt / 'browser'], started_at=started)
+            names = {r['name'] for r in imported}
+            expected = {'quota-race', 'artifact-browser'} | {'artifact-feature-' + f for f in features if f != 'guide-only'}
+            if not expected.issubset(names): raise DeliveryError('Missing parallel job evidence')
+            report.update(status='passed', application=snapshot, steps=sorted(names | {'backend-build'}))
+        except BaseException as error:
+            report.update(status='failed', error=str(error))
+            raise
+        finally:
+            report.update(finished_at=utcnow(), elapsed_seconds=round(time.monotonic() - timer, 3))
+            write_json(output / 'finalize.json', report)
+        print('Release preparation passed; package this artifact without rebuilding.')
 
 
 def build_backend(args):
@@ -306,7 +372,16 @@ def main():
     b.add_argument('--engines', nargs='+', choices=['chromium', 'webkit'], default=['chromium', 'webkit'])
     b.set_defaults(func=lambda a: __import__('review_guide').run(a))
     artifact = sub.add_parser('review-artifact', help='serve the built assets and verify Chromium + WebKit')
+    artifact.add_argument('--feature', dest='features', action='append', choices=sorted(FEATURE_REVIEWS))
     artifact.set_defaults(func=artifact_review)
+    final = sub.add_parser('finalize', help='parallel quota + actual feature browser + one program build; verified evidence collection')
+    final.add_argument('--version', required=True)
+    final.add_argument('--go-command', default='["go"]')
+    final.add_argument('--go-executable')
+    final.add_argument('--jobs', type=int, choices=[1, 2, 3], default=2)
+    final.add_argument('--feature', dest='features', action='append', required=True,
+                       choices=['guide-only', *sorted(FEATURE_REVIEWS)])
+    final.set_defaults(func=finalize)
     build = sub.add_parser('build-backend', help='compile the embedded Linux program once, with evidence')
     build.add_argument('--go-command', default='["go"]')
     build.add_argument('--go-executable', help='single Go path; avoids PowerShell JSON quoting')
@@ -320,7 +395,7 @@ def main():
     p.add_argument('--baseline-binary', type=Path)
     p.add_argument('--full-upload', action='store_true', help='explicitly choose full gzip instead of delta')
     p.set_defaults(func=package)
-    for command in [check, q, s, b, artifact, build, p, plan, freeze, go_check, early]:
+    for command in [check, q, s, b, artifact, build, p, plan, freeze, go_check, early, final]:
         command.add_argument('--output', type=Path, default=ROOT / 'output/delivery/current')
     args = parser.parse_args()
     try:

@@ -49,6 +49,35 @@ class PackageTests(unittest.TestCase):
         self.assertEqual(manifest['quota_tests']['passed'], 1)
         self.assertTrue((self.out / 'release/sub2api.gz').exists())
 
+    def test_incomplete_finalization_cannot_publish_previous_success(self):
+        for status in ['running', 'failed']:
+            (self.out / 'finalize.json').write_text(json.dumps({'status': status}))
+            with self.subTest(status=status), self.assertRaises(DeliveryError): self.package()
+
+    def test_finalized_package_requires_the_selected_feature_evidence(self):
+        from delivery_workflow import application_snapshot
+        (self.out / 'finalize.json').write_text(json.dumps({'status': 'passed', 'version': 'test1',
+            'application': application_snapshot(self.root), 'features': ['unified-coding']}))
+        with self.assertRaises(DeliveryError): self.package()
+
+    def test_finalized_feature_result_can_be_packaged_with_current_artifact_hashes(self):
+        from delivery_core import tree_hash, write_json
+        from delivery_workflow import application_snapshot
+        for name in ['review_unified_coding.cjs', 'browser_fixtures.cjs']:
+            p = self.root / 'tools' / name; p.parent.mkdir(exist_ok=True); p.write_text('fixture')
+        self.git('add', 'tools')
+        self.git('-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'browser fixture')
+        result = self.out / 'parallel/browser/feature-unified-coding/result.json'
+        write_json(result, {'ok': True, 'engines': {'chromium': {}, 'webkit': {}},
+            'frontend_sha256': tree_hash(self.root, ['backend/internal/web/dist'])['backend/internal/web/dist'],
+            'script_sha256': digest(self.root / 'tools/review_unified_coding.cjs'),
+            'fixtures_sha256': digest(self.root / 'tools/browser_fixtures.cjs')})
+        self.runner.run('artifact-feature-unified-coding', [sys.executable, '-c', 'print("checked")'],
+            ['src.txt', 'tools/review_unified_coding.cjs'], artifacts=[result.relative_to(self.root).as_posix()])
+        write_json(self.out / 'finalize.json', {'status': 'passed', 'version': 'test1',
+            'application': application_snapshot(self.root), 'features': ['unified-coding']})
+        self.assertEqual(self.package()['source_commit'], self.commit)
+
     def test_verified_delta_is_reused_across_release_tool_repackaging(self):
         import bsdiff4
         old = self.out / 'previous'; old.write_bytes(b'old program')
