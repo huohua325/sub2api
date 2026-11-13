@@ -114,6 +114,14 @@ python3 /opt/sub2api/releases/<发布名>/release_server.py --root /opt/sub2api 
 
 ## 公开资源与记录
 
+统一编程管理员预览使用 `coding_upgrade.py`。该入口固定已审查的应用提交和线上额度重置基线，只接受列出的后端文件变化，禁止新增或改写迁移；保留前端与个人重置通道原有守卫。打包前需要 `artifact-feature-browser` 双浏览器证据及根证据目录内最新实际额度竞态结果。服务切换仍通过冻结 Compose、完整备份、固定时刻持久数据核对和优雅停止。出现统一编程分组后禁止自动回退到不理解该用途的旧程序；撤回入口应停用新分组并保留数据。
+
+```powershell
+& D:/Programs/anaconda3/python.exe tools/coding_upgrade.py package --output output/delivery/codex-grok-preview --destination output/releases/mile-20261113-coding-preview1 --version 0.2.20-mile.20261113.coding-preview1 --baseline-sha256 <核实的线上程序SHA256> --baseline-binary <核实的旧程序>
+```
+
+服务器使用 `python3 coding_upgrade.py deploy --root /opt/sub2api --release <目录>`，依次 stage、只读预检、已获授权后 apply。此入口不自动创建分组或授权测试用户。
+
 ```powershell
 & D:/Programs/anaconda3/python.exe tools/check_public_release.py --base-url https://<站点> --dist backend/internal/web/dist --output output/delivery/my-change/public.json --timeout 60
 ```

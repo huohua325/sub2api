@@ -67,13 +67,17 @@ def package_release(root, evidence, destination, binary, version, baseline_sha25
     if upgrade_contract is None and any(not path.endswith('_test.go') for path in backend_changes):
         raise DeliveryError('Backend changes require the full upgrade runbook; this lane is frontend-only')
     if upgrade_contract is not None:
-        from full_upgrade import PersonalQuotaUpgrade
-        PersonalQuotaUpgrade(upgrade_contract)
-        migration_changes = git('diff', '--name-only', baseline_commit, source, '--', 'backend/migrations').splitlines()
-        if migration_changes != ['backend/migrations/260_personal_quota_resets.sql']:
-            raise DeliveryError('Full personal-reset upgrade requires exactly the reviewed additive migration')
-        if upgrade_contract['migrations']['260_personal_quota_resets.sql'] != digest(root / migration_changes[0]):
-            raise DeliveryError('Reviewed migration checksum changed')
+        if upgrade_contract.get('name') == 'unified-coding-preview-v1':
+            from coding_upgrade import UnifiedCodingUpgrade
+            UnifiedCodingUpgrade(upgrade_contract).validate_sources(root, baseline_commit, source)
+        else:
+            from full_upgrade import PersonalQuotaUpgrade
+            PersonalQuotaUpgrade(upgrade_contract)
+            migration_changes = git('diff', '--name-only', baseline_commit, source, '--', 'backend/migrations').splitlines()
+            if migration_changes != ['backend/migrations/260_personal_quota_resets.sql']:
+                raise DeliveryError('Full personal-reset upgrade requires exactly the reviewed additive migration')
+            if upgrade_contract['migrations']['260_personal_quota_resets.sql'] != digest(root / migration_changes[0]):
+                raise DeliveryError('Reviewed migration checksum changed')
     data = json.loads((evidence / 'manifest.json').read_text())
     if data.get('schema') != 1 or data.get('root') != str(root): raise DeliveryError('Evidence belongs to another checkout')
     stages = {s['name']: s for s in data['steps']}
@@ -86,13 +90,14 @@ def package_release(root, evidence, destination, binary, version, baseline_sha25
         if stage['artifacts'] != tree_hash(root, list(stage['artifacts'])) or digest(contained(evidence, stage['log'])) != stage['log_sha256']:
             raise DeliveryError('Corrupt artifact or log evidence: ' + name)
     if upgrade_contract is not None:
-        result = evidence / 'feature-browser/result.json'
+        coding_preview = upgrade_contract.get('name') == 'unified-coding-preview-v1'
+        result = evidence / ('artifact-feature-browser/result.json' if coding_preview else 'feature-browser/result.json')
         feature = json.loads(result.read_text())
         if not feature.get('ok') or not {'chromium', 'webkit'}.issubset(feature.get('engines', {})):
             raise DeliveryError('Full upgrade requires the actual reset flow in both browser engines')
         if feature.get('frontend_sha256') != tree_hash(root, ['backend/internal/web/dist'])['backend/internal/web/dist']:
             raise DeliveryError('Feature browser evidence is for another frontend artifact')
-        if feature.get('script_sha256') != digest(root / 'tools/review_personal_quota.cjs'):
+        if feature.get('script_sha256') != digest(root / ('tools/review_unified_coding.cjs' if coding_preview else 'tools/review_personal_quota.cjs')):
             raise DeliveryError('Feature browser scenario changed after verification')
     quota = stages['quota-race'].get('quota_tests', {})
     if not quota.get('passed') or quota.get('skipped') != 0 or quota.get('failed') != 0:
@@ -147,5 +152,8 @@ def package_release(root, evidence, destination, binary, version, baseline_sha25
     if upgrade_contract is not None:
         manifest['upgrade_contract'] = upgrade_contract
         shutil.copyfile(kit / 'full_upgrade.py', destination / 'full_upgrade.py')
+        if upgrade_contract.get('name') == 'unified-coding-preview-v1':
+            shutil.copyfile(kit / 'coding_upgrade.py', destination / 'coding_upgrade.py')
+            shutil.copyfile(kit / 'coding_preview_live.py', destination / 'coding_preview_live.py')
     write_json(destination / 'manifest.json', manifest)
     return manifest

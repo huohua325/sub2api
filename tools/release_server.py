@@ -138,7 +138,7 @@ def deploy(root, release, runtime, *, apply=False, upgrade=None):
             try:
                 if switched:
                     if upgrade is not None and not upgrade.can_rollback(runtime):
-                        record['program_rollback_blocked'] = 'New personal resets exist; old program cannot interpret them. Keep the database and fix forward.'
+                        record['program_rollback_blocked'] = getattr(upgrade, 'rollback_block_reason', 'New personal resets exist; old program cannot interpret them. Keep the database and fix forward.')
                         raise DeliveryError(record['program_rollback_blocked']) from error
                     replace(backup / 'sub2api.previous')
                     runtime.start(); runtime.health()

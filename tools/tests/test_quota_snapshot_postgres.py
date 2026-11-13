@@ -77,5 +77,17 @@ class SnapshotPostgresTests(unittest.TestCase):
         self.sql('DELETE FROM personal_quota_resets;')
         with self.assertRaises(DeliveryError): assert_preserved(personal, snapshot(self.name, self.env, at))
 
+    def test_coding_preview_rollback_query_uses_real_postgres(self):
+        from coding_upgrade import CodingRuntime, UnifiedCodingUpgrade, contract_for_release
+        self.sql('CREATE TABLE groups(id bigint,platform text,usage_kind text,deleted_at timestamptz);')
+        runtime = object.__new__(CodingRuntime)
+        runtime.database, runtime.db_env = self.name, self.env
+        policy = UnifiedCodingUpgrade(contract_for_release())
+        self.assertTrue(policy.can_rollback(runtime))
+        self.sql("INSERT INTO groups VALUES(1,'openai','coding',NULL);")
+        self.assertTrue(policy.can_rollback(runtime))
+        self.sql("INSERT INTO groups VALUES(2,'composite','coding',NULL);")
+        self.assertFalse(policy.can_rollback(runtime))
+
 
 if __name__ == '__main__': unittest.main()
