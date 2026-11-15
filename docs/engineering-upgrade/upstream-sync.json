@@ -2,20 +2,160 @@
   "schema_version": 1,
   "upstream_repository": "https://github.com/Wei-Shaw/sub2api.git",
   "upstream_branch": "main",
-  "previous_upstream_commit": "6b4b37db43443b5e88e424fe3c69602cc3810dfb",
-  "upstream_commit": "e2c9812190dd71bb309c8ad020a1211da1e0d3b4",
-  "upstream_release": "v0.2.20",
-  "fork_before_merge": "406880d1396d1bb9747b90b8618760ea2cc9f39a",
-  "merge_commit": "c7297838b1b3bf0e0a0e64340d52bf112f32dc9a",
+  "previous_upstream_commit": "e2c9812190dd71bb309c8ad020a1211da1e0d3b4",
+  "upstream_commit": "530c5e3a4f9c73ca2b0881191d0ef8e0d82c5484",
+  "upstream_release": "v0.2.21",
+  "fork_before_merge": "f3b217911923de35658969994b1d0f44ad070c38",
+  "merge_commit": "539e4ba8b44eaf90ef29f30c0c51e86d23b3aba6",
   "fork_remote": "fork",
   "fork_branch": "lab/0.2.17",
   "merge_strategy": "merge-commit-no-squash",
-  "included_upstream_commits": 77,
-  "changed_files": 177,
-  "new_database_migrations": 2,
-  "record": "docs/engineering-upgrade/UPSTREAM-SYNC-2026-11-11.md",
+  "included_upstream_commits": 6,
+  "changed_files": 26,
+  "new_database_migrations": 0,
+  "record": "docs/engineering-upgrade/UPSTREAM-SYNC-2026-11-15.md",
   "runbook": "docs/engineering-upgrade/UPSTREAM-MERGE-RUNBOOK.md",
   "deployment": {
+    "version": "0.2.21-mile.20261115.upstream1",
+    "source_commit": "539e4ba8b44eaf90ef29f30c0c51e86d23b3aba6",
+    "sha256": "2648c39d3c658d4a3da9c2b74f7a853ebe64db636132c235a436920d5bfdff6c",
+    "backup": "/opt/sub2api/backups/before-mile-20261115-upstream1-20261115T084813165664Z",
+    "started_at": "2026-11-15T08:48:26.026578+00:00",
+    "status": "deployed",
+    "as_of": "2026-11-15T08:48:47.990672+00:00",
+    "finished_at": "2026-11-15T08:48:59.600151+00:00",
+    "host": "172.104.117.114",
+    "release_directory": "/opt/sub2api/releases/mile-20261115-upstream1",
+    "record": "docs/engineering-upgrade/UPSTREAM-SYNC-2026-11-15.md",
+    "migration_count": 317,
+    "migration_count_before": 317,
+    "migration_count_after": 317,
+    "openai_mode": "shadow",
+    "grok_mode": "shadow",
+    "runtime_environment_preserved": true,
+    "personal_clocks_preserved": true,
+    "audits_preserved": true,
+    "request_rows_preserved": 40704,
+    "settled_imported_preserved": 39057,
+    "confirmed_events_preserved": true,
+    "capacity_events_preserved": true,
+    "personal_reset_audits_preserved": true,
+    "durable_record_counts": {
+      "coding_quota_async_jobs": 0,
+      "coding_quota_reservations": 37717,
+      "coding_quota_billing_tasks": 37609,
+      "coding_quota_reservation_events": 150739
+    },
+    "public_resources_checked": 201,
+    "public_client_all_passed": true,
+    "app_healthy": true,
+    "memslides_healthy": true,
+    "admin_preview_group_id": 17,
+    "ordinary_test_users_granted": 0,
+    "live_inference_calls": 1,
+    "old_key_groups_verified": 17,
+    "live_users_verified": 6,
+    "gc_settings": {
+      "GOMEMLIMIT": "256MiB",
+      "GOGC": "50"
+    }
+  },
+  "last_upstream_check": {
+    "checked_at": "2026-11-15T08:50:57.333943+00:00",
+    "upstream_commit": "530c5e3a4f9c73ca2b0881191d0ef8e0d82c5484",
+    "upstream_release": "v0.2.21 + main sponsor commit",
+    "fork_commit_at_check": "f3b217911923de35658969994b1d0f44ad070c38",
+    "missing_upstream_commits": 6,
+    "action": "merged-and-deployed-pinned-sha",
+    "record": "docs/engineering-upgrade/UPSTREAM-SYNC-2026-11-15.md"
+  },
+  "deployment_status": "deployed-admin-preview-preserved",
+  "deployment_note": "Pinned upstream v0.2.21/main merge; no migrations or dependency changes. OOM incident mitigated separately with GOMEMLIMIT=256MiB and GOGC=50; original hard cap, quota data, shadow and preview access preserved.",
+  "validation": {
+    "frontend_tests": 3267,
+    "frontend_files": 406,
+    "frontend_related_tests": 73,
+    "frontend_lint": true,
+    "frontend_types": true,
+    "frontend_i18n": true,
+    "frontend_build": true,
+    "quota_postgres_race_passed": 74,
+    "quota_postgres_race_skipped": 0,
+    "quota_postgres_race_failed": 0,
+    "targeted_unit_race_passed": 222,
+    "targeted_unit_race_skipped": 0,
+    "go_broad": {
+      "passed": 26999,
+      "skipped": 111,
+      "failed": 155,
+      "failure_roots": [
+        "github.com/Wei-Shaw/sub2api/ent/schema:TestAuthIdentityFoundationSchemas",
+        "github.com/Wei-Shaw/sub2api/internal/model:TestAllPlatformsIncludesEveryConcretePlatform",
+        "github.com/Wei-Shaw/sub2api/internal/pkg/sysutil:TestCgroupMemoryLimit",
+        "github.com/Wei-Shaw/sub2api/internal/repository:TestPgDumperHoldsMigrationLockThroughReaderClose",
+        "github.com/Wei-Shaw/sub2api/internal/repository:TestPgDumperReleasesMigrationLockWhenProcessFails",
+        "github.com/Wei-Shaw/sub2api/internal/repository:TestPgDumperReportsUnlockFailureAndDiscardsConnection",
+        "github.com/Wei-Shaw/sub2api/internal/service:TestCommandCodeGatewayPassesThroughCatalogProtocols",
+        "github.com/Wei-Shaw/sub2api/internal/service:TestCompositeGroupSchedulerHasAllCanonicalPlatformBuckets",
+        "github.com/Wei-Shaw/sub2api/internal/service:TestGatewayServiceRecordUsage_GeminiFlashThinkingTierUsesCatalogPrice",
+        "github.com/Wei-Shaw/sub2api/internal/service:TestGeminiNativeReasoningPricingUsesExplicitForwardedLevel",
+        "github.com/Wei-Shaw/sub2api/internal/service:TestMatchingPlatforms",
+        "github.com/Wei-Shaw/sub2api/internal/service:TestOllamaProbeCallback_StaleLongDoesNotOverrideNewShort",
+        "github.com/Wei-Shaw/sub2api/internal/service:TestOpenAIGatewayServiceRecordUsage_AggregatorClaudeUsesDefaultPricing",
+        "github.com/Wei-Shaw/sub2api/internal/service:TestOpenAIGatewayServiceRecordUsage_CNAndOpenCodeClaudeHonorExplicitPricing",
+        "github.com/Wei-Shaw/sub2api/internal/service:TestOpenAIWSPassthroughFirstTokenFollowsTTFTMode",
+        "github.com/Wei-Shaw/sub2api/internal/service:TestPlatformListDerivedListsMatchLegacy",
+        "github.com/Wei-Shaw/sub2api/internal/service:TestRecordUsage_ImageReasoningPricing",
+        "github.com/Wei-Shaw/sub2api/internal/service:TestRecordUsage_ReasoningPricingUsesForwardedEffort",
+        "github.com/Wei-Shaw/sub2api/internal/service:TestResolveContextPricingSchedule_Scenarios"
+      ],
+      "failed_packages": [
+        "github.com/Wei-Shaw/sub2api/ent/schema",
+        "github.com/Wei-Shaw/sub2api/internal/model",
+        "github.com/Wei-Shaw/sub2api/internal/pkg/sysutil",
+        "github.com/Wei-Shaw/sub2api/internal/repository",
+        "github.com/Wei-Shaw/sub2api/internal/service"
+      ],
+      "log": "go-check-1794731097812789300.log",
+      "log_sha256": "a69631d5e8eb4be1b10306d7ec0de0ffd2af87fe02019546c8e062103438228d",
+      "exit_code": 1,
+      "packages": [
+        "./..."
+      ],
+      "run": null,
+      "checked_at": "2026-11-15T08:32:44.478158+00:00",
+      "status": "failed"
+    },
+    "go_broad_all_passed": false,
+    "baseline_reproduced_failure_roots": 18,
+    "candidate_only_failure_roots": [
+      "github.com/Wei-Shaw/sub2api/internal/service:TestOpenAIWSPassthroughFirstTokenFollowsTTFTMode"
+    ],
+    "timing_recheck_passed": 5,
+    "vet": true,
+    "incremental_lint": "0 issues",
+    "browser_engines": [
+      "Chromium",
+      "WebKit"
+    ],
+    "artifact_browser_features": [
+      "guide",
+      "unified-coding",
+      "personal-quota"
+    ],
+    "independent_review": "Separate self-review; no independent reviewer",
+    "browser_real_api_mutations": 0,
+    "custom_blobs_outside_upstream_preserved": 474,
+    "tools_unit_passed": 96,
+    "tools_unit_opt_in_skipped": 2,
+    "tools_postgres_actual_passed": 2,
+    "tools_postgres_actual_skipped": 0,
+    "finalize_status": "passed",
+    "initial_finalize_failed": true,
+    "initial_finalize_failure_note": "URL DSN incompatible with test helper append; corrected to keyword DSN. Initial browser path guard error did not reproduce with absolute evidence path; exact origin remains unconfirmed."
+  },
+  "integration_fixes": [],
+  "previous_deployment": {
     "version": "0.2.20-mile.20261113.coding-ui1",
     "source_commit": "d44b4c5bf74d5a526798f6be64c29fd25e87d4b9",
     "sha256": "c9de2dbf2c821d6e6c50298cdb8b4aa708f40ab40d3541a332acef1e0737fcc5",
@@ -55,111 +195,9 @@
     "old_key_groups_verified": 5,
     "live_users_verified": 5
   },
-  "last_upstream_check": {
-    "checked_at": "2026-11-10T18:22:55.815301+00:00",
-    "upstream_commit": "e2c9812190dd71bb309c8ad020a1211da1e0d3b4",
-    "upstream_release": "v0.2.20 + main commits",
-    "fork_commit_at_check": "406880d1396d1bb9747b90b8618760ea2cc9f39a",
-    "missing_upstream_commits": 77,
-    "action": "merged-and-deployed-pinned-sha",
-    "record": "docs/engineering-upgrade/UPSTREAM-SYNC-2026-11-11.md"
-  },
-  "deployment_status": "deployed-admin-preview-only",
-  "deployment_note": "Frontend simplification of the administrator preview; automatic remote model catalog, shorter copy and single code icon. Private group metadata only; no backend changes, migrations or upstream merge.",
-  "validation": {
-    "frontend_tests": 3233,
-    "frontend_files": 404,
-    "quota_postgres_race_passed": 66,
-    "quota_postgres_race_skipped": 0,
-    "targeted_unit_race_passed": 3150,
-    "targeted_unit_race_skipped": 1,
-    "default_go_after_passed": 15490,
-    "default_go_skipped": 15,
-    "known_deterministic_failure_roots": 6,
-    "windows_only_new_failure": "TestCgroupMemoryLimit: symlink privilege; unchanged original Linux tests 12 passed",
-    "vet": true,
-    "incremental_lint": "0 issues",
-    "browser_engines": [
-      "Chromium",
-      "WebKit"
-    ],
-    "independent_review": "Separate self-review; no independent reviewer",
-    "browser_real_api_mutations": 0,
-    "new_migration_isolated_idempotency": true,
-    "custom_blobs_outside_upstream_preserved": 447,
-    "default_go_baseline_passed": 15019,
-    "baseline_default_failure_roots": 9,
-    "targeted_optional_skip": "TestEstimateOpenAIInputTokens_CompareWithOpenAIAPI (requires external API credentials)"
-  },
-  "integration_fixes": [
-    {
-      "path": "backend/internal/repository/usage_log_repo_insert.go",
-      "reason": "Preserve seven official metering fields plus two upstream cache TTL fields; consistent 71-argument insert/read paths."
-    },
-    {
-      "path": "backend/internal/repository/migrations_runner.go",
-      "reason": "Retain both fork official-window and upstream API-key-cost invalid-index recovery cases."
-    },
-    {
-      "path": "backend/internal/repository/usage_log_repo_request_type_test.go",
-      "reason": "Repair three related pre-existing SQL fixture failures without changing production charge behavior."
-    },
-    {
-      "path": "backend/internal/server/api_contract_test.go",
-      "reason": "Assert five existing MILE admin settings fields in strict JSON contract fixtures."
-    },
-    {
-      "path": "backend/internal/service/openai_cache_write_ttl_test.go",
-      "reason": "Retain real priced-usage assertions while verifying no duplicate legacy-balance debit for a purpose wallet."
-    },
-    {
-      "path": "backend/internal/service/auth_service_email_bind_test.go",
-      "reason": "Make the existing concurrent email-cache test double return a locked snapshot, matching Redis semantics."
-    }
-  ],
-  "previous_deployment": {
-    "version": "0.2.20-mile.20261113.coding-preview1",
-    "source_commit": "17377e59a0af8d4ba0577f68be5547cf61110323",
-    "sha256": "c1a15962637619d80e5f577a9e10d52488456d4d887694e1a3e6d3652d807f30",
-    "backup": "/opt/sub2api/backups/before-mile-20261113-coding-preview1-20261113T082502117275Z",
-    "started_at": "2026-11-13T08:25:12.098235+00:00",
-    "status": "deployed",
-    "as_of": "2026-11-13T08:26:10.247819+00:00",
-    "finished_at": "2026-11-13T08:26:20.501092+00:00",
-    "host": "172.104.117.114",
-    "release_directory": "/opt/sub2api/releases/mile-20261113-coding-preview1",
-    "record": "docs/engineering-upgrade/CODEX-GROK-PREVIEW-2026-11-13.md",
-    "migration_count_before": 317,
-    "migration_count_after": 317,
-    "migration_count": 317,
-    "openai_mode": "shadow",
-    "grok_mode": "shadow",
-    "runtime_environment_preserved": true,
-    "personal_clocks_preserved": true,
-    "audits_preserved": true,
-    "request_rows_preserved": 35698,
-    "settled_imported_preserved": 34200,
-    "confirmed_events_preserved": true,
-    "capacity_events_preserved": true,
-    "personal_reset_audits_preserved": true,
-    "durable_record_counts": {
-      "coding_quota_async_jobs": 0,
-      "coding_quota_reservations": 32653,
-      "coding_quota_billing_tasks": 32603,
-      "coding_quota_reservation_events": 130568
-    },
-    "public_resources_checked": 201,
-    "public_client_combined": true,
-    "public_server_all_passed": true,
-    "admin_preview_group_id": 17,
-    "ordinary_test_users_granted": 0,
-    "live_inference_calls": 0,
-    "old_key_groups_verified": 5,
-    "live_users_verified": 5
-  },
-  "source_changed_files": 185,
-  "merge_record": "docs/engineering-upgrade/UPSTREAM-SYNC-2026-11-11.md",
-  "business_merge_commit": "c7297838b1b3bf0e0a0e64340d52bf112f32dc9a",
+  "source_changed_files": 32,
+  "merge_record": "docs/engineering-upgrade/UPSTREAM-SYNC-2026-11-15.md",
+  "business_merge_commit": "539e4ba8b44eaf90ef29f30c0c51e86d23b3aba6",
   "last_custom_upgrade": {
     "name": "unified-coding-admin-preview",
     "source_commit": "17377e59a0af8d4ba0577f68be5547cf61110323",
@@ -333,6 +371,46 @@
       "live_inference_calls": 0,
       "old_key_groups_verified": 5,
       "live_users_verified": 5
+    },
+    {
+      "version": "0.2.20-mile.20261113.coding-ui1",
+      "source_commit": "d44b4c5bf74d5a526798f6be64c29fd25e87d4b9",
+      "sha256": "c9de2dbf2c821d6e6c50298cdb8b4aa708f40ab40d3541a332acef1e0737fcc5",
+      "backup": "/opt/sub2api/backups/before-mile-20261113-coding-ui1-20261113T094030609684Z",
+      "started_at": "2026-11-13T09:40:39.457717+00:00",
+      "status": "deployed",
+      "as_of": "2026-11-13T09:40:59.969452+00:00",
+      "finished_at": "2026-11-13T09:41:11.219797+00:00",
+      "host": "172.104.117.114",
+      "release_directory": "/opt/sub2api/releases/mile-20261113-coding-ui1",
+      "record": "docs/engineering-upgrade/CODING-UI-2026-11-13.md",
+      "migration_count": 317,
+      "migration_count_before": 317,
+      "migration_count_after": 317,
+      "openai_mode": "shadow",
+      "grok_mode": "shadow",
+      "runtime_environment_preserved": true,
+      "personal_clocks_preserved": true,
+      "audits_preserved": true,
+      "request_rows_preserved": 35973,
+      "settled_imported_preserved": 34326,
+      "confirmed_events_preserved": true,
+      "capacity_events_preserved": true,
+      "personal_reset_audits_preserved": true,
+      "durable_record_counts": {
+        "coding_quota_async_jobs": 0,
+        "coding_quota_reservations": 32928,
+        "coding_quota_billing_tasks": 32878,
+        "coding_quota_reservation_events": 131668
+      },
+      "public_resources_checked": 201,
+      "public_client_all_passed": true,
+      "public_server_all_passed": true,
+      "admin_preview_group_id": 17,
+      "ordinary_test_users_granted": 0,
+      "live_inference_calls": 0,
+      "old_key_groups_verified": 5,
+      "live_users_verified": 5
     }
   ],
   "custom_upgrade_history": [
@@ -422,5 +500,88 @@
     "evidence": "output/delivery/coding-ui-simple/",
     "approx_minutes_from_resumed_work_to_deployed": 20,
     "go_full_rerun": false
+  },
+  "upstream_history": [
+    {
+      "previous_upstream_commit": "6b4b37db43443b5e88e424fe3c69602cc3810dfb",
+      "upstream_commit": "e2c9812190dd71bb309c8ad020a1211da1e0d3b4",
+      "upstream_release": "v0.2.20",
+      "fork_before_merge": "406880d1396d1bb9747b90b8618760ea2cc9f39a",
+      "merge_commit": "c7297838b1b3bf0e0a0e64340d52bf112f32dc9a",
+      "included_upstream_commits": 77,
+      "changed_files": 177,
+      "new_database_migrations": 2,
+      "record": "docs/engineering-upgrade/UPSTREAM-SYNC-2026-11-11.md",
+      "merge_record": "docs/engineering-upgrade/UPSTREAM-SYNC-2026-11-11.md",
+      "business_merge_commit": "c7297838b1b3bf0e0a0e64340d52bf112f32dc9a",
+      "source_changed_files": 185,
+      "validation": {
+        "frontend_tests": 3233,
+        "frontend_files": 404,
+        "quota_postgres_race_passed": 66,
+        "quota_postgres_race_skipped": 0,
+        "targeted_unit_race_passed": 3150,
+        "targeted_unit_race_skipped": 1,
+        "default_go_after_passed": 15490,
+        "default_go_skipped": 15,
+        "known_deterministic_failure_roots": 6,
+        "windows_only_new_failure": "TestCgroupMemoryLimit: symlink privilege; unchanged original Linux tests 12 passed",
+        "vet": true,
+        "incremental_lint": "0 issues",
+        "browser_engines": [
+          "Chromium",
+          "WebKit"
+        ],
+        "independent_review": "Separate self-review; no independent reviewer",
+        "browser_real_api_mutations": 0,
+        "new_migration_isolated_idempotency": true,
+        "custom_blobs_outside_upstream_preserved": 447,
+        "default_go_baseline_passed": 15019,
+        "baseline_default_failure_roots": 9,
+        "targeted_optional_skip": "TestEstimateOpenAIInputTokens_CompareWithOpenAIAPI (requires external API credentials)"
+      },
+      "integration_fixes": [
+        {
+          "path": "backend/internal/repository/usage_log_repo_insert.go",
+          "reason": "Preserve seven official metering fields plus two upstream cache TTL fields; consistent 71-argument insert/read paths."
+        },
+        {
+          "path": "backend/internal/repository/migrations_runner.go",
+          "reason": "Retain both fork official-window and upstream API-key-cost invalid-index recovery cases."
+        },
+        {
+          "path": "backend/internal/repository/usage_log_repo_request_type_test.go",
+          "reason": "Repair three related pre-existing SQL fixture failures without changing production charge behavior."
+        },
+        {
+          "path": "backend/internal/server/api_contract_test.go",
+          "reason": "Assert five existing MILE admin settings fields in strict JSON contract fixtures."
+        },
+        {
+          "path": "backend/internal/service/openai_cache_write_ttl_test.go",
+          "reason": "Retain real priced-usage assertions while verifying no duplicate legacy-balance debit for a purpose wallet."
+        },
+        {
+          "path": "backend/internal/service/auth_service_email_bind_test.go",
+          "reason": "Make the existing concurrent email-cache test double return a locked snapshot, matching Redis semantics."
+        }
+      ]
+    }
+  ],
+  "last_incident": {
+    "record": "docs/engineering-upgrade/UPSTREAM-SYNC-2026-11-15.md",
+    "root_cause": "Container memcg OOM at 420MiB, 35 previous restarts; backend interruption produced Caddy 502",
+    "operational_backup": "/opt/sub2api/backups/before-memory-gc-20261115T081516319755Z",
+    "mitigated_at": "2026-11-15T08:17:25.562788+00:00",
+    "settings": {
+      "GOMEMLIMIT": "256MiB",
+      "GOGC": "50"
+    },
+    "hard_memory_limit_mib": 420,
+    "observation_at": "2026-11-15T08:50:57.333943+00:00",
+    "new_oom": false,
+    "new_caddy_502_count": 0,
+    "restart_count": 0,
+    "long_term_stability_proven": false
   }
 }
