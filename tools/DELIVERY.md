@@ -1,5 +1,31 @@
 # MILE Lab 交付工具
 
+## 无迁移上游合并
+
+`upstream_upgrade.py` 是显式后端发布入口，当前固定合并前 SHA
+`f3b217911923de35658969994b1d0f44ad070c38` 和上游 SHA
+`530c5e3a4f9c73ca2b0881191d0ef8e0d82c5484`。仅接受这两个父提交的真实、无冲突合并；
+应用树须与 Git 自动合并结果一致，迁移目录不能增删或修改，后续工具／文档提交可以保留。
+下一轮上游同步须重新审查并更新固定基线，不能直接复用旧契约。
+
+仍先按上游 runbook 完成广覆盖 Go、vet、增量 lint、定制审查和失败基线比较，再完成
+`validate` 及 `finalize --feature unified-coding --feature personal-quota`。
+打包额外强制两种定制路径的真实产物浏览器证据；前端发布入口的后端拦截不变。
+
+```powershell
+& D:/Programs/anaconda3/python.exe tools/upstream_upgrade.py package `
+  --output output/delivery/upstream-20261115 `
+  --destination output/releases/mile-20261115-upstream1 `
+  --version 0.2.21-mile.20261115.upstream1 `
+  --source-commit <已审查的真实合并SHA> `
+  --baseline-sha256 <线上程序SHA256> --baseline-binary <已校验的旧程序>
+```
+
+服务器依次执行 `python3 upstream_upgrade.py deploy --release <发布目录> --stage`、
+不带 `--apply` 的只读预检，再带 `--apply` 正式发布。复用冻结 Compose、备份验证、
+固定时刻持久数据核对和同 schema 程序回退，绝不恢复旧数据库。
+线上 `docker-compose.override.yml` 中的 Go 内存回收参数也随有效 Compose 保留。
+
 第一阶段保持现有嵌入式前端架构、额度保护和 shadow 模式。工具使用 Python 3.11+ 标准库；生成差量包时额外安装 `requirements-delivery.txt`。以下命令在仓库根目录执行，PowerShell 普通工具调用应禁用 profile 加载。Python 使用 `D:/Programs/anaconda3/python.exe`，pnpm 使用 `pnpm.cmd`。
 
 ## 日常修改

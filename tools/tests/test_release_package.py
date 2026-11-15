@@ -49,6 +49,48 @@ class PackageTests(unittest.TestCase):
         self.assertEqual(manifest['quota_tests']['passed'], 1)
         self.assertTrue((self.out / 'release/sub2api.gz').exists())
 
+    def test_upstream_lane_requires_custom_reviews_and_packages_explicit_policy(self):
+        import upstream_upgrade
+        from delivery_core import tree_hash, write_json
+        from delivery_workflow import application_snapshot
+        baseline = self.commit
+        self.git('checkout', '-b', 'upstream')
+        (self.root / 'backend/source.go').write_text('new upstream')
+        self.git('add', 'backend/source.go')
+        self.git('-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'upstream')
+        upstream = self.git('rev-parse', 'HEAD')
+        self.git('checkout', '-b', 'merge', baseline)
+        self.git('-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'merge', '--no-ff', upstream, '-m', 'merge')
+        source = self.git('rev-parse', 'HEAD')
+        with patch.object(upstream_upgrade, 'BASELINE', baseline), patch.object(upstream_upgrade, 'UPSTREAM', upstream):
+            contract = upstream_upgrade.contract_for_release(source)
+            args = [self.root, self.out, self.out / 'release', self.binary, 'test1', 'b' * 64, baseline]
+            with self.assertRaisesRegex(DeliveryError, 'both custom feature'):
+                package_release(*args, full_upload=True, upgrade_contract=contract)
+            for feature in ['unified-coding', 'personal-quota']:
+                script = 'review_' + feature.replace('-', '_') + '.cjs'
+                for name in [script, 'browser_fixtures.cjs']:
+                    path = self.root / 'tools' / name
+                    path.parent.mkdir(exist_ok=True)
+                    path.write_text('fixture')
+                result = self.out / feature / 'result.json'
+                write_json(result, dict(ok=True, engines={'chromium': {}, 'webkit': {}},
+                    frontend_sha256=tree_hash(self.root, ['backend/internal/web/dist'])['backend/internal/web/dist'],
+                    script_sha256=digest(self.root / 'tools' / script),
+                    fixtures_sha256=digest(self.root / 'tools/browser_fixtures.cjs')))
+                self.runner.run('artifact-feature-' + feature, [sys.executable, '-c', 'print("verified")'],
+                                ['src.txt'], artifacts=[result.relative_to(self.root).as_posix()])
+            self.git('add', 'tools')
+            self.git('-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'tools')
+            next(s for s in self.runner.manifest['steps'] if s['name'] == 'backend-build')['source_commit'] = source
+            write_json(self.out / 'manifest.json', self.runner.manifest)
+            write_json(self.out / 'finalize.json', dict(status='passed', version='test1',
+                application=application_snapshot(self.root), features=['unified-coding', 'personal-quota']))
+            manifest = package_release(*args, full_upload=True, upgrade_contract=contract)
+            self.assertFalse(manifest['backend_unchanged'])
+            self.assertEqual(manifest['upgrade_contract'], contract)
+            self.assertTrue((self.out / 'release/upstream_upgrade.py').exists())
+
     def test_incomplete_finalization_cannot_publish_previous_success(self):
         for status in ['running', 'failed']:
             (self.out / 'finalize.json').write_text(json.dumps({'status': status}))

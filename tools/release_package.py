@@ -76,6 +76,11 @@ def package_release(root, evidence, destination, binary, version, baseline_sha25
         if upgrade_contract.get('name') == 'unified-coding-preview-v1':
             from coding_upgrade import UnifiedCodingUpgrade
             UnifiedCodingUpgrade(upgrade_contract).validate_sources(root, baseline_commit, source)
+        elif upgrade_contract.get('name') == 'upstream-merge-no-migrations-v1':
+            from upstream_upgrade import UpstreamUpgrade
+            UpstreamUpgrade(upgrade_contract).validate_sources(root, baseline_commit, source)
+            if not final_path.exists() or not {'unified-coding', 'personal-quota'}.issubset(final.get('features', [])):
+                raise DeliveryError('Upstream merge requires both custom feature artifact reviews')
         else:
             from full_upgrade import PersonalQuotaUpgrade
             PersonalQuotaUpgrade(upgrade_contract)
@@ -114,7 +119,7 @@ def package_release(root, evidence, destination, binary, version, baseline_sha25
             raise DeliveryError('Stale input evidence: ' + name)
         if stage['artifacts'] != tree_hash(root, list(stage['artifacts'])) or digest(contained(evidence, stage['log'])) != stage['log_sha256']:
             raise DeliveryError('Corrupt artifact or log evidence: ' + name)
-    if upgrade_contract is not None:
+    if upgrade_contract is not None and upgrade_contract.get('name') != 'upstream-merge-no-migrations-v1':
         coding_preview = upgrade_contract.get('name') == 'unified-coding-preview-v1'
         name = 'artifact-feature-' + ('unified-coding' if coding_preview else 'personal-quota')
         if name in stages:
@@ -188,5 +193,7 @@ def package_release(root, evidence, destination, binary, version, baseline_sha25
         if upgrade_contract.get('name') == 'unified-coding-preview-v1':
             shutil.copyfile(kit / 'coding_upgrade.py', destination / 'coding_upgrade.py')
             shutil.copyfile(kit / 'coding_preview_live.py', destination / 'coding_preview_live.py')
+        elif upgrade_contract.get('name') == 'upstream-merge-no-migrations-v1':
+            shutil.copyfile(kit / 'upstream_upgrade.py', destination / 'upstream_upgrade.py')
     write_json(destination / 'manifest.json', manifest)
     return manifest
