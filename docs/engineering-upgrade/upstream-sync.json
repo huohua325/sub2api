@@ -56,9 +56,10 @@
     "old_key_groups_verified": 17,
     "live_users_verified": 6,
     "gc_settings": {
-      "GOMEMLIMIT": "256MiB",
+      "GOMEMLIMIT": "512MiB",
       "GOGC": "50"
-    }
+    },
+    "runtime_resources_record": "docs/engineering-upgrade/SSH-AND-RESOURCES-2026-11-17.md"
   },
   "last_upstream_check": {
     "checked_at": "2026-11-15T08:50:57.333943+00:00",
@@ -70,7 +71,7 @@
     "record": "docs/engineering-upgrade/UPSTREAM-SYNC-2026-11-15.md"
   },
   "deployment_status": "deployed-admin-preview-preserved",
-  "deployment_note": "Pinned upstream v0.2.21/main merge; no migrations or dependency changes. OOM incident mitigated separately with GOMEMLIMIT=256MiB and GOGC=50; original hard cap, quota data, shadow and preview access preserved.",
+  "deployment_note": "Pinned upstream v0.2.21/main application unchanged. On 2026-11-17 SSH recovered after disabling local TUN; resized 2GB host verified and application resources raised to 768MiB / GOMEMLIMIT=512MiB with a 192MiB request-body budget. A snapshot aggregation OOM on the initial attempt was recovered and fixed with bounded row streaming before successful retry; quota data, shadow and preview access preserved.",
   "validation": {
     "frontend_tests": 3267,
     "frontend_files": 406,
@@ -583,5 +584,81 @@
     "new_caddy_502_count": 0,
     "restart_count": 0,
     "long_term_stability_proven": false
+  },
+  "last_resource_adjustment": {
+    "status": "applied",
+    "record": "docs/engineering-upgrade/SSH-AND-RESOURCES-2026-11-17.md",
+    "finished_at": "2026-11-17T09:31:32.275256+00:00",
+    "backup": "/opt/sub2api/backups/before-runtime-resources-20261117T093047074985Z",
+    "application_version_unchanged": "0.2.21-mile.20261115.upstream1",
+    "application_source_unchanged": "539e4ba8b44eaf90ef29f30c0c51e86d23b3aba6",
+    "program_sha256": "2648c39d3c658d4a3da9c2b74f7a853ebe64db636132c235a436920d5bfdff6c",
+    "tool_source_commit": "53e32df397f49b385288602696b8cfc0fecb45bf",
+    "settings": {
+      "hard_mib": 768,
+      "swap_mib": 1024,
+      "go_mib": 512,
+      "gogc": 50,
+      "body_mib": 192
+    },
+    "modes": [
+      "shadow",
+      "shadow"
+    ],
+    "snapshot_summary": {
+      "before_requests": 46316,
+      "after_requests": 46316,
+      "settled_imported_preserved": 44549,
+      "clocks": 16,
+      "migrations": 317,
+      "immutable_counts": {
+        "reset_events": 4,
+        "corrections": 7,
+        "reconciliations": 1,
+        "anchors": 24,
+        "admin_key_policies": 0,
+        "capacity_events": 1,
+        "personal_resets": 2,
+        "personal_reset_requests": 10744
+      },
+      "durable_counts": {
+        "coding_quota_reservations": 43333,
+        "coding_quota_reservation_events": 173206,
+        "coding_quota_billing_tasks": 43221,
+        "coding_quota_async_jobs": 0
+      }
+    },
+    "validation": {
+      "tool_unit_passed": 28,
+      "tool_unit_skipped": 0,
+      "isolated_postgres_tool_passed": 3,
+      "isolated_postgres_tool_skipped": 0,
+      "body_memory_race_passed": 37,
+      "body_memory_race_skipped": 0,
+      "real_psql_fetch_count": 1000,
+      "real_psql_batch_rows": 2501,
+      "extra_inference_calls": 0,
+      "application_rebuilt": false
+    },
+    "initial_attempt": {
+      "status": "failed-configuration-rolled-back",
+      "backup": "/opt/sub2api/backups/before-runtime-resources-20261117T090950334435Z",
+      "postgres_backend_oom_kills": 1,
+      "cause": "Server-side JSON aggregation exceeded existing PostgreSQL memory cap; replaced with bounded row streaming and FETCH_COUNT=1000",
+      "database_restored": false
+    },
+    "post_change_observation_at": "2026-11-17T09:35:28.839909+00:00",
+    "additional_oom_kills_after_retry": false,
+    "long_term_stability_proven": false,
+    "health": {
+      "app": 200,
+      "memslides": 200,
+      "public_home": 200,
+      "public_health": 200,
+      "unauthenticated_responses": 401,
+      "public_checked_at": "2026-11-17T09:33:49.280959+00:00"
+    },
+    "observation_minutes": 3.94,
+    "caddy_journal_rows_in_observation": 0
   }
 }
