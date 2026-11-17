@@ -1,5 +1,17 @@
 # MILE Lab 交付工具
 
+## v0.2.22 两迁移上游发布
+
+`upstream_additive_upgrade.py` 单独固定已审查的双亲 merge、线上源基线及两条新增 SQL
+的文件／数据库校验和。旧无迁移、前端和个人重置通道守卫保持原样。
+先使用已有冻结前端证据执行 `delivery.py finalize --version <版本> --feature unified-coding
+--feature personal-quota`，再用该入口 `package`，必须提供 `--admin-browser <分组产物回归/result.json>`。
+显式 `--full-upload` 可避免跨 Go 补丁版本时的大差量计算；不会隐式扩大上传。
+服务器用 `python3 upstream_additive_upgrade.py deploy --release <目录>` 依次 stage、预检、apply。
+升级保留原迁移、额度账本／审计、持久任务、周期、分组、Key 绑定和测试授权，禁止自动启用
+Ultra Fast。失败只回退程序；若已人工启用新档位则阻止自动回退并向前修复。
+原程序支持新增列及兼容的汇总触发器，不执行数据库回退。
+
 ## 无迁移上游合并
 
 `upstream_upgrade.py` 是显式后端发布入口，当前固定合并前 SHA
