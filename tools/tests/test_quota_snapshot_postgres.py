@@ -11,9 +11,10 @@ import sys
 import time
 import unittest
 import uuid
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from quota_snapshot import snapshot
+from quota_snapshot import snapshot, build_snapshot_script
 from release_server import assert_preserved
 from delivery_core import DeliveryError
 
@@ -38,8 +39,15 @@ class SnapshotPostgresTests(unittest.TestCase):
         else: raise RuntimeError('Disposable PostgreSQL did not become ready')
     @classmethod
     def sql(cls, text):
-        return subprocess.check_output(['docker', 'exec', '-i', cls.name, 'psql', '-X', '-qAt', '-v', 'ON_ERROR_STOP=1', '-U', 'delivery_test', '-d', 'delivery_test'], input=text, text=True, timeout=20)
-    def test_real_queries_preserve_fixed_cycles_and_detect_changed_charge(self):
+        return subprocess.check_output(['docker', 'exec', '-i', cls.name, 'psql', '-X', '-qAt', '-v', 'ON_ERROR_STOP=1', '-U', cls.env['POSTGRES_USER'], '-d', cls.env['POSTGRES_DB']], input=text, text=True, timeout=20)
+
+    def setUp(self):
+        schema = 'snapshot_' + uuid.uuid4().hex
+        role = self.env['POSTGRES_USER']
+        self.sql('CREATE SCHEMA ' + schema + '; ALTER ROLE ' + role + ' SET search_path TO ' + schema + '; SET search_path TO ' + schema + ';')
+        self.addCleanup(self.sql, 'ALTER ROLE ' + role + ' RESET search_path; SET search_path TO public; DROP SCHEMA ' + schema + ' CASCADE;')
+
+    def create_snapshot_tables(self):
         self.sql("""
         CREATE TABLE users(id bigint PRIMARY KEY, created_at timestamptz, deleted_at timestamptz);
         CREATE TABLE user_purpose_allowances(user_id bigint,purpose text,window_start timestamptz,limit_amount numeric,used_amount numeric,period text);
@@ -59,6 +67,9 @@ class SnapshotPostgresTests(unittest.TestCase):
         INSERT INTO schema_migrations VALUES('001.sql','original','2026-10-01T00:00:00Z');
         INSERT INTO coding_quota_billing_tasks VALUES(1);
         """)
+
+    def test_real_queries_preserve_fixed_cycles_and_detect_changed_charge(self):
+        self.create_snapshot_tables()
         at = '2026-11-13T00:00:00+00:00'
         before = snapshot(self.name, self.env, at)
         openai = next(c for c in before['clocks'] if c['purpose'] == 'openai')
@@ -76,6 +87,29 @@ class SnapshotPostgresTests(unittest.TestCase):
         self.assertEqual(personal['immutable']['personal_reset_requests'], [{'request_row_id': 1, 'reset_id': 'retained-personal'}])
         self.sql('DELETE FROM personal_quota_resets;')
         with self.assertRaises(DeliveryError): assert_preserved(personal, snapshot(self.name, self.env, at))
+
+    def test_large_ledger_stream_keeps_every_request_and_event(self):
+        self.create_snapshot_tables()
+        self.sql("""
+        INSERT INTO coding_quota_requests
+        SELECT i,1,'openai',1,1,'2026-11-12T00:00:00Z'::timestamptz,
+               '2026-11-12T00:01:00Z'::timestamptz,1,0.125,0,'settled'
+          FROM generate_series(2,50000) i;
+        INSERT INTO coding_quota_reservation_events SELECT generate_series(1,200000);
+        """)
+        with patch('quota_snapshot.build_snapshot_script', wraps=build_snapshot_script) as builder:
+            result = snapshot(self.name, self.env, '2026-11-13T00:00:00+00:00')
+        script, _ = build_snapshot_script(*builder.call_args.args)
+        for forbidden in ['jsonb_agg', 'json_agg', 'jsonb_build_object', 'json_build_object']:
+            self.assertNotIn(forbidden, script.lower())
+        self.assertEqual(script.count('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY'), 1)
+        self.assertEqual(len(result['requests']), 50000)
+        self.assertEqual(result['requests'][0]['id'], 1)
+        self.assertEqual(result['requests'][-1]['id'], 50000)
+        self.assertEqual(result['requests'][-1]['points'], '0.125')
+        self.assertEqual(result['durable_ids']['coding_quota_reservation_events'], list(range(1,200001)))
+        self.assertEqual(result['immutable']['capacity_events'], [])
+        self.assertEqual(result['immutable']['personal_resets'], [])
 
     def test_coding_preview_rollback_query_uses_real_postgres(self):
         from coding_upgrade import CodingRuntime, UnifiedCodingUpgrade, contract_for_release
