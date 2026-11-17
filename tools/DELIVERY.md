@@ -12,6 +12,13 @@
 Ultra Fast。失败只回退程序；若已人工启用新档位则阻止自动回退并向前修复。
 原程序支持新增列及兼容的汇总触发器，不执行数据库回退。
 
+SSH 大文件传输丢包时，可用 `release_transfer.py --package <已校验包> --host <SSH目标>
+--remote-release /opt/sub2api/releases/<目录> --proxy http://127.0.0.1:7897 --output <传输证据.json>`
+中转同一 payload。它只创建 fork 内的临时私有草稿资产，不公开发布；Git 凭证只在本机内存中
+使用，短期下载地址通过 SSH stdin 传递，服务器核对大小／SHA256 后原子替换暂存 payload。
+成功或失败均删除本次草稿，证据不包含凭证／签名 URL。发布元数据仍需上传；后续 stage／预检／apply
+守卫不变。先查丢包及当前传输，不同时重建程序或改变线上防火墙。
+
 ## 无迁移上游合并
 
 `upstream_upgrade.py` 是显式后端发布入口，当前固定合并前 SHA
