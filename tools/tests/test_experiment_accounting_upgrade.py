@@ -259,6 +259,10 @@ class AccountingPostgresTests(unittest.TestCase):
                 finally:
                     lib.PQclear(value)
             return values
+        def psql_lines(_command, script):
+            # psql -qAt writes embedded newlines in an unaligned column verbatim.
+            for value in rows(script):
+                yield from value.split('\n')
         schema = 'delivery_experiment_' + uuid.uuid4().hex
         sql('CREATE SCHEMA ' + schema + '; SET search_path TO ' + schema)
         self.addCleanup(sql, 'DROP SCHEMA ' + schema + ' CASCADE')
@@ -283,7 +287,8 @@ class AccountingPostgresTests(unittest.TestCase):
           CREATE TABLE groups(id bigint PRIMARY KEY,platform text,usage_kind text,is_exclusive boolean,
             status text,subscription_type text,force_openai_fast boolean,force_openai_ultrafast boolean,
             model_allowlist jsonb,require_oauth_only boolean,deleted_at timestamptz);
-          INSERT INTO groups VALUES(17,'composite','coding',true,'active','standard',false,false,'{}',true,NULL);
+          INSERT INTO groups VALUES(17,'composite','coding',true,'active','standard',false,false,'{}',true,NULL),
+            (18,'openai','coding',true,'active','standard',false,false,'{}',true,NULL);
           CREATE TABLE api_keys(id bigint,user_id bigint,group_id bigint,deleted_at timestamptz);
           CREATE TABLE user_allowed_groups(user_id bigint,group_id bigint);
           CREATE TABLE composite_model_routes(id bigint,group_id bigint,public_model text);
@@ -307,10 +312,11 @@ class AccountingPostgresTests(unittest.TestCase):
         database = {name: hashlib.sha256((root / 'backend/migrations' / name).read_text(encoding='utf-8').strip().encode()).hexdigest()
                     for name in upgrade.MIGRATIONS}
         with patch.multiple(upgrade, APPLICATION='a' * 40, MIGRATIONS=checksums, DATABASE_MIGRATIONS=database), \
-                patch('quota_snapshot.stream_rows', side_effect=lambda command, script: iter(rows(script))):
+                patch('quota_snapshot.stream_rows', side_effect=psql_lines):
             policy = upgrade.ExperimentAccountingUpgrade(upgrade.contract_for_release())
             reference = sql('SELECT clock_timestamp()::text', read=True)
             before = runtime.snapshot(reference)
+            self.assertEqual([group['id'] for group in before['access']['groups']], [17, 18])
             for name in checksums:
                 sql((root / 'backend/migrations' / name).read_text(encoding='utf-8'))
                 sql("INSERT INTO schema_migrations VALUES('" + name + "','" + database[name] + "')")

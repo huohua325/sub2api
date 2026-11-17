@@ -275,7 +275,8 @@ class ExperimentAccountingRuntime(APIFallbackRuntime):
         sections.update({'fallback.' + key: rows for key, rows in result['fallback'].items()})
         sql = [script.rsplit('COMMIT;', 1)[0]]
         access = ACCESS_QUERY[ACCESS_QUERY.index('SELECT json_build_object('):].rsplit('COMMIT;', 1)[0].strip().removesuffix(';')
-        sql.append("SELECT json_build_array('access',t.value) FROM (" + access + ') AS t(value);')
+        # Native JSON aggregates can contain newlines that break the psql row stream.
+        sql.append("SELECT json_build_array('access',t.value::jsonb) FROM (" + access + ') AS t(value);')
         for table in FALLBACK_TABLES:
             if table in names:
                 sql.append("SELECT json_build_array('fallback." + table + "',to_jsonb(t)) FROM " + table + ' t ORDER BY to_jsonb(t)::text;')
