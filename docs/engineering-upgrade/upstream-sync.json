@@ -2,18 +2,18 @@
   "schema_version": 1,
   "upstream_repository": "https://github.com/Wei-Shaw/sub2api.git",
   "upstream_branch": "main",
-  "previous_upstream_commit": "e2c9812190dd71bb309c8ad020a1211da1e0d3b4",
-  "upstream_commit": "530c5e3a4f9c73ca2b0881191d0ef8e0d82c5484",
-  "upstream_release": "v0.2.21",
-  "fork_before_merge": "f3b217911923de35658969994b1d0f44ad070c38",
-  "merge_commit": "539e4ba8b44eaf90ef29f30c0c51e86d23b3aba6",
+  "previous_upstream_commit": "530c5e3a4f9c73ca2b0881191d0ef8e0d82c5484",
+  "upstream_commit": "15871f904056f548dd874a1d069ffc6cdf777b78",
+  "upstream_release": "v0.2.22 + VERSION sync",
+  "fork_before_merge": "31f27a36ef10c3ea3bb911c073c7da99995c8118",
+  "merge_commit": "45c1cfda1c738a60cd278cd06071305670380252",
   "fork_remote": "fork",
   "fork_branch": "lab/0.2.17",
   "merge_strategy": "merge-commit-no-squash",
-  "included_upstream_commits": 6,
-  "changed_files": 26,
-  "new_database_migrations": 0,
-  "record": "docs/engineering-upgrade/UPSTREAM-SYNC-2026-11-15.md",
+  "included_upstream_commits": 186,
+  "changed_files": 339,
+  "new_database_migrations": 2,
+  "record": "docs/engineering-upgrade/UPSTREAM-SYNC-2026-11-17.md",
   "runbook": "docs/engineering-upgrade/UPSTREAM-MERGE-RUNBOOK.md",
   "deployment": {
     "version": "0.2.21-mile.20261115.upstream1",
@@ -62,35 +62,35 @@
     "runtime_resources_record": "docs/engineering-upgrade/SSH-AND-RESOURCES-2026-11-17.md"
   },
   "last_upstream_check": {
-    "checked_at": "2026-11-15T08:50:57.333943+00:00",
-    "upstream_commit": "530c5e3a4f9c73ca2b0881191d0ef8e0d82c5484",
-    "upstream_release": "v0.2.21 + main sponsor commit",
-    "fork_commit_at_check": "f3b217911923de35658969994b1d0f44ad070c38",
-    "missing_upstream_commits": 6,
-    "action": "merged-and-deployed-pinned-sha",
-    "record": "docs/engineering-upgrade/UPSTREAM-SYNC-2026-11-15.md"
+    "checked_at": "2026-11-17T11:00:59.686390+00:00",
+    "upstream_commit": "15871f904056f548dd874a1d069ffc6cdf777b78",
+    "upstream_release": "v0.2.22 + VERSION sync",
+    "fork_commit_at_check": "31f27a36ef10c3ea3bb911c073c7da99995c8118",
+    "missing_upstream_commits": 186,
+    "action": "merged-and-validated-pinned-sha-not-deployed",
+    "record": "docs/engineering-upgrade/UPSTREAM-SYNC-2026-11-17.md"
   },
-  "deployment_status": "deployed-admin-preview-preserved",
-  "deployment_note": "Pinned upstream v0.2.21/main application unchanged. On 2026-11-17 SSH recovered after disabling local TUN; resized 2GB host verified and application resources raised to 768MiB / GOMEMLIMIT=512MiB with a 192MiB request-body budget. A snapshot aggregation OOM on the initial attempt was recovered and fixed with bounded row streaming before successful retry; quota data, shadow and preview access preserved.",
+  "deployment_status": "previous-release-running-admin-preview-preserved",
+  "deployment_note": "Upstream v0.2.22 main is merged and validated in source. Production remains 0.2.21-mile.20261115.upstream1 at source 539e4ba8b44eaf90ef29f30c0c51e86d23b3aba6; no new migration or program deployment in this merge task. The 2026-11-17 resource adjustment, quota data, shadow, and preview access remain in effect. The old migration-free upstream deployment lane does not accept this merge.",
   "validation": {
-    "frontend_tests": 3267,
-    "frontend_files": 406,
-    "frontend_related_tests": 73,
+    "frontend_tests": 3300,
+    "frontend_files": 408,
+    "frontend_related_tests": 434,
     "frontend_lint": true,
     "frontend_types": true,
     "frontend_i18n": true,
     "frontend_build": true,
-    "quota_postgres_race_passed": 74,
+    "quota_postgres_race_passed": 75,
     "quota_postgres_race_skipped": 0,
     "quota_postgres_race_failed": 0,
-    "targeted_unit_race_passed": 222,
-    "targeted_unit_race_skipped": 0,
+    "billing_auth_race_passed": 48,
+    "protocol_scheduler_memory_race_passed": 443,
+    "lint_fixture_race_passed": 79,
     "go_broad": {
-      "passed": 26999,
-      "skipped": 111,
-      "failed": 155,
+      "passed": 28347,
+      "skipped": 112,
+      "failed": 152,
       "failure_roots": [
-        "github.com/Wei-Shaw/sub2api/ent/schema:TestAuthIdentityFoundationSchemas",
         "github.com/Wei-Shaw/sub2api/internal/model:TestAllPlatformsIncludesEveryConcretePlatform",
         "github.com/Wei-Shaw/sub2api/internal/pkg/sysutil:TestCgroupMemoryLimit",
         "github.com/Wei-Shaw/sub2api/internal/repository:TestPgDumperHoldsMigrationLockThroughReaderClose",
@@ -104,56 +104,54 @@
         "github.com/Wei-Shaw/sub2api/internal/service:TestOllamaProbeCallback_StaleLongDoesNotOverrideNewShort",
         "github.com/Wei-Shaw/sub2api/internal/service:TestOpenAIGatewayServiceRecordUsage_AggregatorClaudeUsesDefaultPricing",
         "github.com/Wei-Shaw/sub2api/internal/service:TestOpenAIGatewayServiceRecordUsage_CNAndOpenCodeClaudeHonorExplicitPricing",
-        "github.com/Wei-Shaw/sub2api/internal/service:TestOpenAIWSPassthroughFirstTokenFollowsTTFTMode",
         "github.com/Wei-Shaw/sub2api/internal/service:TestPlatformListDerivedListsMatchLegacy",
         "github.com/Wei-Shaw/sub2api/internal/service:TestRecordUsage_ImageReasoningPricing",
         "github.com/Wei-Shaw/sub2api/internal/service:TestRecordUsage_ReasoningPricingUsesForwardedEffort",
         "github.com/Wei-Shaw/sub2api/internal/service:TestResolveContextPricingSchedule_Scenarios"
       ],
       "failed_packages": [
-        "github.com/Wei-Shaw/sub2api/ent/schema",
         "github.com/Wei-Shaw/sub2api/internal/model",
         "github.com/Wei-Shaw/sub2api/internal/pkg/sysutil",
         "github.com/Wei-Shaw/sub2api/internal/repository",
         "github.com/Wei-Shaw/sub2api/internal/service"
       ],
-      "log": "go-check-1794731097812789300.log",
-      "log_sha256": "a69631d5e8eb4be1b10306d7ec0de0ffd2af87fe02019546c8e062103438228d",
+      "log": "go-check-1794910583991342400.log",
+      "log_sha256": "192326bcadbadf4c9001644bf31de8dba6e05d554e397a181228ae4d346a38e6",
       "exit_code": 1,
       "packages": [
         "./..."
       ],
       "run": null,
-      "checked_at": "2026-11-15T08:32:44.478158+00:00",
+      "checked_at": "2026-11-17T10:30:45.940314+00:00",
       "status": "failed"
     },
-    "go_broad_all_passed": false,
-    "baseline_reproduced_failure_roots": 18,
-    "candidate_only_failure_roots": [
-      "github.com/Wei-Shaw/sub2api/internal/service:TestOpenAIWSPassthroughFirstTokenFollowsTTFTMode"
-    ],
-    "timing_recheck_passed": 5,
-    "vet": true,
+    "go_baseline_exact_failed_test_matches": 151,
+    "context_sensitive_full_only_test": "TestCommandCodeGatewayPassesThroughCatalogProtocols",
+    "context_sensitive_test_passed_on_both_isolated_sides": true,
+    "go_full_suite_passed": false,
+    "go_vet": true,
     "incremental_lint": "0 issues",
+    "incremental_lint_packages": 19,
+    "incremental_lint_evidence": "output/upstream-20261117/lint-scoped/",
     "browser_engines": [
       "Chromium",
       "WebKit"
     ],
-    "artifact_browser_features": [
+    "artifact_feature_paths": [
       "guide",
       "unified-coding",
-      "personal-quota"
+      "personal-quota",
+      "admin-groups-tier"
     ],
-    "independent_review": "Separate self-review; no independent reviewer",
     "browser_real_api_mutations": 0,
-    "custom_blobs_outside_upstream_preserved": 474,
-    "tools_unit_passed": 96,
-    "tools_unit_opt_in_skipped": 2,
-    "tools_postgres_actual_passed": 2,
-    "tools_postgres_actual_skipped": 0,
-    "finalize_status": "passed",
-    "initial_finalize_failed": true,
-    "initial_finalize_failure_note": "URL DSN incompatible with test helper append; corrected to keyword DSN. Initial browser path guard error did not reproduce with absolute evidence path; exact origin remains unconfirmed."
+    "new_migrations_isolated_postgres_idempotency": true,
+    "existing_sql_checksums_preserved": 317,
+    "nonoverlapping_custom_application_paths_preserved": 414,
+    "ent_runtime_references_verified": 51,
+    "independent_review": "Separate second self-review; no independent reviewer",
+    "docker_integration_harness_executed": false,
+    "docker_integration_limitation": "Local Docker daemon unavailable; required quota and additive migration checks executed against isolated local PostgreSQL 17.6",
+    "application_deployed": false
   },
   "integration_fixes": [],
   "previous_deployment": {
@@ -567,6 +565,100 @@
           "reason": "Make the existing concurrent email-cache test double return a locked snapshot, matching Redis semantics."
         }
       ]
+    },
+    {
+      "previous_upstream_commit": "e2c9812190dd71bb309c8ad020a1211da1e0d3b4",
+      "upstream_commit": "530c5e3a4f9c73ca2b0881191d0ef8e0d82c5484",
+      "upstream_release": "v0.2.21",
+      "fork_before_merge": "f3b217911923de35658969994b1d0f44ad070c38",
+      "merge_commit": "539e4ba8b44eaf90ef29f30c0c51e86d23b3aba6",
+      "included_upstream_commits": 6,
+      "changed_files": 26,
+      "new_database_migrations": 0,
+      "record": "docs/engineering-upgrade/UPSTREAM-SYNC-2026-11-15.md",
+      "validation": {
+        "frontend_tests": 3267,
+        "frontend_files": 406,
+        "frontend_related_tests": 73,
+        "frontend_lint": true,
+        "frontend_types": true,
+        "frontend_i18n": true,
+        "frontend_build": true,
+        "quota_postgres_race_passed": 74,
+        "quota_postgres_race_skipped": 0,
+        "quota_postgres_race_failed": 0,
+        "targeted_unit_race_passed": 222,
+        "targeted_unit_race_skipped": 0,
+        "go_broad": {
+          "passed": 26999,
+          "skipped": 111,
+          "failed": 155,
+          "failure_roots": [
+            "github.com/Wei-Shaw/sub2api/ent/schema:TestAuthIdentityFoundationSchemas",
+            "github.com/Wei-Shaw/sub2api/internal/model:TestAllPlatformsIncludesEveryConcretePlatform",
+            "github.com/Wei-Shaw/sub2api/internal/pkg/sysutil:TestCgroupMemoryLimit",
+            "github.com/Wei-Shaw/sub2api/internal/repository:TestPgDumperHoldsMigrationLockThroughReaderClose",
+            "github.com/Wei-Shaw/sub2api/internal/repository:TestPgDumperReleasesMigrationLockWhenProcessFails",
+            "github.com/Wei-Shaw/sub2api/internal/repository:TestPgDumperReportsUnlockFailureAndDiscardsConnection",
+            "github.com/Wei-Shaw/sub2api/internal/service:TestCommandCodeGatewayPassesThroughCatalogProtocols",
+            "github.com/Wei-Shaw/sub2api/internal/service:TestCompositeGroupSchedulerHasAllCanonicalPlatformBuckets",
+            "github.com/Wei-Shaw/sub2api/internal/service:TestGatewayServiceRecordUsage_GeminiFlashThinkingTierUsesCatalogPrice",
+            "github.com/Wei-Shaw/sub2api/internal/service:TestGeminiNativeReasoningPricingUsesExplicitForwardedLevel",
+            "github.com/Wei-Shaw/sub2api/internal/service:TestMatchingPlatforms",
+            "github.com/Wei-Shaw/sub2api/internal/service:TestOllamaProbeCallback_StaleLongDoesNotOverrideNewShort",
+            "github.com/Wei-Shaw/sub2api/internal/service:TestOpenAIGatewayServiceRecordUsage_AggregatorClaudeUsesDefaultPricing",
+            "github.com/Wei-Shaw/sub2api/internal/service:TestOpenAIGatewayServiceRecordUsage_CNAndOpenCodeClaudeHonorExplicitPricing",
+            "github.com/Wei-Shaw/sub2api/internal/service:TestOpenAIWSPassthroughFirstTokenFollowsTTFTMode",
+            "github.com/Wei-Shaw/sub2api/internal/service:TestPlatformListDerivedListsMatchLegacy",
+            "github.com/Wei-Shaw/sub2api/internal/service:TestRecordUsage_ImageReasoningPricing",
+            "github.com/Wei-Shaw/sub2api/internal/service:TestRecordUsage_ReasoningPricingUsesForwardedEffort",
+            "github.com/Wei-Shaw/sub2api/internal/service:TestResolveContextPricingSchedule_Scenarios"
+          ],
+          "failed_packages": [
+            "github.com/Wei-Shaw/sub2api/ent/schema",
+            "github.com/Wei-Shaw/sub2api/internal/model",
+            "github.com/Wei-Shaw/sub2api/internal/pkg/sysutil",
+            "github.com/Wei-Shaw/sub2api/internal/repository",
+            "github.com/Wei-Shaw/sub2api/internal/service"
+          ],
+          "log": "go-check-1794731097812789300.log",
+          "log_sha256": "a69631d5e8eb4be1b10306d7ec0de0ffd2af87fe02019546c8e062103438228d",
+          "exit_code": 1,
+          "packages": [
+            "./..."
+          ],
+          "run": null,
+          "checked_at": "2026-11-15T08:32:44.478158+00:00",
+          "status": "failed"
+        },
+        "go_broad_all_passed": false,
+        "baseline_reproduced_failure_roots": 18,
+        "candidate_only_failure_roots": [
+          "github.com/Wei-Shaw/sub2api/internal/service:TestOpenAIWSPassthroughFirstTokenFollowsTTFTMode"
+        ],
+        "timing_recheck_passed": 5,
+        "vet": true,
+        "incremental_lint": "0 issues",
+        "browser_engines": [
+          "Chromium",
+          "WebKit"
+        ],
+        "artifact_browser_features": [
+          "guide",
+          "unified-coding",
+          "personal-quota"
+        ],
+        "independent_review": "Separate self-review; no independent reviewer",
+        "browser_real_api_mutations": 0,
+        "custom_blobs_outside_upstream_preserved": 474,
+        "tools_unit_passed": 96,
+        "tools_unit_opt_in_skipped": 2,
+        "tools_postgres_actual_passed": 2,
+        "tools_postgres_actual_skipped": 0,
+        "finalize_status": "passed",
+        "initial_finalize_failed": true,
+        "initial_finalize_failure_note": "URL DSN incompatible with test helper append; corrected to keyword DSN. Initial browser path guard error did not reproduce with absolute evidence path; exact origin remains unconfirmed."
+      }
     }
   ],
   "last_incident": {
