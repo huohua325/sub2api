@@ -254,15 +254,12 @@ func parseGlobalAILogs(body []byte) ([]globalAIConsumeLog, error) {
 }
 
 func recordedUpstreamRequestID(account *Account, headers http.Header, wsMode bool) *string {
-	if id := usageUpstreamRequestIDPtr(account, headers, wsMode); id != nil {
-		return id
-	}
 	if wsMode || !accountUsesGlobalAI(account) {
-		return nil
+		return usageUpstreamRequestIDPtr(account, headers, wsMode)
 	}
 	id := globalAIRequestID(headers)
 	if id == "" {
-		return nil
+		return usageUpstreamRequestIDPtr(account, headers, wsMode)
 	}
 	if len(id) > maxUsageUpstreamRequestIDLen {
 		id = id[:maxUsageUpstreamRequestIDLen]

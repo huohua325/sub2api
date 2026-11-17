@@ -91,9 +91,9 @@ func parseExperimentReconcile(reader io.Reader) (*experimentReconcileInput, erro
 		if row.Type != 2 {
 			return nil
 		}
-		request := row.UpstreamRequestID
+		request := row.RequestID
 		if request == "" {
-			request = row.RequestID
+			request = row.UpstreamRequestID
 		}
 		if account <= 0 || request == "" || len(request) > 256 || row.Quota < 0 {
 			return errors.New("invalid supplier consume record")

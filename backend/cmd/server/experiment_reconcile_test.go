@@ -78,6 +78,22 @@ func TestExperimentReconcileLegacyCapture(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestExperimentReconcileSupplierRequestIDPrecedesProviderHop(t *testing.T) {
+	input := experimentCLIInput(t, time.Now().UTC())
+	evidence := []byte(`{"schema":1,"provider":"globalai.vip","quota_per_yuan":500000,"logs":[{"account_id":8,"type":2,"request_id":"supplier-1","upstream_request_id":"another-provider-hop","quota":10247}]}`)
+	digest := sha256.Sum256(evidence)
+	input.EvidenceBase64, input.Plan.EvidenceSHA256 = base64.StdEncoding.EncodeToString(evidence), hex.EncodeToString(digest[:])
+	raw, err := json.Marshal(input)
+	require.NoError(t, err)
+	_, err = parseExperimentReconcile(bytes.NewReader(raw))
+	require.NoError(t, err)
+	input.Plan.Entries[0].UpstreamRequestID = "another-provider-hop"
+	raw, err = json.Marshal(input)
+	require.NoError(t, err)
+	_, err = parseExperimentReconcile(bytes.NewReader(raw))
+	require.Error(t, err)
+}
+
 func TestExperimentReconcileDatabaseIdentityPreflight(t *testing.T) {
 	for _, tc := range []struct {
 		name, upstream, state string

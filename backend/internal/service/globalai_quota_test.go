@@ -117,3 +117,14 @@ func TestFetchGlobalAILogsHTTP(t *testing.T) {
 		t.Fatalf("logs=%+v err=%v", logs, err)
 	}
 }
+
+func TestGlobalAIRecordsItsOwnRequestIDBeforeItsSuppliersID(t *testing.T) {
+	account := &Account{Credentials: map[string]any{"base_url": "https://globalai.vip/v1"}}
+	headers := http.Header{}
+	headers.Set(globalAIRequestIDHeader, "globalai-canonical")
+	headers.Set("X-Request-Id", "another-supplier-id")
+	id := recordedUpstreamRequestID(account, headers, false)
+	if id == nil || *id != "globalai-canonical" {
+		t.Fatalf("recorded the supplier's supplier ID instead of GlobalAI's canonical receipt: %v", id)
+	}
+}

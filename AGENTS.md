@@ -16,6 +16,7 @@
 - 不把生产事件写成每次启动执行的 SQL、种子数据或带固定日期的通用迁移。已有迁移文件保持不变；恢复数据库时必须保留后续事件和消耗。
 - 升级前后核对已确认事件的 ID、发生时间、状态及个人周期；同一周期内已耗尽用户不能仅因升级变成可用。真实周期边界、已审计的纠正或明确实施的容量折算造成的变化，须按对应业务事件解释和核对，不能伪装成部署重置。
 - 额度相关改动及升级需在隔离 PostgreSQL 配置 `SUB2API_QUOTA_TEST_DSN` 后运行 `go test -race ./internal/repository -run TestCodingQuotaDB -count=1`，确认测试实际执行，不能把缺少 DSN 的 skip 作为通过。
+- GlobalAI API 实验按供应商消费日志的 `request_id` 匹配本站保存的 `X-Oneapi-Request-Id`；供应商的 `upstream_request_id` 是另一层请求，不能混用。`experiment_quota_charges`、`experiment_quota_attempts` 和 `experiment_quota_settlement_events` 是持久计费数据，升级、重启、回退不得清空。未知金额不能视为免费，已发送请求不能因超时自动释放或重放；只有有证据的幂等结算才能补账。严格保护及恢复边界见 [实验费用对账](docs/engineering-upgrade/EXPERIMENT-ACCOUNTING-2026-11-18.md)。
 
 业务规则改变需要用户明确指示；合并上游、工具建议和版本默认值不能覆盖本项目已经确认的规则。
 
