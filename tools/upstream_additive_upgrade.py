@@ -104,6 +104,12 @@ COMMIT;"""
 
 
 class AdditiveRuntime(DockerRuntime):
+    def preflight(self):
+        result = super().preflight()
+        if self.access_snapshot()['ultrafast_enabled']:
+            raise DeliveryError('Reviewed baseline requires Ultra Fast disabled')
+        return result
+
     def access_snapshot(self):
         command = ['docker', 'exec', '-i', self.database, 'psql', '-X', '-qAt',
                    '-v', 'ON_ERROR_STOP=1', '-U', self.db_env['POSTGRES_USER'], '-d', self.db_env['POSTGRES_DB']]
