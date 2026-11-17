@@ -54,6 +54,21 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual((self.root / 'count').read_text(), '5')
         self.assertNotIn('MILE_TEST_VALUE', (self.out / 'manifest.json').read_text())
 
+    def test_tool_call_trace_id_does_not_repeat_verified_work(self):
+        env = {**os.environ, 'CODEX_TOOL_CALL_ID': 'first-trace', 'MILE_TEST_VALUE': 'one'}
+        first = self.runner(env=env).run('build', self.command(), ['source.txt'], artifacts=['artifact'])
+        env['CODEX_TOOL_CALL_ID'] = 'next-trace'
+        second = self.runner(env=env).run('build', self.command(), ['source.txt'], artifacts=['artifact'])
+        self.assertEqual((first['status'], second['status']), ('passed', 'reused'))
+        self.assertEqual((self.root / 'count').read_text(), '1')
+        env['MILE_TEST_VALUE'] = 'two'
+        third = self.runner(env=env).run('build', self.command(), ['source.txt'], artifacts=['artifact'])
+        self.assertEqual(third['status'], 'passed')
+        self.assertEqual((self.root / 'count').read_text(), '2')
+        manifest = (self.out / 'manifest.json').read_text()
+        self.assertNotIn('first-trace', manifest)
+        self.assertNotIn('next-trace', manifest)
+
     def test_failed_command_and_missing_artifact_never_cached(self):
         run = self.runner()
         for _ in range(2):

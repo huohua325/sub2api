@@ -27,7 +27,9 @@ class AdditiveUpgradeTests(unittest.TestCase):
 
     def test_reviewed_source_and_tool_only_descendants(self):
         root = Path(__file__).resolve().parents[2]
-        source = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=root, text=True).strip()
+        # This historical lane validates its reviewed merge, independently of
+        # later application development on the current branch.
+        source = subprocess.check_output(['git', 'rev-parse', upgrade.MERGE], cwd=root, text=True).strip()
         self.policy.validate_sources(root, upgrade.BASELINE, source)
         for base, tip in [('0' * 40, source), (upgrade.BASELINE, upgrade.PARENTS[0])]:
             with self.assertRaises(DeliveryError): self.policy.validate_sources(root, base, tip)

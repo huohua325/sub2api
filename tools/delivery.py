@@ -18,7 +18,7 @@ from delivery_core import DeliveryError, Runner, digest, exclusive, tree_hash, u
 ROOT = Path(__file__).resolve().parents[1]
 FRONTEND_INPUTS = ['frontend', 'tools/delivery.py', 'tools/delivery_core.py', 'tools/delivery_workflow.py', 'tools/review_guide.py',
                    'tools/review_guide.cjs', 'tools/browser_fixtures.cjs', 'AGENTS.md']
-FEATURE_REVIEWS = {'unified-coding': 'review_unified_coding', 'personal-quota': 'review_personal_quota'}
+FEATURE_REVIEWS = {'unified-coding': 'review_unified_coding', 'personal-quota': 'review_personal_quota', 'api-fallback': 'review_api_fallback'}
 
 
 def version(command):

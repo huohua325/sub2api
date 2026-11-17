@@ -139,13 +139,17 @@ class Runner:
         if not executable:
             raise DeliveryError('Executable not found: ' + argv[0])
         before = tree_hash(self.root, inputs, inputs=True)
+        # This tracing ID changes for every exec call, without changing a build.
+        # Keep the actual child environment intact and hash every other value.
+        cache_environment = {key: value for key, value in self.env.items() if key != 'CODEX_TOOL_CALL_ID'}
+        environment_hash = json_hash(cache_environment)
         identity = {'inputs': before, 'argv': argv, 'cwd': str(work), 'tools': self.tools,
-                    'executable': digest(executable), 'environment_hash': json_hash(self.env)}
+                    'executable': digest(executable), 'environment_hash': environment_hash}
         key = json_hash(identity)
         with self.lock:
             previous = next((s for s in reversed(self.manifest['steps']) if s['name'] == name), None)
         record = {'name': name, 'key': key, 'inputs': before, 'command': argv,
-                  'cwd': str(work), 'tools': self.tools, 'started_at': utcnow()}
+                  'cwd': str(work), 'tools': self.tools, 'environment_hash': environment_hash, 'started_at': utcnow()}
         if cache and previous and previous['status'] in ('passed', 'reused') and previous['key'] == key:
             try:
                 intact = tree_hash(self.root, artifacts) == previous['artifacts']

@@ -34,6 +34,13 @@
 
 ## v0.2.22 两迁移上游发布
 
+管理员 API 备用使用独立的 `api_fallback_upgrade.py` 契约；开发／验收见
+[管理员备用实现](../docs/engineering-upgrade/API-FALLBACK-ADMIN-2026-11-17.md)。
+该入口只接受固定基线、已审查应用树及两条备用迁移，最终准备须显式选择
+`--feature api-fallback --feature unified-coding --feature personal-quota`。
+初始发布保持所有备用策略关闭；已有任何付费尝试或固定扣点时阻止旧程序回退，绝不恢复旧数据库。
+不能复用下述旧上游契约放行新增计费迁移。
+
 `upstream_additive_upgrade.py` 单独固定已审查的双亲 merge、线上源基线及两条新增 SQL
 的文件／数据库校验和。旧无迁移、前端和个人重置通道守卫保持原样。
 先使用已有冻结前端证据执行 `delivery.py finalize --version <版本> --feature unified-coding
@@ -114,6 +121,10 @@ SSH 大文件传输丢包时，可用 `release_transfer.py --package <已校验�
    临时本机 SPA server 自动启动和关闭，Chromium/WebKit 验证 16 次导航、历史/深链接/刷新/焦点、375/768/1440px、复制。接口共用 mock fixtures，真实业务写入和推理请求被拦截。普通导航等待 DOM、字体和业务元素，并确认滚动稳定；尾部短章节检查标题实际可见。WebKit 新文档深链接及刷新会在 load 阶段完成原生 hash 恢复，仅这两处使用最多 15 秒的 load 等待，避免 DOM 阶段探测干扰原生滚动。首次需准备 Node、npx、`@playwright/cli` 和浏览器；工具使用 `npx --no-install`，缺失会失败，不会暗中安装新依赖。
 
 ## 结果复用与计时
+
+执行追踪变量 `CODEX_TOOL_CALL_ID` 每次工具调用都会变化，仅它不参与缓存指纹，实际子进程环境
+保持原样。其余环境变量、源码、依赖、命令和产物继续参与校验。2026-11-17 已通过两个不同
+工具调用标识复用同一检查的回归，避免追踪标识导致所有检查反复执行。
 
 同一个 `--output` 下保留历史 `manifest.json` 和每次原始日志。只有输入文件内容（含锁文件/配置）、完整参数、运行目录、环境摘要、工具版本、执行文件，以及产物/日志哈希都匹配，lint/tests/types/build 才会复用。新增/删除文件、产物损坏、执行失败、运行中编辑输入都会导致失效或失败。环境只存摘要，不把 DSN 和密钥写入 manifest；原始命令输出仍需按敏感证据管理，留在忽略的 output 内。
 
