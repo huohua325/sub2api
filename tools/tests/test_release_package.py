@@ -96,6 +96,49 @@ class PackageTests(unittest.TestCase):
             (self.out / 'finalize.json').write_text(json.dumps({'status': status}))
             with self.subTest(status=status), self.assertRaises(DeliveryError): self.package()
 
+    def test_experiment_lane_requires_its_actual_path_and_packages_pinned_policy(self):
+        import experiment_accounting_upgrade as upgrade
+        from delivery_core import tree_hash, write_json
+        from delivery_workflow import application_snapshot
+        baseline = self.commit
+        folder = self.root / 'backend/migrations'; folder.mkdir()
+        migrations = {}
+        for name in upgrade.MIGRATIONS:
+            target = folder / name; target.write_text('-- synthetic ' + name)
+            migrations[name] = digest(target)
+        self.git('add', 'backend')
+        self.git('-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'reviewed accounting')
+        source = self.git('rev-parse', 'HEAD')
+        features = ['api-fallback', 'unified-coding', 'personal-quota', 'experiment-accounting']
+        for feature in features:
+            script = 'review_' + feature.replace('-', '_') + '.cjs'
+            for name in (script, 'browser_fixtures.cjs'):
+                target = self.root / 'tools' / name; target.parent.mkdir(exist_ok=True); target.write_text('fixture')
+            result = self.out / feature / 'result.json'
+            write_json(result, dict(ok=True, engines={'chromium': {}, 'webkit': {}},
+                frontend_sha256=tree_hash(self.root, ['backend/internal/web/dist'])['backend/internal/web/dist'],
+                script_sha256=digest(self.root / 'tools' / script),
+                fixtures_sha256=digest(self.root / 'tools/browser_fixtures.cjs')))
+            self.runner.run('artifact-feature-' + feature, [sys.executable, '-c', 'print("verified")'],
+                            ['src.txt'], artifacts=[result.relative_to(self.root).as_posix()])
+        self.git('add', 'tools')
+        self.git('-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'review tools')
+        next(step for step in self.runner.manifest['steps'] if step['name'] == 'backend-build')['source_commit'] = source
+        write_json(self.out / 'manifest.json', self.runner.manifest)
+        with patch.multiple(upgrade, BASELINE=baseline, STANDBY_APPLICATION=baseline, APPLICATION=source,
+                            MIGRATIONS=migrations, DATABASE_MIGRATIONS=migrations):
+            contract = upgrade.contract_for_release()
+            final = dict(status='passed', version='test1', application=application_snapshot(self.root), features=features[:-1])
+            write_json(self.out / 'finalize.json', final)
+            args = [self.root, self.out, self.out / 'release', self.binary, 'test1', 'b' * 64, baseline]
+            with self.assertRaisesRegex(DeliveryError, 'all retained feature'):
+                package_release(*args, full_upload=True, upgrade_contract=contract)
+            final['features'] = features; write_json(self.out / 'finalize.json', final)
+            manifest = package_release(*args, full_upload=True, upgrade_contract=contract)
+            self.assertEqual(manifest['upgrade_contract'], contract)
+            for name in ('experiment_accounting_upgrade.py', 'api_fallback_upgrade.py', 'upstream_additive_upgrade.py'):
+                self.assertTrue((self.out / 'release' / name).is_file(), 'Missing server policy dependency: ' + name)
+
     def test_finalized_package_requires_the_selected_feature_evidence(self):
         from delivery_workflow import application_snapshot
         (self.out / 'finalize.json').write_text(json.dumps({'status': 'passed', 'version': 'test1',

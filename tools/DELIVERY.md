@@ -34,6 +34,21 @@
 
 ## v0.2.22 两迁移上游发布
 
+GlobalAI 实验计费修复使用独立的 `experiment_accounting_upgrade.py` 契约。它固定生产
+`33e5d3d99` 基线、审查后的完整应用 SHA 及 270/271/272 三条新增迁移的文件／数据库哈希；
+未冻结 `APPLICATION` 和哈希时拒绝打包或发布，不复用旧备用契约绕过源码检查。
+原前端内容与工具指纹一致时复用完整前端证据，仍须本轮成功执行 `finalize`，选择
+`--feature experiment-accounting --feature api-fallback --feature unified-coding --feature personal-quota`；
+实验场景核对已结算金额、待对账数量、对账暂停与真实耗尽的区别，以及 Codex/Grok 不受影响。
+失败的旧 finalize 不可沿用。
+
+该通道用同一只读 PostgreSQL MVCC 事务核对额度、实验收费、用量元数据、尝试及不可变结算
+事件。只允许新增事件逐请求解释 pending→settled、原零费用→已核实费用，以及同用户、原请求
+周期对应的钱包金额增量；原已结算金额、tokens、请求身份、周期、权限和其他审计仍须保留。
+重试次数与下次重试时间可以更新，不能借重试改写费用。存在任何新实验尝试／结算事件或备用
+付费尝试／固定扣点时，失败回退禁止换回不理解它们的旧程序，应保留兼容程序向前修复。
+API 备用仍保持全部关闭，Codex/Grok 仍为 shadow，不恢复旧数据库覆盖新消费。
+
 管理员 API 备用使用独立的 `api_fallback_upgrade.py` 契约；开发／验收见
 [管理员备用实现](../docs/engineering-upgrade/API-FALLBACK-ADMIN-2026-11-17.md)。
 该入口只接受固定基线、已审查应用树及两条备用迁移，最终准备须显式选择
