@@ -224,7 +224,8 @@ class DockerRuntime:
         if not (folder / 'database.dump').stat().st_size: raise DeliveryError('Empty database backup')
         with (folder / 'database.dump').open('rb') as src, (folder / 'database-contents.txt').open('wb') as out:
             self.command(['docker', 'exec', '-i', self.database, 'pg_restore', '--list'], stdin=src, stdout=out)
-        self.command(['tar', '-czf', str(folder / 'data.tar.gz'), 'data'])
+        # The live log directory can rotate during the backup; it contains no restore state.
+        self.command(['tar', '--exclude=data/logs', '-czf', str(folder / 'data.tar.gz'), 'data'])
     def compose(self):
         return ['docker', 'compose', '-f', str(self.frozen_file), '--project-name', self.project]
     def stop(self): self.command(self.compose() + ['stop', '-t', '120', self.app], timeout=150)

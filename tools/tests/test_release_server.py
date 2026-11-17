@@ -1,6 +1,8 @@
 import copy
 from pathlib import Path
+import shutil
 import sys
+import tarfile
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -189,6 +191,45 @@ class ReleaseServerTests(unittest.TestCase):
         with patch.object(runtime, 'command', side_effect=lambda argv, **kw: commands.append(argv)), patch('release_server.subprocess.check_output', return_value='sub2api changed\n'):
             with self.assertRaises(DeliveryError): runtime.backup(folder)
         self.assertEqual(commands, [], 'Invalid frozen configuration proceeded to backup commands')
+
+    @unittest.skipUnless(shutil.which('tar'), 'An archive command is required')
+    def test_backup_verifies_database_and_omits_only_runtime_logs(self):
+        from release_server import DockerRuntime
+        runtime = DockerRuntime.__new__(DockerRuntime)
+        runtime.root = self.root; runtime.database = 'test'
+        runtime.db_env = {'POSTGRES_USER': 'test', 'POSTGRES_DB': 'test'}
+        for name in ('docker-compose.yml', '.env'):
+            (self.root / name).write_text('original')
+        folder = self.root / 'backup'; folder.mkdir()
+        log = self.root / 'data/logs/sub2api.log'
+        business = self.root / 'data/uploads/logs/document.txt'
+        for path in (log, business):
+            path.parent.mkdir(parents=True)
+            path.write_bytes(b'fixture')
+        verified = False
+        run = runtime.command
+
+        def command(argv, **kwargs):
+            nonlocal verified
+            if 'pg_dump' in argv:
+                self.assertIn('-Fc', argv)
+                kwargs['stdout'].write(b'database dump')
+            elif 'pg_restore' in argv:
+                self.assertIn('--list', argv)
+                self.assertEqual(kwargs['stdin'].read(), b'database dump')
+                kwargs['stdout'].write(b'verified contents')
+                verified = True
+            else:
+                self.assertTrue(verified, 'Database archive verification must precede data archiving')
+                return run(argv, **kwargs)
+
+        with patch.object(runtime, 'verify_frozen_configuration'), patch.object(runtime, 'command', side_effect=command):
+            runtime.backup(folder)
+        self.assertEqual((folder / 'database-contents.txt').read_bytes(), b'verified contents')
+        with tarfile.open(folder / 'data.tar.gz') as archive:
+            self.assertIn('data/uploads/logs/document.txt', archive.getnames())
+            self.assertNotIn('data/logs/sub2api.log', archive.getnames())
+        self.assertEqual(log.read_bytes(), b'fixture')
 
 
 if __name__ == '__main__': unittest.main()
