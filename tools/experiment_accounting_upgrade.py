@@ -16,7 +16,7 @@ from release_server import assert_preserved, deploy, stage_release
 
 # Complete reviewed application; later tool/document commits may only retain its
 # exact frontend/backend tree. Program identity still comes from its real build.
-APPLICATION = '5e7a4cdecf77eec7b107771c63e203d7d92dc576'
+APPLICATION = '0c494bf9d55808d9b33882a8b3dd0b32ebcb9b3c'
 MIGRATIONS = {**STANDBY_MIGRATIONS,
               '272_experiment_accounting_guard.sql': 'd44ccb7429fed949416b4c1c2349b5e639a99f2a79060ba91c7228f45b6bbf54'}
 DATABASE_MIGRATIONS = {**STANDBY_DATABASE_MIGRATIONS,
