@@ -2587,7 +2587,7 @@ func (h *GatewayHandler) maybeLogCompatibilityFallbackMetrics(reqLog *zap.Logger
 }
 
 func (h *GatewayHandler) submitUsageRecordTask(parent context.Context, task service.UsageRecordTask) {
-	if service.CodingReservationFromContext(parent) != nil {
+	if service.CodingReservationFromContext(parent) != nil || service.HasExperimentAccounting(parent) {
 		runCodingUsageTask(parent, task)
 		return
 	}
@@ -2624,7 +2624,7 @@ func (h *GatewayHandler) submitUsageRecordTask(parent context.Context, task serv
 
 // submitMandatoryUsageRecordTask never silently drops billing work on pool overflow.
 func (h *GatewayHandler) submitMandatoryUsageRecordTask(parent context.Context, task service.UsageRecordTask) {
-	if service.CodingReservationFromContext(parent) != nil {
+	if service.CodingReservationFromContext(parent) != nil || service.HasExperimentAccounting(parent) {
 		runCodingUsageTask(parent, task)
 		return
 	}

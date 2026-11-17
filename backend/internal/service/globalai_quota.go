@@ -1,8 +1,8 @@
 // Experiment calls on a globalai.vip account are billed from GlobalAI's own
 // consume log. Do not price those calls from local cards, the USD catalog, or
 // a group rate. One yuan is 500000 quota points. Match the row by
-// X-Oneapi-Request-Id. If that row cannot be read, record zero instead of a
-// locally computed price. Codex and Grok Build (usage_kind coding) are unchanged.
+// X-Oneapi-Request-Id. Unreadable charges remain explicitly pending, and durable
+// admission prevents another unpriced send. Codex and Grok Build are unchanged.
 package service
 
 import (
@@ -30,10 +30,6 @@ const (
 // globalAILogFetch loads the recent consume logs for one GlobalAI API key.
 // Tests replace it. Production calls GlobalAI's token log API.
 var globalAILogFetch = fetchGlobalAILogsHTTP
-
-// globalAIRetryWait pauses between log lookups. The consume row is written
-// as the upstream response finishes, so the first read usually hits.
-var globalAIRetryWait = []time.Duration{0, 150 * time.Millisecond, 300 * time.Millisecond, 600 * time.Millisecond}
 
 type globalAIConsumeLog struct {
 	Type             int    `json:"type"`
@@ -191,32 +187,17 @@ func lookupGlobalAIQuota(ctx context.Context, account *Account, requestID string
 	lookupCtx, cancel := context.WithTimeout(lookupCtx, 4*time.Second)
 	defer cancel()
 
-	var lastErr error
-	for i, wait := range globalAIRetryWait {
-		if wait > 0 {
-			timer := time.NewTimer(wait)
-			select {
-			case <-lookupCtx.Done():
-				timer.Stop()
-				return 0, false, lookupCtx.Err()
-			case <-timer.C:
-			}
-		}
-		logs, err := globalAILogFetch(lookupCtx, apiKey, logURL)
-		if err != nil {
-			lastErr = err
-			slog.Warn("globalai_quota.fetch_failed", "attempt", i+1, "error", err.Error())
-			continue
-		}
-		if log, ok := matchGlobalAIConsumeLog(logs, requestID); ok {
-			return log.Quota, true, nil
-		}
-		lastErr = fmt.Errorf("consume log %s was not in the recent GlobalAI logs", requestID)
+	logs, err := globalAILogs.load(lookupCtx, apiKey, logURL)
+	if err != nil {
+		return 0, false, err
 	}
-	if lastErr == nil {
-		lastErr = fmt.Errorf("consume log %s was not in the recent GlobalAI logs", requestID)
+	if log, ok := matchGlobalAIConsumeLog(logs, requestID); ok {
+		if log.Quota < 0 {
+			return 0, false, fmt.Errorf("GlobalAI consume log has a negative quota")
+		}
+		return log.Quota, true, nil
 	}
-	return 0, false, lastErr
+	return 0, false, fmt.Errorf("consume log %s was not in the recent GlobalAI logs", requestID)
 }
 
 func fetchGlobalAILogsHTTP(ctx context.Context, apiKey, logURL string) ([]globalAIConsumeLog, error) {
@@ -237,7 +218,7 @@ func fetchGlobalAILogsHTTP(ctx context.Context, apiKey, logURL string) ([]global
 		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("globalai log api returned %d", resp.StatusCode)
+		return nil, &globalAILogHTTPError{status: resp.StatusCode, retryAfter: globalAIRetryAfter(resp.Header.Get("Retry-After"), time.Now())}
 	}
 	return parseGlobalAILogs(body)
 }
@@ -255,6 +236,19 @@ func parseGlobalAILogs(body []byte) ([]globalAIConsumeLog, error) {
 	var logs []globalAIConsumeLog
 	if err := json.Unmarshal(wrapped.Data, &logs); err != nil {
 		return nil, err
+	}
+	seen := make(map[string]int, len(logs))
+	for _, row := range logs {
+		if row.Type != 0 && row.Type != globalAIConsumeLogType {
+			continue
+		}
+		if row.Quota < 0 {
+			return nil, fmt.Errorf("GlobalAI consume log has a negative quota")
+		}
+		if old, ok := seen[row.RequestID]; row.RequestID != "" && ok && old != row.Quota {
+			return nil, fmt.Errorf("GlobalAI returned conflicting consume-log amounts")
+		}
+		seen[row.RequestID] = row.Quota
 	}
 	return logs, nil
 }

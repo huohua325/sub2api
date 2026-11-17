@@ -27,6 +27,23 @@ function mountRuler(allowances: PurposeAllowanceItem[] | null, extra: { loading?
 }
 
 describe('StudentQuotaRuler', () => {
+  it('separates settled experiment money from unknown charges and quota exhaustion', () => {
+    const wrapper = mountRuler([
+      { purpose: 'openai', display_percent: 30, blocked: false, data_status: 'current' },
+      { purpose: 'experiment', display_percent: 30, used_amount: 150.45967, limit_amount: 500,
+        blocked: true, blocked_reason: 'EXPERIMENT_ACCOUNTING_PENDING', pending_requests: 12909, data_status: 'pending' },
+    ])
+    const card = wrapper.get('[data-testid="experiment-purpose-card"]')
+    expect(card.text()).toContain('150.46 / 500')
+    expect(card.text()).toContain('dashboard.ruler.settledLabel')
+    expect(card.text()).toContain('dashboard.ruler.pendingCount:{"count":12909}')
+    expect(card.text()).toContain('dashboard.ruler.accountingPaused')
+    expect(card.text()).toContain('dashboard.ruler.accountingBlockedHint')
+    expect(card.text()).not.toContain('dashboard.ruler.exhausted')
+    expect(card.text()).not.toContain('dashboard.ruler.ready')
+    expect(wrapper.get('[data-testid="openai-purpose-card"]').text()).toContain('dashboard.ruler.ready')
+    wrapper.unmount()
+  })
  it.each(['processing','settling','busy','verifying','unavailable'])('shows %s without points or false exhaustion', (activity_status) => {
   const wrapper=mountRuler([{purpose:'openai',display_percent:100,blocked:false,point_used:'7.12345678',activity_status} as PurposeAllowanceItem])
   const card=wrapper.get('[data-testid="openai-purpose-card"]')

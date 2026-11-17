@@ -235,6 +235,18 @@ func (s *BatchImagePublicService) Submit(ctx context.Context, owner BatchImageOw
 	if err != nil {
 		return nil, err
 	}
+	if accountUsesGlobalAI(account) && owner.GroupID != nil && *owner.GroupID > 0 {
+		if s.GroupRepo == nil {
+			return nil, ErrExperimentAccountingUnavailable
+		}
+		group, groupErr := s.GroupRepo.GetByIDLite(ctx, *owner.GroupID)
+		if groupErr != nil {
+			return nil, groupErr
+		}
+		if err := ValidateGlobalAIExperimentProtocol(ctx, nil, account, group, "batch"); err != nil {
+			return nil, err
+		}
+	}
 	pricingSnapshot, err := s.resolvePricingSnapshot(ctx, owner, normalized, provider.Name(), account)
 	if err != nil {
 		return nil, err

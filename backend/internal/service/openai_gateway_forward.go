@@ -237,6 +237,9 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 		c.Set("openai_ws_transport_reason", wsDecision.Reason)
 	}
 	if wsDecision.Transport == OpenAIUpstreamTransportResponsesWebsocketV2 {
+		if err := ValidateGlobalAIExperimentProtocol(ctx, c, account, experimentAPIKeyGroup(c), "websocket"); err != nil {
+			return nil, err
+		}
 		logOpenAIWSModeDebug(
 			"selected account_id=%d account_type=%s transport=%s reason=%s model=%s stream=%v",
 			account.ID,

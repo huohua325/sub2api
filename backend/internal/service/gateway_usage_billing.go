@@ -223,6 +223,9 @@ func resolveUsageBillingRequestID(ctx context.Context, upstreamRequestID string)
 			return requestID
 		}
 	}
+	if HasExperimentAccounting(ctx) {
+		return experimentRequestFromContext(ctx).input.RequestID
+	}
 	if ctx != nil {
 		if clientRequestID, _ := ctx.Value(ctxkey.ClientRequestID).(string); strings.TrimSpace(clientRequestID) != "" {
 			return "client:" + strings.TrimSpace(clientRequestID)

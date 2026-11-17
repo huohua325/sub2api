@@ -115,6 +115,9 @@ func isClientCanceledTransportError(ctx context.Context, err error) bool {
 //
 // passthrough tags the Ops error event for the OpenAI passthrough forward path.
 func (s *OpenAIGatewayService) handleOpenAIUpstreamTransportError(ctx context.Context, c *gin.Context, account *Account, err error, passthrough bool) error {
+	if IsExperimentAccountingError(err) || HasExperimentAccounting(ctx) {
+		return err
+	}
 	// A local quota-store failure is not an upstream/account failure.
 	if errors.Is(err, ErrCodingQuotaUnavailable) {
 		if c != nil && !c.Writer.Written() {

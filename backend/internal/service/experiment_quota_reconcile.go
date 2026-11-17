@@ -2,7 +2,13 @@ package service
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"net/http"
+	"strings"
 	"time"
 )
 
@@ -46,23 +52,72 @@ func (s *OfficialPointService) reconcileExperiment(ctx context.Context) error {
 			return ctx.Err()
 		}
 		account, lookupErr := s.grok.accountRepo.GetByID(ctx, item.AccountID)
-		var quota int
-		var found bool
+		var logs []globalAIConsumeLog
 		if lookupErr == nil {
-			quota, found, lookupErr = lookupGlobalAIQuota(ctx, account, item.UpstreamRequestID)
-		}
-		if lookupErr == nil && found {
-			if err := store.CompleteExperimentCharge(ctx, item.ID, globalAIYuan(quota)); err != nil {
-				return err
+			origin, key := globalAIOrigin(account), strings.TrimSpace(account.GetCredential("api_key"))
+			if origin == "" || key == "" {
+				lookupErr = fmt.Errorf("GlobalAI accounting identity is unavailable")
+			} else {
+				logs, lookupErr = globalAILogs.load(ctx, key, origin+globalAILogPath)
 			}
+		}
+		triggerSettled := false
+		if lookupErr == nil {
+			matches := []PendingExperimentCharge{item}
+			if matcher, ok := s.store.(ExperimentRecentChargeMatcher); ok {
+				ids := make([]string, 0, len(logs))
+				for _, row := range logs {
+					if row.RequestID != "" && (row.Type == 0 || row.Type == globalAIConsumeLogType) {
+						ids = append(ids, row.RequestID)
+					}
+				}
+				matches, err = matcher.MatchPendingExperimentCharges(ctx, item.AccountID, ids)
+				if err != nil {
+					return err
+				}
+			}
+			for _, pending := range matches {
+				row, found := matchGlobalAIConsumeLog(logs, pending.UpstreamRequestID)
+				if !found || row.Quota < 0 {
+					continue
+				}
+				if evidenceStore, ok := s.store.(ExperimentEvidenceReconciler); ok {
+					encoded, encodeErr := json.Marshal(row)
+					if encodeErr != nil {
+						return encodeErr
+					}
+					digest := sha256.Sum256(encoded)
+					evidence := ExperimentChargeEvidence{Source: "globalai_consume_log", SHA256: hex.EncodeToString(digest[:]), AccountID: pending.AccountID, UpstreamRequestID: pending.UpstreamRequestID}
+					err = evidenceStore.CompleteExperimentChargeWithEvidence(ctx, pending.ID, globalAIYuan(row.Quota), evidence)
+				} else {
+					err = store.CompleteExperimentCharge(ctx, pending.ID, globalAIYuan(row.Quota))
+				}
+				if err != nil {
+					return err
+				}
+				triggerSettled = triggerSettled || pending.ID == item.ID
+			}
+		}
+		if triggerSettled {
 			continue
 		}
 		reason := "upstream consume log not available"
 		if lookupErr != nil {
 			reason = fmt.Sprintf("%v", lookupErr)
 		}
-		delay := time.Minute * time.Duration(1<<min(item.Attempts, 6))
-		if err := store.RetryExperimentCharge(ctx, item.ID, reason, time.Now().Add(delay)); err != nil {
+		next := time.Now().Add(time.Minute * time.Duration(1<<min(item.Attempts, 6)))
+		var deferred *globalAILogDeferred
+		var failed *globalAILogHTTPError
+		if errors.As(lookupErr, &deferred) {
+			next = deferred.until
+		} else if errors.As(lookupErr, &failed) && failed.status == http.StatusTooManyRequests {
+			delay := 5 * time.Minute
+			if failed.retryAfter > delay {
+				delay = failed.retryAfter
+			}
+			next = time.Now().Add(delay)
+		}
+		if err := store.RetryExperimentCharge(ctx, item.ID, reason, next); err != nil {
 			return err
 		}
 	}
@@ -79,4 +134,17 @@ func (s *OfficialPointService) ExperimentState(ctx context.Context, user int64, 
 		return "current", nil
 	}
 	return store.ExperimentQuotaState(ctx, user, now)
+}
+
+// ExperimentAccountingStatus reads unknown charges and in-flight attempts
+// without querying the supplier or describing unknown amounts as available.
+func (s *OfficialPointService) ExperimentAccountingStatus(ctx context.Context, user int64, now time.Time) (ExperimentAccountingStatus, error) {
+	if s == nil {
+		return ExperimentAccountingStatus{}, ErrExperimentAccountingUnavailable
+	}
+	reader, ok := s.store.(ExperimentAccountingStatusReader)
+	if !ok {
+		return ExperimentAccountingStatus{}, ErrExperimentAccountingUnavailable
+	}
+	return reader.ReadExperimentAccountingStatus(ctx, user, now)
 }

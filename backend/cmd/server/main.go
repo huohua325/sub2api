@@ -55,6 +55,9 @@ func init() {
 // initLogger configures the default slog handler based on gin.Mode().
 // In non-release mode, Debug level logs are enabled.
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "reconcile-experiment" {
+		os.Exit(runExperimentReconcile(os.Args[2:]))
+	}
 	logger.InitBootstrap()
 	defer logger.Sync()
 

@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 )
 
 func TestGlobalAIYuanUsesQuotaPerUnit(t *testing.T) {
@@ -43,12 +42,12 @@ func TestParseGlobalAILogs(t *testing.T) {
 
 func TestApplyGlobalAIExperimentChargeReplacesLocalPrice(t *testing.T) {
 	orig := globalAILogFetch
-	origWait := globalAIRetryWait
+	origCache := globalAILogs
 	t.Cleanup(func() {
 		globalAILogFetch = orig
-		globalAIRetryWait = origWait
+		globalAILogs = origCache
 	})
-	globalAIRetryWait = []time.Duration{0}
+	globalAILogs = newGlobalAILogCoordinator()
 	globalAILogFetch = func(context.Context, string, string) ([]globalAIConsumeLog, error) {
 		return []globalAIConsumeLog{{Type: 2, Quota: 10247, RequestID: "req-1"}}, nil
 	}
@@ -81,12 +80,12 @@ func TestApplyGlobalAIExperimentChargeLeavesCodingGroups(t *testing.T) {
 
 func TestApplyGlobalAIExperimentChargeZerosWhenLogIsMissing(t *testing.T) {
 	orig := globalAILogFetch
-	origWait := globalAIRetryWait
+	origCache := globalAILogs
 	t.Cleanup(func() {
 		globalAILogFetch = orig
-		globalAIRetryWait = origWait
+		globalAILogs = origCache
 	})
-	globalAIRetryWait = []time.Duration{0}
+	globalAILogs = newGlobalAILogCoordinator()
 	globalAILogFetch = func(context.Context, string, string) ([]globalAIConsumeLog, error) {
 		return nil, errors.New("upstream down")
 	}

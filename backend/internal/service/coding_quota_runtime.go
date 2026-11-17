@@ -124,8 +124,34 @@ func (s *OfficialPointService) Start(ctx context.Context) {
 	workerCtx, cancel := context.WithCancel(ctx)
 	s.workerCancel = cancel
 	s.workerDone = make(chan struct{})
+	experimentDone := make(chan struct{})
+	go func() {
+		defer close(experimentDone)
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
+		for {
+			cycleCtx, cycleCancel := context.WithTimeout(workerCtx, 30*time.Second)
+			if recovery, ok := s.store.(interface {
+				RecoverExperimentUnsentRequests(context.Context, time.Time) (int64, error)
+			}); ok {
+				if _, err := recovery.RecoverExperimentUnsentRequests(cycleCtx, time.Now().UTC().Add(-5*time.Minute)); err != nil {
+					slog.Error("experiment_unsent_recovery_failed", "error", err)
+				}
+			}
+			if err := s.reconcileExperiment(cycleCtx); err != nil && workerCtx.Err() == nil {
+				slog.Warn("experiment_quota_reconcile_failed", "error", err)
+			}
+			cycleCancel()
+			select {
+			case <-workerCtx.Done():
+				return
+			case <-ticker.C:
+			}
+		}
+	}()
 	go func() {
 		defer close(s.workerDone)
+		defer func() { <-experimentDone }()
 		ticker := time.NewTicker(10 * time.Second)
 		defer ticker.Stop()
 		for {
@@ -224,7 +250,7 @@ func (s *OfficialPointService) reconcileLedger(ctx context.Context, ledger Codin
 	if err := ledger.ReconcileCodingQuota(ctx, now.Add(-30*time.Second)); err != nil {
 		return err
 	}
-	return s.reconcileExperiment(ctx)
+	return nil
 }
 
 // SetCodexQuota enables a read-only billing endpoint for idle/exhausted pools.

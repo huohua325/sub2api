@@ -137,6 +137,19 @@ func (h *UserHandler) GetMyPlatformQuotas(c *gin.Context) {
 					if stateErr != nil {
 						item["blocked"] = true
 					}
+					status, statusErr := h.officialPoints.ExperimentAccountingStatus(c.Request.Context(), subject.UserID, nowUsage)
+					if statusErr != nil {
+						item["data_status"], item["blocked"] = "error", true
+					} else {
+						pending := status.PendingRequests + status.UnresolvedRequests + status.InFlightRequests
+						item["pending_requests"] = pending
+						if status.UpdatedAt != nil {
+							item["updated_at"] = status.UpdatedAt
+						}
+						if pending > 0 {
+							item["data_status"], item["blocked"], item["blocked_reason"] = "pending", true, "EXPERIMENT_ACCOUNTING_PENDING"
+						}
+					}
 				}
 				item["reset_scope"] = service.AllowancePeriod(row.Purpose, row.Period)
 				if !resetsAt.IsZero() {

@@ -272,7 +272,7 @@ func newAsyncImageContext(c *gin.Context, body []byte, timeoutDuration time.Dura
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	base := context.WithoutCancel(retained)
+	base := service.WithExperimentDeferredProtocol(context.WithoutCancel(retained), "asynchronous-image")
 	executionCtx, cancelExecution := context.WithTimeout(base, timeoutDuration)
 	cancel := func() {
 		cancelExecution()

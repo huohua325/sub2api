@@ -176,6 +176,12 @@ func (s *OpenAIGatewayService) CreateLiveCall(
 		}
 
 		account := selection.Account
+		if err := ValidateGlobalAIExperimentProtocol(ctx, nil, account, experimentContextGroup(ctx), "live-webrtc"); err != nil {
+			if selection.ReleaseFunc != nil {
+				selection.ReleaseFunc()
+			}
+			return nil, err
+		}
 		leaseID := generateRequestID()
 		acquired, acquireErr := liveCache.AcquireLiveLease(
 			ctx,

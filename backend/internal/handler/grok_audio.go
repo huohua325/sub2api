@@ -87,6 +87,12 @@ func (h *OpenAIGatewayHandler) GrokRealtime(c *gin.Context) {
 		}
 		candidateSeen = true
 		account := candidate.Account
+		if err := service.ValidateGlobalAIExperimentProtocol(c.Request.Context(), c, account, apiKey.Group, "realtime-websocket"); err != nil {
+			if candidate.Acquired && candidate.ReleaseFunc != nil {
+				candidate.ReleaseFunc()
+			}
+			return
+		}
 		var streamStarted bool
 		var slotStatus openAISlotAcquireResult
 		release, slotStatus = h.acquireResponsesAccountSlot(c, apiKey.GroupID, "", candidate, false, &streamStarted, reqLog)

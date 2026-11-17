@@ -155,6 +155,7 @@ func (s *GatewayService) PrepareCodingRequest(ctx context.Context, c *gin.Contex
 }
 
 func FinishCodingRequest(c *gin.Context) {
+	finishExperimentRequest(c)
 	if c == nil {
 		return
 	}

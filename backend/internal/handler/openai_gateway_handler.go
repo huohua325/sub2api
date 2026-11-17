@@ -262,7 +262,7 @@ func usageRecordContext(parent context.Context, base context.Context) context.Co
 	if hold := service.CodingReservationFromContext(parent); hold != nil {
 		base = service.WithCodingReservation(base, hold)
 	}
-	return base
+	return service.CarryExperimentAccounting(parent, base)
 }
 
 // wrapUsageRecordTaskContext 包装计费任务：复制请求级 context 值，并接管请求的在途余额预留引用。
@@ -3540,7 +3540,7 @@ func getContextInt64(c *gin.Context, key string) (int64, bool) {
 }
 
 func (h *OpenAIGatewayHandler) submitUsageRecordTask(parent context.Context, task service.UsageRecordTask) {
-	if service.CodingReservationFromContext(parent) != nil {
+	if service.CodingReservationFromContext(parent) != nil || service.HasExperimentAccounting(parent) {
 		runCodingUsageTask(parent, task)
 		return
 	}
@@ -3589,7 +3589,7 @@ func (h *OpenAIGatewayHandler) submitOpenAIUsageRecordTask(parent context.Contex
 }
 
 func (h *OpenAIGatewayHandler) submitMandatoryUsageRecordTask(parent context.Context, task service.UsageRecordTask) {
-	if service.CodingReservationFromContext(parent) != nil {
+	if service.CodingReservationFromContext(parent) != nil || service.HasExperimentAccounting(parent) {
 		runCodingUsageTask(parent, task)
 		return
 	}

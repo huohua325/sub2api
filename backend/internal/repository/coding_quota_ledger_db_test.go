@@ -81,6 +81,9 @@ func quotaTestDB(t *testing.T, seed string) (*sql.DB, *UsageMonitorRepository, t
 	fallback, err := migrations.FS.ReadFile("270_api_fallback_metering.sql")
 	require.NoError(t, err)
 	require.NoError(t, applyMigrationsFS(context.Background(), db, fstest.MapFS{"270_api_fallback_metering.sql": &fstest.MapFile{Data: fallback}}))
+	experimentGuard, err := migrations.FS.ReadFile("272_experiment_accounting_guard.sql")
+	require.NoError(t, err)
+	require.NoError(t, applyMigrationsFS(context.Background(), db, fstest.MapFS{"272_experiment_accounting_guard.sql": &fstest.MapFile{Data: experimentGuard}}))
 	var base time.Time
 	require.NoError(t, db.QueryRow(`SELECT window_start FROM user_purpose_allowances WHERE user_id=1 AND purpose='openai'`).Scan(&base))
 	return db, NewUsageMonitorRepository(db), base
@@ -421,6 +424,9 @@ func TestCodingQuotaDBExperimentDelayedChargeAndClosedMonth(t *testing.T) {
 	require.Equal(t, "pending", state)
 	items, err := r.ListPendingExperimentCharges(ctx, quotaDBNow(t, db))
 	require.NoError(t, err)
+	require.Len(t, items, 1, "the scheduler selects one trigger per upstream account")
+	items, err = r.MatchPendingExperimentCharges(ctx, 10, []string{"late-current", "late-previous"})
+	require.NoError(t, err)
 	require.Len(t, items, 2)
 	for _, item := range items {
 		require.NoError(t, r.CompleteExperimentCharge(ctx, item.ID, 4.73))
@@ -458,7 +464,7 @@ func TestCodingQuotaDBDeferredKeyCountersKeepClosedWindows(t *testing.T) {
 		_, err = repo.Apply(context.Background(), &service.UsageBillingCommand{RequestID: tc.id, APIKeyID: 1, UserID: 1, AccountID: 10, Purpose: "experiment", StartedAt: tc.at, ExperimentPending: true, ExperimentUpstreamRequestID: tc.id, ExperimentEffects: &service.ExperimentBillingEffects{KeyQuota: true, KeyRateLimits: true, SubscriptionID: &subscriptionID, AccountQuota: true, AccountMultiplier: 1.5}})
 		require.NoError(t, err)
 	}
-	items, err := r.ListPendingExperimentCharges(context.Background(), quotaDBNow(t, db))
+	items, err := r.MatchPendingExperimentCharges(context.Background(), 10, []string{"open", "closed"})
 	require.NoError(t, err)
 	for _, item := range items {
 		require.NoError(t, r.CompleteExperimentCharge(context.Background(), item.ID, 2))
