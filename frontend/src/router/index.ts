@@ -686,6 +686,17 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/admin/api-fallback',
+    name: 'AdminAPIFallback',
+    component: () => import('@/views/admin/APIFallbackView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'API backup',
+      titleKey: 'admin.apiFallback.title'
+    }
+  },
+  {
     path: '/admin/usage-monitor',
     name: 'AdminUsageMonitor',
     component: () => import('@/views/admin/UsageMonitorView.vue'),

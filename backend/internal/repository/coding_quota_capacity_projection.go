@@ -23,12 +23,19 @@ func codingCapacityFactorSQL(account, purpose, basis string) string {
  WHERE f.account_id=%s AND f.purpose=%s AND f.effective_at>%s ORDER BY f.effective_at LIMIT 1),1)`, account, purpose, basis)
 }
 
+// API fallback points were fixed at their approved price version. A later
+// subscription capacity event must never revalue those already settled points.
+func codingRequestCapacityFactorSQL(alias string) string {
+	return fmt.Sprintf(`CASE WHEN %s.metering_source='api_fallback' THEN 1 ELSE %s END`, alias,
+		codingCapacityFactorSQL(alias+".account_id", alias+".purpose", alias+".started_at"))
+}
+
 // Re-estimate unresolved history only with evidence from the same official
 // window and capacity stage. The unknown state and original estimate stay intact.
 // A different/absent window, missing rate or later meter cannot manufacture an
 // exact charge or silently turn an unknown request into a free settled request.
 func codingProjectedEstimateSQL(asOf string) string {
-	return fmt.Sprintf(`CASE WHEN q.state='unmetered' AND q.weight>0 THEN COALESCE(
+	return fmt.Sprintf(`CASE WHEN q.metering_source='subscription' AND q.state='unmetered' AND q.weight>0 THEN COALESCE(
  (SELECT CASE WHEN f.previous_rate>0
   AND q.official_window_end BETWEEN f.window_end-INTERVAL '5 minutes' AND f.window_end+INTERVAL '5 minutes'
   THEN q.weight*f.previous_rate END FROM capacity_factors f

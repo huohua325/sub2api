@@ -8,6 +8,7 @@ import audit from './audit'
 import promptAudit from './promptAudit'
 import plugins from './plugins'
 import usageMonitor from './usageMonitor'
+import apiFallback from './apiFallback'
 
 export default {
   ...overview,
@@ -20,4 +21,5 @@ export default {
   ...promptAudit,
   ...plugins,
   ...usageMonitor,
+  ...apiFallback,
 }

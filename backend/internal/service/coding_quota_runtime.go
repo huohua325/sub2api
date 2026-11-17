@@ -130,6 +130,16 @@ func (s *OfficialPointService) Start(ctx context.Context) {
 		defer ticker.Stop()
 		for {
 			cycleCtx, cycleCancel := context.WithTimeout(workerCtx, 30*time.Second)
+			if store, ok := s.store.(interface {
+				RecoverAPIFallback(context.Context, time.Time) error
+			}); ok {
+				// Paid forwarding has a five-minute deadline. A process crash
+				// cannot prove that a stale attempt was never sent, so recovery
+				// retains its spend/point occupancy for explicit reconciliation.
+				if err := store.RecoverAPIFallback(cycleCtx, time.Now().UTC().Add(-10*time.Minute)); err != nil {
+					slog.Error("api_fallback_recovery_failed", "error", err)
+				}
+			}
 			if store, ok := s.store.(CodingBillingStore); ok {
 				if err := store.RecoverCodingReservations(cycleCtx, time.Now().UTC()); err != nil {
 					slog.Error("coding_reservation_recovery_failed", "error", err)

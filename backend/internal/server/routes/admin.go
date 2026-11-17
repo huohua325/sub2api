@@ -712,6 +712,13 @@ func registerSubscriptionRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 }
 
 func registerUsageRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	// Spending controls have an explicit role gate in addition to admin auth.
+	fallback := admin.Group("/api-fallback", middleware.AdminOnly())
+	fallback.GET("", h.Admin.UsageMonitor.GetAPIFallback)
+	fallback.POST("/policies", h.Admin.UsageMonitor.SaveAPIFallbackPolicy)
+	fallback.POST("/policies/:id/disable", h.Admin.UsageMonitor.DisableAPIFallbackPolicy)
+	fallback.POST("/policies/:id/preview", h.Admin.UsageMonitor.PreviewAPIFallback)
+	fallback.POST("/attempts/:id/resolve", h.Admin.UsageMonitor.ResolveAPIFallback)
 	admin.GET("/usage-monitor", h.Admin.UsageMonitor.Get)
 	admin.GET("/usage-monitor/requests", h.Admin.UsageMonitor.ListCodingReservations)
 	admin.POST("/usage-monitor/adjustments", h.Admin.UsageMonitor.Adjust)

@@ -235,9 +235,10 @@ type UsageMonitorStore interface {
 
 // UsageMonitorService builds the admin read model from stamped usage and wallets.
 type UsageMonitorService struct {
-	store  UsageMonitorStore
-	now    func() time.Time
-	points *OfficialPointService
+	store              UsageMonitorStore
+	now                func() time.Time
+	points             *OfficialPointService
+	apiFallbackPreview func(context.Context, *APIFallbackPolicy) (*APIFallbackPreview, error)
 }
 
 func (s *UsageMonitorService) SetOfficialPoints(points *OfficialPointService) {

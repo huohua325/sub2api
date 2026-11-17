@@ -98,7 +98,7 @@ func (r *UsageMonitorRepository) ConfirmCodingCapacityChange(ctx context.Context
 	}
 	if n > 0 {
 		_, err = tx.ExecContext(ctx, `UPDATE coding_quota_requests SET state='unmetered',updated_at=NOW()
- WHERE account_id=$1 AND purpose=$2 AND state='pending' AND started_at<$3`, change.AccountID, change.Purpose, change.EffectiveAt.UTC())
+ WHERE account_id=$1 AND purpose=$2 AND metering_source='subscription' AND state='pending' AND started_at<$3`, change.AccountID, change.Purpose, change.EffectiveAt.UTC())
 		if err != nil {
 			return err
 		}

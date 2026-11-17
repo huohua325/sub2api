@@ -30,7 +30,7 @@ func readCodingQuotas(ctx context.Context, db codingQuotaQueryer, users []int64,
 }
 
 func readCodingQuotasAt(ctx context.Context, db codingQuotaQueryer, users []int64, periodAt, capacityAt time.Time) ([]service.CodingQuotaReading, error) {
-	factor := codingCapacityFactorSQL("q.account_id", "q.purpose", "q.started_at")
+	factor := codingRequestCapacityFactorSQL("q")
 	rows, err := db.QueryContext(ctx, `
 WITH RECURSIVE `+codingCapacityCTE("$3::timestamptz")+`, anchors AS (
  SELECT u.id,p.purpose,GREATEST(COALESCE(a.window_start,u.created_at),
@@ -244,7 +244,7 @@ func (r *UsageMonitorRepository) reconcileCodingObservation(ctx context.Context,
 			return err
 		}
 		// No trustworthy pre-request baseline: retain an explicit unresolved entry.
-		_, err = tx.ExecContext(ctx, `UPDATE coding_quota_requests SET state='unmetered',updated_at=NOW() WHERE account_id=$1 AND state='pending' AND completed_at<=$2`, v.AccountID, v.ObservedAt)
+		_, err = tx.ExecContext(ctx, `UPDATE coding_quota_requests SET state='unmetered',updated_at=NOW() WHERE account_id=$1 AND metering_source='subscription' AND state='pending' AND completed_at<=$2`, v.AccountID, v.ObservedAt)
 	case err != nil:
 		return err
 	case !v.ObservedAt.After(m.ObservedAt): // stale/replayed snapshots cannot move the cursor backwards.
@@ -293,7 +293,7 @@ func (r *UsageMonitorRepository) reconcileCodingObservation(ctx context.Context,
 			if err != nil {
 				return err
 			}
-			_, err = tx.ExecContext(ctx, `UPDATE coding_quota_requests SET state='unmetered',updated_at=NOW() WHERE account_id=$1 AND state='pending' AND completed_at<=$2`, v.AccountID, v.ObservedAt)
+			_, err = tx.ExecContext(ctx, `UPDATE coding_quota_requests SET state='unmetered',updated_at=NOW() WHERE account_id=$1 AND metering_source='subscription' AND state='pending' AND completed_at<=$2`, v.AccountID, v.ObservedAt)
 		case p.Equal(m.Used):
 			// Keep the original baseline until a visible positive increment arrives.
 			// A flat read can still repair a legacy estimate; recovery must not
@@ -313,7 +313,7 @@ func (r *UsageMonitorRepository) reconcileCodingObservation(ctx context.Context,
 }
 
 func settleCodingIncrement(ctx context.Context, tx *sql.Tx, v service.OfficialQuotaObservation, m codingMeter, delta decimal.Decimal) error {
-	rows, err := tx.QueryContext(ctx, `SELECT id,weight::text FROM coding_quota_requests WHERE account_id=$1 AND state='pending'
+	rows, err := tx.QueryContext(ctx, `SELECT id,weight::text FROM coding_quota_requests WHERE account_id=$1 AND metering_source='subscription' AND state='pending'
  AND completed_at>$2 AND completed_at<=$3 AND (official_window_end IS NULL OR ABS(EXTRACT(EPOCH FROM(official_window_end-$4::timestamptz)))<=300)
  AND started_at>=COALESCE((SELECT calibration_started_at FROM coding_quota_meters WHERE account_id=$1),'-infinity'::timestamptz)
  ORDER BY id FOR UPDATE`, v.AccountID, m.ObservedAt, v.ObservedAt, v.WindowEnd)
@@ -339,7 +339,7 @@ func settleCodingIncrement(ctx context.Context, tx *sql.Tx, v service.OfficialQu
 		return err
 	}
 	for _, a := range allocations {
-		if _, err = tx.ExecContext(ctx, `UPDATE coding_quota_requests SET points=$2,estimated_points=0,state='settled',official_window_end=$3,updated_at=NOW() WHERE id=$1`, a.ID, a.Points, v.WindowEnd); err != nil {
+		if _, err = tx.ExecContext(ctx, `UPDATE coding_quota_requests SET points=$2,estimated_points=0,state='settled',official_window_end=$3,updated_at=NOW() WHERE id=$1 AND metering_source='subscription'`, a.ID, a.Points, v.WindowEnd); err != nil {
 			return err
 		}
 	}
@@ -352,7 +352,7 @@ func settleCodingIncrement(ctx context.Context, tx *sql.Tx, v service.OfficialQu
 	}
 	// Requests that arrived after an already closed observation remain visible
 	// as unresolved; they must not dilute charges already assigned to others.
-	if _, err = tx.ExecContext(ctx, `UPDATE coding_quota_requests SET state='unmetered',updated_at=NOW() WHERE account_id=$1 AND state='pending' AND completed_at<=$2`, v.AccountID, v.ObservedAt); err != nil {
+	if _, err = tx.ExecContext(ctx, `UPDATE coding_quota_requests SET state='unmetered',updated_at=NOW() WHERE account_id=$1 AND metering_source='subscription' AND state='pending' AND completed_at<=$2`, v.AccountID, v.ObservedAt); err != nil {
 		return err
 	}
 	return refreshCodingCalibration(ctx, tx, v.AccountID, v.WindowEnd)
@@ -366,7 +366,7 @@ func refreshCodingCalibration(ctx context.Context, tx *sql.Tx, accountID int64, 
 	_, err := tx.ExecContext(ctx, `UPDATE coding_quota_meters m SET points_per_weight=s.rate,updated_at=NOW()
  FROM (SELECT ROUND(SUM(q.points+COALESCE(c.delta,0))/NULLIF(SUM(q.weight),0),12) AS rate
  FROM coding_quota_requests q LEFT JOIN coding_quota_corrections c ON c.request_row_id=q.id
- WHERE q.account_id=$1 AND q.state='settled'
+ WHERE q.account_id=$1 AND q.metering_source='subscription' AND q.state='settled'
  AND q.started_at>=COALESCE((SELECT calibration_started_at FROM coding_quota_meters WHERE account_id=$1),'-infinity'::timestamptz)
  AND q.official_window_end BETWEEN $2::timestamptz-INTERVAL '5 minutes' AND $2::timestamptz+INTERVAL '5 minutes') s
  WHERE m.account_id=$1 AND m.points_per_weight IS DISTINCT FROM s.rate`, accountID, windowEnd)
@@ -376,7 +376,7 @@ func refreshCodingCalibration(ctx context.Context, tx *sql.Tx, accountID int64, 
 	_, err = tx.ExecContext(ctx, `UPDATE coding_quota_requests q SET
  estimated_points=q.weight*COALESCE(m.points_per_weight,0),updated_at=NOW()
  FROM coding_quota_meters m WHERE m.account_id=$1 AND q.account_id=m.account_id
- AND q.state='pending'
+ AND q.metering_source='subscription' AND q.state='pending'
  AND q.started_at>=COALESCE(m.calibration_started_at,'-infinity'::timestamptz)
  AND (q.official_window_end IS NULL OR ABS(EXTRACT(EPOCH FROM(q.official_window_end-m.window_end)))<=300)
  AND q.estimated_points IS DISTINCT FROM ROUND(q.weight*COALESCE(m.points_per_weight,0),8)`, accountID)

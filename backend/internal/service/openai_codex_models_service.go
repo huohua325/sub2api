@@ -911,6 +911,7 @@ func buildCodexModelsManifestForAccounts(
 	compositeRoutes []CompositeModelRoute,
 	compositeRoutesAvailable bool,
 ) ([]byte, error) {
+	accounts = unifiedCodingCatalogAccounts(group, accounts)
 	if effectivePlatform == PlatformOpenAI {
 		modelIDs = filterRetiredOpenAIModelIDs(accounts, modelIDs)
 	} else if effectivePlatform == PlatformComposite {

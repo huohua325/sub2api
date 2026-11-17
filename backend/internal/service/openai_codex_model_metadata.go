@@ -137,6 +137,7 @@ func groupCodexModelMetadata(
 	compositeRoutes []CompositeModelRoute,
 	compositeRoutesAvailable bool,
 ) (codexModelMetadataOverride, bool) {
+	accounts = unifiedCodingCatalogAccounts(group, accounts)
 	modelID = strings.TrimSpace(modelID)
 	if modelID == "" {
 		return codexModelMetadataOverride{}, false

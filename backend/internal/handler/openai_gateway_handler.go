@@ -37,6 +37,7 @@ import (
 
 // OpenAIGatewayHandler handles OpenAI API gateway requests
 type OpenAIGatewayHandler struct {
+	apiFallback                *service.UsageMonitorService
 	compositeResolver          *service.CompositeRouteResolver
 	gatewayService             *service.OpenAIGatewayService
 	billingCacheService        *service.BillingCacheService
@@ -662,6 +663,13 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 	firstOutputTimeoutSwitchCount := 0
 	profitVetoCount := 0
 	failedAccountIDs := make(map[int64]struct{})
+	if service.IsUnifiedCodingGroup(apiKey.Group) && apiKey.GroupID != nil {
+		failedAccountIDs, err = h.gatewayService.CodingSubscriptionExclusions(c.Request.Context(), *apiKey.GroupID)
+		if err != nil {
+			h.handleStreamingAwareError(c, http.StatusServiceUnavailable, "coding_pool_unavailable", "Subscription pool cannot be verified", streamStarted)
+			return
+		}
+	}
 	sameAccountRetryCount := make(map[int64]int)
 	var lastFailoverErr *service.UpstreamFailoverError
 	var oauth429FailoverState service.OpenAIOAuth429FailoverState
@@ -687,6 +695,15 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 	// token 计费部分仍受利润门保护，独立图片/视频端点才在门外。
 	pricingCtx, pricingAt := h.gatewayService.WithOpenAIRequestPricingContext(c.Request.Context(), apiKey.GroupID)
 	c.Request = c.Request.WithContext(pricingCtx)
+	if handled, fallbackErr := h.gatewayService.TryAPIFallback(c.Request.Context(), c, h.apiFallback, apiKey, forwardModel, forwardBody, requestStart); handled {
+		if fallbackErr != nil {
+			reqLog.Warn("api_fallback_request_failed", zap.Error(fallbackErr))
+			if !c.Writer.Written() {
+				h.handleStreamingAwareError(c, http.StatusServiceUnavailable, "api_fallback_unavailable", fallbackErr.Error(), streamStarted)
+			}
+		}
+		return
+	}
 
 	for {
 		// Streaming Forward intentionally detaches the upstream request so usage can

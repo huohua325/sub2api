@@ -1496,6 +1496,10 @@ func (s *GatewayService) GetAvailableModels(ctx context.Context, groupID *int64,
 	if err != nil || len(accounts) == 0 {
 		return nil
 	}
+	accounts, err = s.codingCatalogAccountsForGroupID(ctx, groupID, accounts)
+	if err != nil || len(accounts) == 0 {
+		return nil
+	}
 
 	// Filter by platform if specified. Mixed scheduling (a gemini group routing
 	// to antigravity accounts) is honoured here as well, so the advertised list
@@ -1597,6 +1601,10 @@ func (s *GatewayService) resolveCompositeModelOwnership(ctx context.Context, gro
 	if err != nil {
 		return CompositeModelOwnership{}, err
 	}
+	accounts, err = s.codingCatalogAccountsForGroupID(ctx, &groupID, accounts)
+	if err != nil {
+		return CompositeModelOwnership{}, err
+	}
 
 	platforms := make(map[string]struct{})
 	ownership := CompositeModelOwnership{}
@@ -1671,6 +1679,10 @@ func (s *GatewayService) GetSchedulablePlatforms(ctx context.Context, groupID *i
 	} else {
 		accounts, err = s.accountRepo.ListSchedulable(ctx)
 	}
+	if err != nil {
+		return platforms
+	}
+	accounts, err = s.codingCatalogAccountsForGroupID(ctx, groupID, accounts)
 	if err != nil {
 		return platforms
 	}

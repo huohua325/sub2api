@@ -46,7 +46,7 @@ func (r *UsageMonitorRepository) ReadCodingReservationSummariesForReadings(ctx c
  FROM coding_quota_billing_tasks t JOIN coding_quota_reservations r ON r.id=t.reservation_id
  JOIN wanted w USING(user_id,purpose) WHERE t.state<>'applied' GROUP BY r.user_id,r.purpose
 ), corrections AS (
- SELECT w.user_id,w.purpose,ROUND(SUM(c.delta/`+codingCapacityFactorSQL("q.account_id", "q.purpose", "q.started_at")+`),8)::text delta FROM wanted w
+ SELECT w.user_id,w.purpose,ROUND(SUM(c.delta/`+codingRequestCapacityFactorSQL("q")+`),8)::text delta FROM wanted w
  JOIN coding_quota_requests q ON q.user_id=w.user_id AND q.purpose=w.purpose AND q.started_at>=w.start_at AND q.started_at<w.end_at
  JOIN coding_quota_corrections c ON c.request_row_id=q.id GROUP BY w.user_id,w.purpose
 ), latest AS (

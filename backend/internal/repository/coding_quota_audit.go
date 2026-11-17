@@ -38,7 +38,7 @@ func readCodingAuditSnapshot(ctx context.Context, tx *sql.Tx, account int64, fro
  WHERE account_id=$1 AND observed_at>=$2 AND observed_at<=$3 ORDER BY observed_at,id LIMIT 200001) s),
  'requests',(SELECT COALESCE(json_agg(s ORDER BY id),'[]') FROM
  (SELECT id,account_id,user_id,purpose,started_at,completed_at,official_window_end,weight::text,points::text,state,updated_at
- FROM coding_quota_requests WHERE account_id=$1 AND completed_at>=$2 AND completed_at<=$3 ORDER BY id LIMIT 200001) s),
+ FROM coding_quota_requests WHERE account_id=$1 AND metering_source='subscription' AND completed_at>=$2 AND completed_at<=$3 ORDER BY id LIMIT 200001) s),
  'events',(SELECT COALESCE(json_agg(s ORDER BY effective_at),'[]') FROM
  (SELECT effective_at,status FROM coding_quota_reset_events WHERE status='confirmed' AND effective_at>=$2 AND effective_at<=$3) s)
 )`, account, from.UTC(), to.UTC()).Scan(&raw)
@@ -97,7 +97,7 @@ func (r *UsageMonitorRepository) ApplyCodingQuotaAudit(ctx context.Context, plan
 		for _, entry := range episode.Entries {
 			var row int64
 			err = tx.QueryRowContext(ctx, `SELECT id FROM coding_quota_requests WHERE id=$1 AND account_id=$2 AND user_id=$3
- AND purpose=$4 AND state='settled' AND points=$5::numeric FOR UPDATE`, entry.RequestID, fresh.AccountID, entry.UserID, entry.Purpose, entry.Before).Scan(&row)
+ AND purpose=$4 AND metering_source='subscription' AND state='settled' AND points=$5::numeric FOR UPDATE`, entry.RequestID, fresh.AccountID, entry.UserID, entry.Purpose, entry.Before).Scan(&row)
 			if err != nil {
 				return 0, fmt.Errorf("original request %d changed: %w", entry.RequestID, err)
 			}
