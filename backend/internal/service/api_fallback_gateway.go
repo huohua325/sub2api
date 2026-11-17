@@ -184,11 +184,12 @@ func prepareAPIFallbackBodyWithLineage(p *APIFallbackPolicy, raw []byte, allowEn
 // TryAPIFallback runs at most one paid HTTP attempt, outside the normal wallet
 // billing/failover path. False leaves the existing subscription request intact.
 func (s *OpenAIGatewayService) TryAPIFallback(ctx context.Context, c *gin.Context, control *UsageMonitorService, key *APIKey, model string, raw []byte, started time.Time) (bool, error) {
-	if control == nil || key == nil || key.User == nil || !key.User.IsAdmin() || key.GroupID == nil || !IsUnifiedCodingGroup(key.Group) {
+	if control == nil || key == nil || key.User == nil || !key.User.IsAdmin() || key.GroupID == nil || key.Group == nil || key.Group.ID != *key.GroupID {
 		return false, nil
 	}
-	platform, ok := ResolvedTargetPlatformFromContext(ctx)
-	if !ok || (platform != PlatformOpenAI && platform != PlatformGrok) {
+	resolved, _ := ResolvedTargetPlatformFromContext(ctx)
+	platform, ok := APIFallbackPlatformForGroup(key.Group, resolved)
+	if !ok {
 		return false, nil
 	}
 	hashes := apiFallbackEncryptedDigests(gjson.ParseBytes(raw))

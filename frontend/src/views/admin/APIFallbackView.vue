@@ -10,6 +10,7 @@ import fallbackAPI, { type APIFallbackAttempt, type APIFallbackPolicy, type APIF
 import groupsAPI from '@/api/admin/groups'
 import { useAuthStore } from '@/stores'
 import { formatDateTime } from '@/utils/format'
+import { apiFallbackEntry } from '@/utils/apiFallbackGroups'
 import type { AdminGroup } from '@/types'
 
 const { t } = useI18n()
@@ -35,7 +36,10 @@ const summaryItems = computed(() => {
     { label: 'today', value: summary.today_usd }
   ] : []
 })
-const groupNames = computed(() => new Map(groups.value.map(group => [group.id, group.name])))
+const groupNames = computed(() => new Map(groups.value.map(group => {
+  const entry = apiFallbackEntry(group)
+  return [group.id, entry ? `${t(`admin.apiFallback.entrances.${entry}`)} · ${group.name}` : group.name] as const
+})))
 const knownReasons = new Set([
   'primary_pool_changed', 'primary_paused', 'subscription_recovered', 'primary_credentials_or_state_changed',
   'all_subscriptions_unavailable', 'policy_disabled', 'policy_expired', 'capabilities_unverified'

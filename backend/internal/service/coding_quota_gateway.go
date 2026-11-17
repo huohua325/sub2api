@@ -148,6 +148,12 @@ func prepareCodingRequest(ctx context.Context, c *gin.Context, points *OfficialP
 func (s *OpenAIGatewayService) SetCodingPoints(points *OfficialPointService) { s.codingPoints = points }
 func (s *GatewayService) SetCodingPoints(points *OfficialPointService)       { s.codingPoints = points }
 func (s *OpenAIGatewayService) PrepareCodingRequest(ctx context.Context, c *gin.Context, account *Account, body []byte) (context.Context, error) {
+	if err := guardAPIFallbackNormalAccount(ctx, s.accountRepo, apiFallbackRequestGroup(ctx, c), account); err != nil {
+		if c != nil {
+			WriteCodingQuotaError(c, err)
+		}
+		return ctx, err
+	}
 	return prepareCodingRequest(ctx, c, s.codingPoints, s.billingService, account, body)
 }
 func (s *GatewayService) PrepareCodingRequest(ctx context.Context, c *gin.Context, account *Account, body []byte) (context.Context, error) {

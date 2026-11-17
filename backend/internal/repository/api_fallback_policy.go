@@ -143,14 +143,29 @@ func containsFallbackID(ids []int64, id int64) bool {
 	return false
 }
 
-func validateFallbackMembers(ctx context.Context, tx *sql.Tx, p *service.APIFallbackPolicy) error {
+func validateFallbackGroup(ctx context.Context, tx *sql.Tx, p *service.APIFallbackPolicy, active bool) error {
 	var group bool
-	if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM groups WHERE id=$1 AND platform='composite' AND usage_kind='coding' AND status='active' AND deleted_at IS NULL)`, p.GroupID).Scan(&group); err != nil {
+	// A standalone group has exactly one billing purpose. It may only select
+	// backup policies for that same platform; unified coding can select either.
+	if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM groups
+ WHERE id=$1 AND usage_kind='coding' AND (platform='composite' OR platform=$2)
+ AND deleted_at IS NULL AND (NOT $3::boolean OR status='active'))`, p.GroupID, p.Platform, active).Scan(&group); err != nil {
 		return err
 	}
 	if !group {
-		return fallbackInvalid("a unified coding group is required")
+		return fallbackInvalid("a matching Codex, Grok Build or unified coding group is required")
 	}
+	return nil
+}
+
+func validateFallbackMembers(ctx context.Context, tx *sql.Tx, p *service.APIFallbackPolicy) error {
+	if err := validateFallbackGroup(ctx, tx, p, true); err != nil {
+		return err
+	}
+	return validateFallbackSelectedMembers(ctx, tx, p)
+}
+
+func validateFallbackSelectedMembers(ctx context.Context, tx *sql.Tx, p *service.APIFallbackPolicy) error {
 	for i, ids := range [][]int64{p.PrimaryAccountIDs, p.BackupAccountIDs} {
 		if len(ids) == 0 {
 			continue
@@ -193,6 +208,10 @@ func validateFallbackSelectedBackup(ctx context.Context, tx *sql.Tx, p *service.
 }
 
 func (r *UsageMonitorRepository) SaveAPIFallbackPolicy(ctx context.Context, in service.APIFallbackPolicyInput) (*service.APIFallbackPolicy, error) {
+	return r.saveAPIFallbackPolicy(ctx, in, false)
+}
+
+func (r *UsageMonitorRepository) saveAPIFallbackPolicy(ctx context.Context, in service.APIFallbackPolicyInput, disableOnly bool) (*service.APIFallbackPolicy, error) {
 	if !in.Confirm {
 		return nil, fallbackInvalid("explicit confirmation is required")
 	}
@@ -200,6 +219,9 @@ func (r *UsageMonitorRepository) SaveAPIFallbackPolicy(ctx context.Context, in s
 	now := time.Now().UTC()
 	if err := normalizeFallbackPolicy(&p, now); err != nil {
 		return nil, err
+	}
+	if disableOnly && (p.ID == "" || p.Enabled) {
+		return nil, fallbackInvalid("disabling requires an existing policy")
 	}
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -209,15 +231,14 @@ func (r *UsageMonitorRepository) SaveAPIFallbackPolicy(ctx context.Context, in s
 	if err = requireFallbackAdmin(ctx, tx, in.ActorUserID); err != nil {
 		return nil, err
 	}
-	var unifiedGroup bool
-	if err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM groups WHERE id=$1 AND platform='composite' AND usage_kind='coding' AND deleted_at IS NULL)`, p.GroupID).Scan(&unifiedGroup); err != nil {
-		return nil, err
-	}
-	if !unifiedGroup {
-		return nil, fallbackInvalid("a unified coding group is required")
-	}
-	if p.Enabled {
-		if err = validateFallbackMembers(ctx, tx, &p); err != nil {
+	if !disableOnly {
+		if err = validateFallbackGroup(ctx, tx, &p, p.Enabled); err != nil {
+			return nil, err
+		}
+		// Saving a disabled draft also assigns a durable backup role. Validate every
+		// selected account before persisting either the draft or its audit version.
+		// Empty selections remain valid for an incomplete, disabled draft.
+		if err = validateFallbackSelectedMembers(ctx, tx, &p); err != nil {
 			return nil, err
 		}
 	}
@@ -238,6 +259,15 @@ func (r *UsageMonitorRepository) SaveAPIFallbackPolicy(ctx context.Context, in s
 		}
 		if old.Version != in.ExpectedVersion || old.GroupID != p.GroupID || old.Platform != p.Platform || old.Model != p.Model {
 			return nil, fallbackConflict()
+		}
+		if disableOnly {
+			// Emergency stop cannot depend on still-valid membership or group
+			// state. Copy the locked stored configuration so this path can only
+			// turn it off and add the administrator's note, never assign new roles.
+			note := p.Note
+			p = *old
+			p.Enabled = false
+			p.Note = note
 		}
 		p.Version = old.Version + 1
 		p.CreatedAt = old.CreatedAt
@@ -276,7 +306,7 @@ func (r *UsageMonitorRepository) DisableAPIFallbackPolicy(ctx context.Context, i
 	}
 	p.Enabled = false
 	p.Note = note
-	return r.SaveAPIFallbackPolicy(ctx, service.APIFallbackPolicyInput{APIFallbackPolicy: *p, ExpectedVersion: version, ActorUserID: actor, Confirm: true})
+	return r.saveAPIFallbackPolicy(ctx, service.APIFallbackPolicyInput{APIFallbackPolicy: *p, ExpectedVersion: version, ActorUserID: actor, Confirm: true}, true)
 }
 
 func (r *UsageMonitorRepository) FindAPIFallbackPolicy(ctx context.Context, group int64, platform, model string) (*service.APIFallbackPolicy, error) {

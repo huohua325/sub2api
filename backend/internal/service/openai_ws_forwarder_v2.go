@@ -199,6 +199,9 @@ func (s *OpenAIGatewayService) forwardOpenAIWSV2(
 		account.ProxyID != nil && account.Proxy != nil,
 	)
 
+	if err := guardAPIFallbackNormalAccount(ctx, s.accountRepo, apiFallbackRequestGroup(ctx, c), account); err != nil {
+		return nil, err
+	}
 	acquireCtx, acquireCancel := context.WithTimeout(ctx, s.openAIWSAcquireTimeout())
 	defer acquireCancel()
 

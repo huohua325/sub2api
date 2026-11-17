@@ -82,12 +82,12 @@ func TestCodingQuotaDBAPIFallbackAdminAndExplicitApproval(t *testing.T) {
 	require.NoError(t, err)
 	_, err = r.ReadAPIFallback(t.Context(), 1)
 	require.ErrorContains(t, err, "administrator")
-	_, err = db.Exec(`UPDATE users SET status='active' WHERE id=1; UPDATE groups SET platform='openai' WHERE id=1`)
+	_, err = db.Exec(`UPDATE users SET status='active' WHERE id=1; UPDATE groups SET usage_kind='experiment' WHERE id=1`)
 	require.NoError(t, err)
 	p.Enabled = false
 	input.APIFallbackPolicy = *p
 	_, err = r.SaveAPIFallbackPolicy(t.Context(), input)
-	require.ErrorContains(t, err, "unified coding")
+	require.ErrorContains(t, err, "coding group")
 }
 
 func TestCodingQuotaDBAPIFallbackConcurrentBudgetAndUnknownRetention(t *testing.T) {
