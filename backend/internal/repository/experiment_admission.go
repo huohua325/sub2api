@@ -186,9 +186,10 @@ func finishExperimentAttemptForBilling(ctx context.Context, tx *sql.Tx, cmd *ser
 		return errors.New("experiment billing admission identity or state conflict")
 	}
 	next := "handed_off"
-	if chargeState == "settled" {
+	switch chargeState {
+	case "settled":
 		next = "settled"
-	} else if chargeState == "unresolved" {
+	case "unresolved":
 		next = "unknown"
 	}
 	_, err = tx.ExecContext(ctx, `UPDATE experiment_quota_attempts SET state=$3,handed_off_at=clock_timestamp(),
