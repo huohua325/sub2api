@@ -204,6 +204,15 @@ python3 /opt/sub2api/releases/<发布名>/release_server.py --root /opt/sub2api 
 
 ## 工具自身验证
 
+管理员分组的 Fast／Ultra Fast 修改可复用双浏览器场景：
+
+```powershell
+& D:/Programs/anaconda3/python.exe tools/review_admin_groups.py --artifact --output output/delivery/my-change/admin-groups
+```
+
+该场景只使用 mock API，核对默认关闭、独立开关、显式保存／重开、专属用途保持、取消与
+375/768/1440px 布局；开发时以 `--base-url <实际开发地址>` 替代 `--artifact`。
+
 ```powershell
 $env:PYTHONDONTWRITEBYTECODE='1' # 避免工作树出现未跟踪的工具字节码
 & D:/Programs/anaconda3/python.exe -m pip install -r tools/requirements-delivery.txt

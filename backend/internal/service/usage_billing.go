@@ -59,6 +59,14 @@ type UsageBillingCommand struct {
 	AccountQuotaHasWeeklyLimit bool
 }
 
+// RequiresIndividualSettlement reports whether this command needs the durable
+// quota or experiment effects that the standard batch settlement does not apply.
+func (c *UsageBillingCommand) RequiresIndividualSettlement() bool {
+	return c != nil && (c.Purpose != "" || c.PurposeCost != 0 || c.CodingQuota != nil ||
+		c.CodingReservationID != "" || len(c.CodingReservationIDs) > 0 ||
+		c.ExperimentPending || c.ExperimentUpstreamRequestID != "" || c.ExperimentEffects != nil)
+}
+
 func (c *UsageBillingCommand) Normalize() {
 	if c == nil {
 		return
@@ -239,4 +247,18 @@ type UsageBillingRepository interface {
 	ReserveBatchImageBalance(ctx context.Context, cmd *BatchImageBalanceHoldCommand) (*BatchImageBalanceHoldResult, error)
 	CaptureBatchImageBalance(ctx context.Context, cmd *BatchImageBalanceHoldCommand) (*BatchImageBalanceHoldResult, error)
 	ReleaseBatchImageBalance(ctx context.Context, cmd *BatchImageBalanceHoldCommand) (*BatchImageBalanceHoldResult, error)
+}
+
+// UsageBillingBatchOutcome 是合并结算中单条命令的结果：Err 非空时 Result 为 nil。
+type UsageBillingBatchOutcome struct {
+	Result *UsageBillingApplyResult
+	Err    error
+}
+
+// UsageBillingBatchRepository 在 UsageBillingRepository 之上支持把同一用户的多条命令合并到一个事务内结算。
+type UsageBillingBatchRepository interface {
+	UsageBillingRepository
+	// ApplyBatch 在一个事务内结算同一用户的多条命令，各条结果与按 cmds 顺序逐条调用 Apply 一致，
+	// 返回值与 cmds 一一对应。返回 error 时没有任何命令生效；提交请求发出后连接中断时提交结果未知，与 Apply 相同。
+	ApplyBatch(ctx context.Context, cmds []*UsageBillingCommand) ([]UsageBillingBatchOutcome, error)
 }
