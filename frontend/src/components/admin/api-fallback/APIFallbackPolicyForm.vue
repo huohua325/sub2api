@@ -2,7 +2,8 @@
 import { computed, onBeforeUnmount, reactive, shallowRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import accountsAPI from '@/api/admin/accounts'
-import { savePolicy, type APIFallbackPolicy, type APIFallbackPolicyInput, type APIFallbackPrimaryEvidence } from '@/api/admin/apiFallback'
+import { savePolicy, type APIFallbackPlatform, type APIFallbackPolicy, type APIFallbackPolicyInput, type APIFallbackPrimaryEvidence } from '@/api/admin/apiFallback'
+import { apiFallbackEntry, isAPIFallbackGroup } from '@/utils/apiFallbackGroups'
 import type { AccountListItem, AdminGroup } from '@/types'
 
 const props = defineProps<{ policy: APIFallbackPolicy | null; groups: AdminGroup[] }>()
@@ -62,7 +63,21 @@ watch(() => [form.model, form.primary_account_ids.join(','), form.backup_account
   approved.value = false
 })
 
-const groups = computed(() => props.groups.filter(group => group.platform === 'composite'))
+const groups = computed(() => props.groups.filter(isAPIFallbackGroup))
+const selectedGroup = computed(() => props.groups.find(group => group.id === form.group_id))
+const fixedPlatform = computed<APIFallbackPlatform | null>(() => {
+  const group = selectedGroup.value
+  if (!group || !apiFallbackEntry(group)) return null
+  if (group.platform === 'openai') return 'openai'
+  if (group.platform === 'grok') return 'grok'
+  return null
+})
+watch(() => form.group_id, () => {
+  if (!initial && fixedPlatform.value) form.platform = fixedPlatform.value
+}, { flush: 'sync' })
+function groupLabel(group: AdminGroup): string {
+  return `${t(`admin.apiFallback.entrances.${apiFallbackEntry(group)}`)} · ${group.name} · #${group.id}`
+}
 const primaryAccounts = computed(() => {
   const choices = new Map<number, { id: number; name: string }>()
   for (const account of accounts.value) {
@@ -92,10 +107,12 @@ watch(() => [form.group_id, form.platform] as const, async ([groupID, platform],
   onCleanup(() => { current = false; controller.abort() })
   accounts.value = []
   accountError.value = ''
+  loadingAccounts.value = false
   if (previous && (previous[0] !== groupID || previous[1] !== platform)) {
     form.primary_account_ids = []
     form.backup_account_ids = []
     form.capabilities_verified = false
+    approved.value = false
   }
   if (!groupID) return
   loadingAccounts.value = true
@@ -131,6 +148,12 @@ async function submit() {
   error.value = ''
   if (!form.group_id || !form.model.trim() || !form.note.trim()) {
     error.value = t('admin.apiFallback.required')
+    return
+  }
+  const group = selectedGroup.value
+  const existingDisabledGroup = initial && !form.enabled && group?.id === initial.group_id
+  if (!group || !apiFallbackEntry(group) || (!isAPIFallbackGroup(group) && !existingDisabledGroup) || (fixedPlatform.value && fixedPlatform.value !== form.platform)) {
+    error.value = t('admin.apiFallback.invalidGroup')
     return
   }
   if (form.enabled) {
@@ -198,10 +221,11 @@ async function submit() {
     <fieldset :disabled="saving" class="space-y-5">
       <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <label class="block text-sm"><span class="form-label">{{ t('admin.apiFallback.group') }}</span>
-          <select v-model.number="form.group_id" class="input w-full" :disabled="policy !== null" data-testid="fallback-group"><option :value="0">{{ t('common.selectOption') }}</option><option v-for="group in groups" :key="group.id" :value="group.id">{{ group.name }} · #{{ group.id }}</option></select>
+          <select v-model.number="form.group_id" class="input w-full" :disabled="policy !== null" data-testid="fallback-group"><option :value="0">{{ t('common.selectOption') }}</option><option v-for="group in groups" :key="group.id" :value="group.id">{{ groupLabel(group) }}</option><option v-if="policy && !groups.some(group => group.id === policy?.group_id)" :value="policy.group_id">{{ selectedGroup?.name ?? `#${policy.group_id}` }}</option></select>
+          <span class="mt-1 block text-xs text-gray-500">{{ t('admin.apiFallback.groupHint') }}</span>
         </label>
         <label class="block text-sm"><span class="form-label">{{ t('admin.apiFallback.platform') }}</span>
-          <select v-model="form.platform" class="input w-full" :disabled="policy !== null" data-testid="fallback-platform"><option value="openai">Codex / GPT</option><option value="grok">Grok</option></select>
+          <select v-model="form.platform" class="input w-full" :disabled="policy !== null || fixedPlatform !== null" data-testid="fallback-platform"><option value="openai">Codex / GPT</option><option value="grok">Grok</option></select>
         </label>
         <label class="block text-sm"><span class="form-label">{{ t('admin.apiFallback.model') }}</span><input v-model="form.model" class="input w-full" :disabled="policy !== null" data-testid="fallback-model" autocomplete="off" /><span class="mt-1 block text-xs text-gray-500">{{ t('admin.apiFallback.modelHint') }}</span></label>
       </div>

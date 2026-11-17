@@ -243,6 +243,10 @@ func loadCodexGroupCatalogAccounts(ctx context.Context, repo AccountRepository, 
 	if err != nil {
 		return nil, nil, err
 	}
+	visible, err = filterAPIFallbackCatalogAccounts(ctx, repo, &groupID, visible)
+	if err != nil {
+		return nil, nil, err
+	}
 	catalog = visible
 	groupAccounts, listErr := repo.ListModelAvailabilityCandidates(
 		ctx,
@@ -263,6 +267,10 @@ func loadCodexGroupCatalogAccounts(ctx context.Context, repo AccountRepository, 
 	)
 	if listErr != nil {
 		return visible, catalog, nil
+	}
+	groupAccounts, err = filterAPIFallbackCatalogAccounts(ctx, repo, &groupID, groupAccounts)
+	if err != nil {
+		return nil, nil, err
 	}
 	return visible, groupAccounts, nil
 }

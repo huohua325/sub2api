@@ -22,7 +22,15 @@ vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
 vi.mock('@/i18n', () => ({ getLocale: () => 'en', i18n: { global: { t: (key: string) => key } } }))
 vi.mock('@/components/layout/AppLayout.vue', () => ({ default: { template: '<main><slot /></main>' } }))
 
-const groups = [{ id: 17, name: 'Unified admin', platform: 'composite' }] as AdminGroup[]
+const groups = [
+  { id: 17, name: 'Unified admin', platform: 'composite', usage_kind: 'coding', status: 'active' },
+  { id: 18, name: 'Codex admin', platform: 'openai', usage_kind: 'coding', status: 'active' },
+  { id: 19, name: 'Grok Build admin', platform: 'grok', usage_kind: 'coding', status: 'active' },
+  { id: 21, name: 'API experiment', platform: 'openai', usage_kind: 'experiment', status: 'active' },
+  { id: 22, name: 'Inactive coding', platform: 'grok', usage_kind: 'coding', status: 'inactive' },
+  { id: 23, name: 'Other coding', platform: 'anthropic', usage_kind: 'coding', status: 'active' },
+  { id: 24, name: 'Unclassified group', platform: 'openai', status: 'active' }
+] as AdminGroup[]
 const policy = (): APIFallbackPolicy => ({
   id: 'policy-1', version: 3, group_id: 17, platform: 'openai', model: 'gpt-6.1-sol',
   primary_account_ids: [10], backup_account_ids: [20], primary_evidence: [], enabled: true,
@@ -116,6 +124,85 @@ describe('administrator API backup', () => {
 })
 
 describe('backup policy approval', () => {
+  it('offers the three active coding entrances and excludes experiment, inactive and other groups', async () => {
+    const wrapper = track(mount(APIFallbackPolicyForm, { props: { policy: null, groups }, global }))
+    const options = wrapper.get('[data-testid="fallback-group"]').findAll('option')
+    expect(options.map(option => option.attributes('value'))).toEqual(['0', '17', '18', '19'])
+    expect(options[1].text()).toContain('admin.apiFallback.entrances.unified')
+    expect(options[2].text()).toContain('admin.apiFallback.entrances.codex')
+    expect(options[3].text()).toContain('admin.apiFallback.entrances.grokBuild')
+  })
+
+  it.each([
+    { groupID: 18, platform: 'openai', model: 'gpt-6.1-sol' },
+    { groupID: 19, platform: 'grok', model: 'grok-4.3' }
+  ])('saves a disabled $platform draft with the platform fixed by its standalone group', async ({ groupID, platform, model }) => {
+    const wrapper = track(mount(APIFallbackPolicyForm, { props: { policy: null, groups }, global }))
+    await wrapper.get('[data-testid="fallback-group"]').setValue(groupID)
+    await flushPromises()
+    const selector = wrapper.get('[data-testid="fallback-platform"]')
+    expect(selector.element).toHaveProperty('value', platform)
+    expect(selector.attributes('disabled')).toBeDefined()
+    expect(mocks.listAccounts).toHaveBeenLastCalledWith(1, 100, { platform, group: String(groupID) }, expect.any(Object))
+    await wrapper.get('[data-testid="fallback-model"]').setValue(model)
+    await wrapper.get('[data-testid="fallback-note"]').setValue('Standalone draft pending supplier approval')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(mocks.savePolicy).toHaveBeenCalledWith(expect.objectContaining({ group_id: groupID, platform, model, enabled: false, capabilities_verified: false, points_per_usd: '0' }))
+  })
+
+  it('clears accounts and approval when moving from Codex to Grok Build, and keeps unified platform selection available', async () => {
+    const wrapper = track(mount(APIFallbackPolicyForm, { props: { policy: null, groups }, global }))
+    await wrapper.get('[data-testid="fallback-group"]').setValue(18)
+    await flushPromises()
+    await wrapper.get('[data-testid="fallback-primary-10"]').setValue(true)
+    await wrapper.get('[data-testid="fallback-backup-20"]').setValue(true)
+    await wrapper.get('[data-testid="fallback-enabled"]').setValue(true)
+    await wrapper.get('[data-testid="fallback-verified"]').setValue(true)
+    await wrapper.get('[data-testid="fallback-approved"]').setValue(true)
+    await wrapper.get('[data-testid="fallback-group"]').setValue(19)
+    await flushPromises()
+    expect(wrapper.get('[data-testid="fallback-platform"]').element).toHaveProperty('value', 'grok')
+    expect(wrapper.get('[data-testid="fallback-primary-10"]').element).toHaveProperty('checked', false)
+    expect(wrapper.get('[data-testid="fallback-backup-20"]').element).toHaveProperty('checked', false)
+    expect(wrapper.get('[data-testid="fallback-verified"]').element).toHaveProperty('checked', false)
+    expect(wrapper.get('[data-testid="fallback-approved"]').element).toHaveProperty('checked', false)
+    await wrapper.get('[data-testid="fallback-group"]').setValue(17)
+    await flushPromises()
+    expect(wrapper.get('[data-testid="fallback-platform"]').attributes('disabled')).toBeUndefined()
+  })
+
+  it('rejects a platform mismatch even if the disabled standalone selector is manipulated', async () => {
+    const wrapper = track(mount(APIFallbackPolicyForm, { props: { policy: null, groups }, global }))
+    await wrapper.get('[data-testid="fallback-group"]').setValue(18)
+    await flushPromises()
+    const platformSelector = wrapper.get('[data-testid="fallback-platform"]').element as HTMLSelectElement
+    platformSelector.disabled = false
+    await wrapper.get('[data-testid="fallback-platform"]').setValue('grok')
+    await wrapper.get('[data-testid="fallback-model"]').setValue('grok-4.3')
+    await wrapper.get('[data-testid="fallback-note"]').setValue('Mismatched group must not save')
+    await wrapper.get('form').trigger('submit')
+    expect(mocks.savePolicy).not.toHaveBeenCalled()
+    expect(wrapper.get('[data-testid="fallback-form-error"]').text()).toContain('admin.apiFallback.invalidGroup')
+  })
+
+  it('allows saving an existing disabled policy in an inactive coding group without allowing it to be enabled', async () => {
+    const inactive = { ...policy(), group_id: 22, platform: 'grok' as const, model: 'grok-4.3', enabled: false }
+    const wrapper = track(mount(APIFallbackPolicyForm, { props: { policy: inactive, groups }, global }))
+    await flushPromises()
+    expect(wrapper.get('[data-testid="fallback-group"]').element).toHaveProperty('value', '22')
+    expect(wrapper.get('[data-testid="fallback-group"]').attributes('disabled')).toBeDefined()
+    await wrapper.get('[data-testid="fallback-note"]').setValue('Keep the inactive group policy disabled')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(mocks.savePolicy).toHaveBeenCalledWith(expect.objectContaining({ id: 'policy-1', group_id: 22, platform: 'grok', enabled: false }))
+    mocks.savePolicy.mockClear()
+    await wrapper.get('[data-testid="fallback-enabled"]').setValue(true)
+    await wrapper.get('form').trigger('submit')
+    expect(mocks.savePolicy).not.toHaveBeenCalled()
+    expect(wrapper.get('[data-testid="fallback-form-error"]').text()).toContain('admin.apiFallback.invalidGroup')
+  })
+
   it('allows an incomplete disabled draft without inventing an approved conversion rate', async () => {
     const wrapper = track(mount(APIFallbackPolicyForm, { props: { policy: null, groups }, global }))
     await wrapper.get('[data-testid="fallback-group"]').setValue(17)

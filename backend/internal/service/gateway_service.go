@@ -1473,7 +1473,10 @@ func mixedListingModelAllowed(groupPlatform, model string) bool {
 }
 
 func (s *GatewayService) GetAvailableModels(ctx context.Context, groupID *int64, platform string) []string {
-	cacheKey := modelsListCacheKey(groupID, platform)
+	cacheKey, roleErr := apiFallbackModelCacheKey(ctx, s.accountRepo, groupID, modelsListCacheKey(groupID, platform))
+	if roleErr != nil {
+		return nil
+	}
 	if s.modelsListCache != nil {
 		if cached, found := s.modelsListCache.Get(cacheKey); found {
 			if models, ok := cached.([]string); ok {
@@ -1586,7 +1589,10 @@ func (s *GatewayService) resolveCompositeModelOwnership(ctx context.Context, gro
 		return CompositeModelOwnership{}, nil
 	}
 
-	cacheKey := compositeModelOwnershipCacheKey(groupID, model)
+	cacheKey, roleErr := apiFallbackModelCacheKey(ctx, s.accountRepo, &groupID, compositeModelOwnershipCacheKey(groupID, model))
+	if roleErr != nil {
+		return CompositeModelOwnership{}, roleErr
+	}
 	if s.modelsListCache != nil {
 		if cached, found := s.modelsListCache.Get(cacheKey); found {
 			if ownership, ok := cached.(CompositeModelOwnership); ok {

@@ -2,7 +2,19 @@ async page => {
   const options = __MILE_REVIEW_OPTIONS__, base = options.base, fixtures = (__MILE_FIXTURES__)(base)
   let auth = { ...fixtures.auth, id: 2, role: 'admin' }, primaryUnavailable = false, failSave = true
   const errors = [], apiMutations = [], requests = [], mockedWrites = [], checks = []
-  const group = { id: 17, name: 'Unified admin review', platform: 'composite', usage_kind: 'coding', subscription_type: 'standard', rate_multiplier: 1 }
+  const group = { id: 17, name: 'Unified admin review', platform: 'composite', usage_kind: 'coding', status: 'active', subscription_type: 'standard', rate_multiplier: 1 }
+  const groups = [group,
+    { ...group, id: 18, name: 'Codex admin review', platform: 'openai' },
+    { ...group, id: 19, name: 'Grok Build admin review', platform: 'grok' },
+    { ...group, id: 21, name: 'Experiment must be excluded', platform: 'openai', usage_kind: 'experiment' },
+    { ...group, id: 22, name: 'Inactive must be excluded', platform: 'grok', status: 'inactive' },
+    { ...group, id: 23, name: 'Other platform must be excluded', platform: 'anthropic' }
+  ]
+  const accountsByGroup = {
+    17: [{ id: 10, name: 'Review subscription', type: 'oauth', platform: 'openai' }, { id: 20, name: 'Review API', type: 'apikey', platform: 'openai' }],
+    18: [{ id: 11, name: 'Codex subscription', type: 'oauth', platform: 'openai' }, { id: 21, name: 'Codex API', type: 'apikey', platform: 'openai' }],
+    19: [{ id: 30, name: 'Grok Build subscription', type: 'oauth', platform: 'grok' }, { id: 40, name: 'Grok Build API', type: 'apikey', platform: 'grok' }]
+  }
   const policies = [{
     id: 'review-policy', version: 3, group_id: 17, platform: 'openai', model: 'gpt-6.1-sol',
     primary_account_ids: [10], backup_account_ids: [20], primary_evidence: [], enabled: true,
@@ -58,7 +70,9 @@ async page => {
         return route.fulfill({ status: 409, json: { code: 409, message: 'Synthetic version conflict' } })
       }
       const index = policies.findIndex(policy => policy.id === body.id)
-      data = { ...body, id: body.id || 'review-draft', version: body.expected_version + 1 }
+      const selectedGroup = groups.find(group => group.id === body.group_id)
+      if (!selectedGroup || selectedGroup.usage_kind !== 'coding' || selectedGroup.status !== 'active' || (selectedGroup.platform !== 'composite' && selectedGroup.platform !== body.platform)) throw Error('Invalid policy entrance')
+      data = { ...body, id: body.id || (body.group_id === 17 ? 'review-draft' : 'review-draft-' + body.group_id), version: body.expected_version + 1 }
       if (index >= 0) policies[index] = data; else policies.push(data)
     }
     else if (path === '/api/v1/admin/api-fallback/policies/review-policy/disable' && method === 'POST') {
@@ -66,18 +80,22 @@ async page => {
       if (!body.confirm || body.expected_version !== policies[0].version) throw Error('Invalid disable version')
       policies[0] = { ...policies[0], enabled: false, version: policies[0].version + 1 }; data = policies[0]
     }
-    else if (/\/api-fallback\/policies\/[^/]+\/preview$/.test(path) && method === 'POST') data = {
-      eligible: primaryUnavailable, reason: primaryUnavailable ? '主订阅额度已明确耗尽' : '订阅已恢复，继续使用订阅',
-      checks: [{ name: '主池状态', passed: primaryUnavailable, detail: primaryUnavailable ? '所有主身份有有效失效证据' : '仍有健康订阅' }]
+    else if (/\/api-fallback\/policies\/[^/]+\/preview$/.test(path) && method === 'POST') {
+      const policy = policies.find(policy => policy.id === path.split('/').at(-2)), eligible = policy?.enabled && primaryUnavailable
+      data = {
+        eligible, reason: !policy?.enabled ? 'policy_disabled' : primaryUnavailable ? '主订阅额度已明确耗尽' : '订阅已恢复，继续使用订阅',
+        checks: [{ name: '主池状态', passed: !!eligible, detail: !policy?.enabled ? '策略已关闭' : primaryUnavailable ? '所有主身份有有效失效证据' : '仍有健康订阅' }]
+      }
     }
     else if (path === '/api/v1/admin/api-fallback/attempts/review-unresolved/resolve' && method === 'POST') {
       const body = req.postDataJSON(); mockedWrites.push({ path, body })
       if (!body.confirm || !body.evidence?.trim()) throw Error('Unverified unknown spending release')
       attempts[0] = { ...attempts[0], state: body.outcome === 'not_billed' ? 'cancelled' : 'settled' }; data = attempts[0]
     }
-    else if (path === '/api/v1/admin/groups/all') data = [group]
-    else if (path === '/api/v1/admin/accounts' && method === 'GET') data = {
-      items: [{ id: 10, name: 'Review subscription', type: 'oauth', platform: 'openai' }, { id: 20, name: 'Review API', type: 'apikey', platform: 'openai' }], total: 2, page: 1, pages: 1, page_size: 100
+    else if (path === '/api/v1/admin/groups/all') data = groups
+    else if (path === '/api/v1/admin/accounts' && method === 'GET') {
+      const items = (accountsByGroup[url.searchParams.get('group')] || []).filter(account => account.platform === url.searchParams.get('platform'))
+      data = { items, total: items.length, page: 1, pages: 1, page_size: 100 }
     }
     else if (method === 'GET') data = fixtures.resolve(path, method)
     else if (path === '/api/v1/usage/dashboard/api-keys-usage' && method === 'POST') data = { stats: {} }
@@ -135,12 +153,42 @@ async page => {
   await page.getByTestId('fallback-new').click()
   check('new-policy-disabled', !await page.getByTestId('fallback-enabled').isChecked())
   check('new-pricing-unapproved', await page.getByTestId('fallback-points_per_usd').inputValue() === '')
+  check('only-active-coding-entrances-offered', JSON.stringify(await page.getByTestId('fallback-group').locator('option').evaluateAll(options => options.map(option => option.value))) === JSON.stringify(['0', '17', '18', '19']))
   await page.getByTestId('fallback-group').selectOption('17')
   await page.getByTestId('fallback-model').fill('gpt-review-draft')
   await page.getByTestId('fallback-note').fill('Draft only, no paid authorization')
   await page.getByTestId('fallback-save').click()
   await page.getByTestId('fallback-policy-review-draft').waitFor()
   check('incomplete-disabled-draft-saved', policies[1].enabled === false && policies[1].points_per_usd === '0')
+
+  for (const entry of [
+    { groupID: 18, platform: 'openai', model: 'gpt-6.1-sol', primaryID: 11, backupID: 21, name: 'Codex' },
+    { groupID: 19, platform: 'grok', model: 'grok-4.3', primaryID: 30, backupID: 40, name: 'Grok Build' }
+  ]) {
+    await page.getByTestId('fallback-new').click()
+    await page.getByTestId('fallback-group').selectOption(String(entry.groupID))
+    await page.getByTestId('fallback-primary-' + entry.primaryID).waitFor()
+    check('standalone-platform-fixed-' + entry.platform, await page.getByTestId('fallback-platform').inputValue() === entry.platform && await page.getByTestId('fallback-platform').isDisabled())
+    await page.getByTestId('fallback-primary-' + entry.primaryID).check()
+    await page.getByTestId('fallback-backup-' + entry.backupID).check()
+    await page.getByTestId('fallback-model').fill(entry.model)
+    await page.getByTestId('fallback-note').fill(entry.name + ' draft, pricing and paid calls not approved')
+    await page.getByTestId('fallback-save').click()
+    const id = 'review-draft-' + entry.groupID, card = page.getByTestId('fallback-policy-' + id)
+    await card.waitFor()
+    const saved = policies.find(policy => policy.id === id)
+    check('standalone-draft-saved-' + entry.platform, saved.group_id === entry.groupID && saved.platform === entry.platform && !saved.enabled && saved.primary_account_ids[0] === entry.primaryID && saved.backup_account_ids[0] === entry.backupID)
+    check('standalone-entrance-visible-' + entry.platform, (await card.innerText()).includes(entry.name))
+    await page.getByTestId('fallback-preview-' + id).click()
+    await page.getByTestId('fallback-preview-result').waitFor()
+    check('standalone-preview-' + entry.platform, (await page.getByTestId('fallback-preview-result').innerText()).includes('当前不接管') && (await page.getByTestId('fallback-preview-result').innerText()).includes('策略已关闭'))
+    await page.getByRole('button', { name: 'Close modal', exact: true }).click()
+    await page.getByTestId('fallback-edit-' + id).click()
+    await page.getByTestId('fallback-primary-' + entry.primaryID).waitFor()
+    check('standalone-edit-identity-fixed-' + entry.platform, await page.getByTestId('fallback-group').isDisabled() && await page.getByTestId('fallback-platform').isDisabled() && await page.getByTestId('fallback-model').isDisabled())
+    await page.getByTestId('fallback-policy-form').getByRole('button', { name: '取消', exact: true }).click()
+  }
+  await page.screenshot({ path: options.output + '/three-entrances-desktop.png' })
 
   await page.getByTestId('fallback-attempt-state').selectOption('unresolved')
   await page.getByTestId('fallback-resolve-review-unresolved').click()
@@ -157,6 +205,12 @@ async page => {
 
   await page.setViewportSize({ width: 375, height: 812 })
   await page.getByTestId('fallback-new').click()
+  await page.getByTestId('fallback-group').selectOption('19')
+  await page.getByTestId('fallback-primary-30').waitFor()
+  await page.getByTestId('fallback-model').fill('grok-4.3')
+  check('mobile-grok-build-purpose-fixed', await page.getByTestId('fallback-platform').isDisabled() && await page.getByTestId('fallback-platform').inputValue() === 'grok')
+  await page.getByTestId('fallback-group').scrollIntoViewIfNeeded()
+  await page.screenshot({ path: options.output + '/grok-build-mobile.png' })
   await page.getByTestId('fallback-save').scrollIntoViewIfNeeded()
   const box = await page.getByTestId('fallback-save').boundingBox()
   check('mobile-save-in-viewport', box && box.x >= 0 && box.x + box.width <= 375)

@@ -901,6 +901,9 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 	agentTaskRecoveryTried := false
 	var acquireTurnLease func(int, string, bool, bool) (*openAIWSConnLease, error)
 	acquireTurnLease = func(turn int, preferred string, forcePreferredConn bool, forceNewConn bool) (*openAIWSConnLease, error) {
+		if err := guardAPIFallbackNormalAccount(ctx, s.accountRepo, apiFallbackRequestGroup(ctx, c), account); err != nil {
+			return nil, err
+		}
 		req := cloneOpenAIWSAcquireRequest(baseAcquireReq)
 		req.PreferredConnID = strings.TrimSpace(preferred)
 		req.ForcePreferredConn = forcePreferredConn

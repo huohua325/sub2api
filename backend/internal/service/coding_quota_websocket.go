@@ -31,6 +31,11 @@ func (s *OpenAIGatewayService) codingWSTurnHooks(ctx context.Context, key *APIKe
 	begin := func(turn int, body []byte) error {
 		mu.Lock()
 		defer mu.Unlock()
+		if key != nil {
+			if err := guardAPIFallbackNormalAccount(ctx, s.accountRepo, key.Group, account); err != nil {
+				return NewOpenAIWSClientCloseError(coderws.StatusTryAgainLater, err.Error(), err)
+			}
+		}
 		if finishes[turn] != nil {
 			return nil
 		}

@@ -2176,6 +2176,11 @@ func (s *OpenAIGatewayService) selectAccountWithScheduler(
 	previousResponseCanMove bool,
 	useUpstreamTokenCost bool,
 ) (*AccountSelectionResult, OpenAIAccountScheduleDecision, error) {
+	var exclusionErr error
+	excludedIDs, exclusionErr = s.apiFallbackSchedulingExclusions(ctx, groupID, excludedIDs)
+	if exclusionErr != nil {
+		return nil, OpenAIAccountScheduleDecision{}, exclusionErr
+	}
 	selection, decision, err := s.selectAccountWithSchedulerBySize(ctx, groupID, previousResponseID, sessionHash, requestedModel, excludedIDs, requiredTransport, requiredCapability, requiredImageCapability, requireCompact, platform, previousResponseCanMove, useUpstreamTokenCost)
 	if err == nil || openAIProxyStreamQuarantineBypassed(ctx) {
 		return selection, decision, err
