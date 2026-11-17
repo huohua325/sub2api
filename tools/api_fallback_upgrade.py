@@ -10,7 +10,7 @@ from release_server import assert_preserved, deploy, stage_release
 from upstream_additive_upgrade import AdditiveRuntime
 
 BASELINE = '33e5d3d99cac471f82339f4a507582e0e338954b'
-APPLICATION = 'b3d68dbabe61398c1688ec55f628049ac8cb1e00'
+APPLICATION = 'ad6f53065eceeafbb9490558557b5288f112f57a'
 MIGRATIONS = {
     '270_api_fallback_metering.sql': 'bffd68827dacf48074291445992a4e49459c92e963124d82f02762f8083af6bf',
     '271_api_fallback_control.sql': '296c89f2b2de5728cda31b971e05a9ebc25cc55399ee5f7a7bb02c578eab2cf6',
@@ -29,7 +29,7 @@ def contract_for_release():
 
 
 class APIFallbackUpgrade:
-    rollback_block_reason = 'API standby charges or durable attempts exist; retain the compatible program and fix forward. Never restore an older database.'
+    rollback_block_reason = 'API standby backup roles, charges or durable attempts exist; retain the compatible program and fix forward. Never restore an older database.'
 
     def __init__(self, contract):
         if contract != contract_for_release() or len(APPLICATION) != 40 or len(MIGRATIONS) != 2:
@@ -74,7 +74,16 @@ class APIFallbackUpgrade:
 
     def can_rollback(self, runtime):
         snapshot = runtime.fallback_snapshot()
-        return not snapshot['api_fallback_attempts'] and not snapshot['api_fallback_requests']
+        if snapshot['api_fallback_attempts'] or snapshot['api_fallback_requests']:
+            return False
+        # Even a disabled draft can reserve an API account for standby only.
+        # The old program ignores these roles and could schedule it normally.
+        for table in ('api_fallback_policies', 'api_fallback_policy_versions'):
+            for row in snapshot[table]:
+                config = row.get('config', {})
+                if not isinstance(config, dict) or config.get('backup_account_ids'):
+                    return False
+        return True
 
 
 class APIFallbackRuntime(AdditiveRuntime):

@@ -150,6 +150,22 @@ class StandbyUpgradeTests(unittest.TestCase):
         runtime.data = empty_fallback(); runtime.data['api_fallback_requests'].append({'id': 'fixed', 'points': '0.13'})
         self.assertFalse(self.policy.can_rollback(runtime))
 
+    def test_current_or_historical_backup_role_blocks_old_program_rollback(self):
+        class Runtime:
+            def fallback_snapshot(inner): return inner.data
+        runtime = Runtime()
+        for table in ('api_fallback_policies', 'api_fallback_policy_versions'):
+            for config in ({'enabled': False, 'backup_account_ids': [20]},
+                           {'enabled': False, 'backup_account_ids': [20], 'expires_at': '2000-01-01'},
+                           'invalid persisted config'):
+                runtime.data = empty_fallback()
+                runtime.data[table].append({'config': config})
+                with self.subTest(table=table, config=config):
+                    self.assertFalse(self.policy.can_rollback(runtime))
+        runtime.data = empty_fallback()
+        runtime.data['api_fallback_policies'].append({'config': {'enabled': False, 'backup_account_ids': []}})
+        self.assertTrue(self.policy.can_rollback(runtime))
+
     def test_success_and_post_switch_failure_never_restore_database(self):
         from release_server import deploy
         import test_release_server as fixtures
@@ -204,7 +220,9 @@ class StandbyPostgresTests(unittest.TestCase):
             ('PQresultErrorMessage', [ctypes.c_void_p], ctypes.c_char_p),
             ('PQclear', [ctypes.c_void_p], None), ('PQfinish', [ctypes.c_void_p], None)]:
             function = getattr(lib, name); function.argtypes = args; function.restype = result
-        conn = lib.PQconnectdb(b'host=127.0.0.1 port=55432 user=mile_fallback dbname=postgres connect_timeout=5')
+        dsn = os.environ.get('MILE_DELIVERY_TEST_PG_DSN',
+                             'host=127.0.0.1 port=55432 user=mile_fallback dbname=postgres connect_timeout=5')
+        conn = lib.PQconnectdb(dsn.encode())
         self.addCleanup(lib.PQfinish, conn)
         self.assertEqual(lib.PQstatus(conn), 0, 'Isolated PostgreSQL must be running')
         def sql(text, read=False, fail=False):

@@ -41,6 +41,15 @@
 初始发布保持所有备用策略关闭；已有任何付费尝试或固定扣点时阻止旧程序回退，绝不恢复旧数据库。
 不能复用下述旧上游契约放行新增计费迁移。
 
+2026-11-18 的[独立入口扩展](../docs/engineering-upgrade/API-FALLBACK-STANDALONE-2026-11-18.md)
+复用同一入口，固定审核应用 `ad6f53065eceeafbb9490558557b5288f112f57a`，支持 Codex、Grok Build
+和统一编程；相对线上仍只有原两条迁移。即使仅保存关闭草稿，已建立的备用账号角色也会阻止
+回退旧程序，避免旧程序把账号重新用于普通计费。最终浏览器场景须覆盖全部三个入口。
+原发布包各自携带固定工具与应用契约，不因后续文档或新包改变身份。
+
+本机发布工具原生 PostgreSQL 测试可通过 `MILE_DELIVERY_TEST_PG_DSN` 指定本轮隔离库，
+仍须显式设置 `MILE_DELIVERY_TEST_LIBPQ`；本轮使用 55434，不占用其他任务的 55432。
+
 `upstream_additive_upgrade.py` 单独固定已审查的双亲 merge、线上源基线及两条新增 SQL
 的文件／数据库校验和。旧无迁移、前端和个人重置通道守卫保持原样。
 先使用已有冻结前端证据执行 `delivery.py finalize --version <版本> --feature unified-coding
