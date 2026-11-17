@@ -6,7 +6,9 @@ import json
 from pathlib import Path
 import sys
 import tempfile
+from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
 
 SPEC = importlib.util.spec_from_file_location('globalai_reconcile', Path(__file__).parents[1] / 'globalai_reconcile.py')
@@ -322,6 +324,25 @@ class HistoryTests(unittest.TestCase):
                        {'path': '/opt/sub2api/backups/../config', 'sha256': 'a'*64}):
             with self.subTest(backup=backup), self.assertRaises(MODULE.ReconcileError):
                 MODULE.execute_plan('host', src, plan, 'b'*40, backup=backup, apply=True)
+
+    def test_execute_reuses_staged_payload_and_sends_only_small_controls(self):
+        from tools.globalai_stage import artifact, compact, digest
+        src = evidence(); plan = MODULE.build_plan(src, snapshot())
+        manifest, _ = artifact(MODULE.apply_payload(src, plan))
+        staged = {'status': 'ready', 'manifest': manifest, 'manifest_sha256': digest(compact(manifest))}
+        returned = SimpleNamespace(returncode=0, stdout='{"status":"planned"}', stderr='')
+        with patch.object(MODULE, 'stage_payload', side_effect=AssertionError('Existing staging must be reused')):
+            with patch.object(MODULE.subprocess, 'run', return_value=returned) as run:
+                result = MODULE.execute_plan('host', src, plan, 'b'*40, staged=staged)
+        self.assertEqual(result['status'], 'planned')
+        code = run.call_args.kwargs['input']
+        self.assertLess(len(code.encode()), 15000)
+        import ast, base64
+        encoded = next(line.split('=', 1)[1] for line in code.splitlines() if line.startswith('encoded='))
+        control = json.loads(base64.b64decode(ast.literal_eval(encoded)))
+        self.assertEqual(set(control), {'staged', 'source_commit', 'backup', 'apply'})
+        self.assertEqual(control['staged']['blob_sha256'], manifest['blob_sha256'])
+        self.assertNotIn('payload', control)
 
 
 class SnapshotPartitionTests(unittest.TestCase):

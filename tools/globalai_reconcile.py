@@ -23,6 +23,11 @@ import urllib.parse
 import urllib.request
 import zlib
 
+try:
+    from globalai_stage import REMOTE_LIBRARY, StageError, stage_payload, stage_reference
+except ModuleNotFoundError:  # Module-loaded tool tests run from the repository root.
+    from tools.globalai_stage import REMOTE_LIBRARY, StageError, stage_payload, stage_reference
+
 
 PROVIDER = 'globalai.vip'
 QUOTA_PER_YUAN = 500000
@@ -474,7 +479,7 @@ def apply_payload(source, plan):
     return {'schema': 1, 'evidence_base64': base64.b64encode(canonical(source)).decode(), 'plan': plan}
 
 
-def execute_plan(host, source, plan, source_commit, backup=None, apply=False):
+def execute_plan(host, source, plan, source_commit, backup=None, apply=False, staged=None):
     """Run the deployed program's shared settlement implementation over SSH.
 
     Backup verification is performed remotely before any settlement. Its exact
@@ -491,12 +496,19 @@ def execute_plan(host, source, plan, source_commit, backup=None, apply=False):
             raise ReconcileError('Backup archive must be within /opt/sub2api/backups')
         if not re.fullmatch(r'[0-9a-f]{64}', backup.get('sha256', '')):
             raise ReconcileError('The exact verified database archive digest is required')
-    value = {'payload': apply_payload(source, plan), 'source_commit': source_commit,
+    payload = apply_payload(source, plan)
+    try:
+        staged = staged or stage_payload(host, payload)
+        reference = stage_reference(staged, payload)
+    except StageError as error:
+        raise ReconcileError(str(error)) from error
+    value = {'staged': reference, 'source_commit': source_commit,
              'backup': backup, 'apply': bool(apply)}
-    encoded = base64.b64encode(zlib.compress(canonical(value))).decode()
-    script = "encoded=" + repr(encoded) + '\n' + r'''
+    encoded = base64.b64encode(canonical(value)).decode()
+    script = REMOTE_LIBRARY + "\nencoded=" + repr(encoded) + '\n' + r'''
 import base64,hashlib,json,os,pathlib,re,subprocess,urllib.parse,zlib
-data=json.loads(zlib.decompress(base64.b64decode(encoded)))
+data=json.loads(base64.b64decode(encoded))
+payload=_load_reference(data['staged'])
 version=subprocess.run(['/opt/sub2api/bin/sub2api','-version'],text=True,encoding='utf-8',capture_output=True,timeout=10)
 match=re.search(r'commit:\s*([0-9a-f]{40})',version.stdout+version.stderr)
 if version.returncode or not match or match.group(1)!=data['source_commit']:raise SystemExit('Deployed program source does not match the reviewed reconciliation program')
@@ -524,11 +536,11 @@ dsn='postgresql://'+quote(settings.get('POSTGRES_USER','postgres'),safe='')+':'+
 env=dict(os.environ);env['SUB2API_RECONCILE_DSN']=dsn
 args=['/opt/sub2api/bin/sub2api','reconcile-experiment','--expected-source-commit',data['source_commit']]
 if data['apply']:args+=['--apply','--backup-sha256',data['backup']['sha256']]
-result=subprocess.run(args,input=json.dumps(data['payload']),text=True,encoding='utf-8',env=env,capture_output=True,timeout=330)
-if result.stdout:print(result.stdout,end='')
+result=subprocess.run(args,input=payload,capture_output=True,env=env,timeout=330)
+if result.stdout:print(result.stdout.decode('utf-8'),end='')
 if result.returncode:
  # The Go CLI emits only bounded safe labels; no SQL driver/DSN errors.
- if result.stderr:print(result.stderr,end='',file=__import__('sys').stderr)
+ if result.stderr:print(result.stderr.decode('utf-8'),end='',file=__import__('sys').stderr)
  raise SystemExit(result.returncode)
 '''
     try:
@@ -627,7 +639,15 @@ def main(argv=None):
     execute.add_argument('--source-commit', required=True)
     execute.add_argument('--backup-record', type=Path)
     execute.add_argument('--apply', action='store_true')
+    execute.add_argument('--staged-report', type=Path)
     execute.add_argument('--output', type=Path, required=True)
+    stage = commands.add_parser('stage', help='Privately stage evidence in verified resumable SSH chunks; no database access')
+    stage.add_argument('--host', required=True)
+    stage.add_argument('--evidence', type=Path, required=True)
+    stage.add_argument('--plan', type=Path, required=True)
+    stage.add_argument('--chunk-kib', type=int, choices=(256, 512), default=256)
+    stage.add_argument('--max-new-chunks', type=int)
+    stage.add_argument('--output', type=Path, required=True)
     snap = commands.add_parser('snapshot', help='Read local charge identities in resumable bounded partitions')
     snap.add_argument('--host', required=True)
     snap.add_argument('--accounts', nargs='+', type=int, required=True)
@@ -673,11 +693,23 @@ def main(argv=None):
             write_json(args.output / 'local-snapshot.json', result)
             print(json.dumps({'status': 'snapshot_complete', 'charges': len(result['charges'])}, ensure_ascii=True))
             return 0
+        elif args.command == 'stage':
+            payload = apply_payload(json.loads(args.evidence.read_text(encoding='utf-8')),
+                                    json.loads(args.plan.read_text(encoding='utf-8')))
+            def checkpoint(report):
+                write_json(args.output, report)
+            result = stage_payload(args.host, payload, args.chunk_kib << 10,
+                                   progress=checkpoint, max_new_chunks=args.max_new_chunks)
+            print(json.dumps({'status': result['status'], 'directory': result['directory'],
+                              'uploaded_chunks': len(result['uploaded_chunks']), 'reused_chunks': result.get('reused_chunks'),
+                              'elapsed_seconds': result['elapsed_seconds']}, ensure_ascii=True))
+            return 0
         elif args.command == 'execute':
             result = execute_plan(args.host, json.loads(args.evidence.read_text(encoding='utf-8')),
                                   json.loads(args.plan.read_text(encoding='utf-8')), args.source_commit,
                                   json.loads(args.backup_record.read_text(encoding='utf-8')) if args.backup_record else None,
-                                  args.apply)
+                                  args.apply,
+                                  json.loads(args.staged_report.read_text(encoding='utf-8')) if args.staged_report else None)
             write_json(args.output, result)
             print(json.dumps(result, ensure_ascii=True))
             return 0
@@ -689,7 +721,7 @@ def main(argv=None):
                           'total_amount_yuan': result['total_amount_yuan'],
                           'remaining_unpriced_requests': result['remaining_unpriced_requests']}, ensure_ascii=True))
         return 0
-    except (ReconcileError, OSError, ValueError) as error:
+    except (ReconcileError, StageError, OSError, ValueError) as error:
         # Do not include raw HTTP bodies, SSH stderr, or credentials in errors.
         print('GlobalAI reconciliation failed: ' + str(error), file=sys.stderr)
         return 1
