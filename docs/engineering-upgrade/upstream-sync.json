@@ -16,61 +16,81 @@
   "record": "docs/engineering-upgrade/UPSTREAM-SYNC-2026-11-17.md",
   "runbook": "docs/engineering-upgrade/UPSTREAM-MERGE-RUNBOOK.md",
   "deployment": {
-    "version": "0.2.22-mile.20261118.continuation1",
-    "source_commit": "2898b7e4b478e581c1ccc34b65a898e98a1ed086",
-    "reviewed_application_commit": "7624e4b236f85775ebd841c2058458a36b6af2f3",
-    "sha256": "d82cda44b69b1f32adf4f3da33a62c9de4d03962185007e87c009a16e27af2ef",
-    "backup": "/opt/sub2api/backups/before-mile-20261118-continuation1-20261118T033923080263Z",
-    "database_backup_sha256": "fe4ea0fe298b8acbe30ac83b9af8366a01687d48b15d1b1b163078cd64de484c",
-    "started_at": "2026-11-18T03:39:44.545481+00:00",
+    "version": "0.2.22-mile.20261118.experiment-async1",
+    "source_commit": "16ba3ae098dfca67bc3e8b900b4e30702181d4ef",
+    "sha256": "8666ce341be6b6955566586420856df6f55812b774a6a0edfa6298966a58fd2c",
+    "backup": "/opt/sub2api/backups/before-mile-20261118-experiment-async1-20261118T045537632627Z",
+    "started_at": "2026-11-18T04:55:58.455267+00:00",
     "status": "deployed",
-    "as_of": "2026-11-18T03:39:44.965432+00:00",
-    "finished_at": "2026-11-18T03:40:19.034116+00:00",
+    "as_of": "2026-11-18T04:55:58.821256+00:00",
+    "finished_at": "2026-11-18T04:56:30.760065+00:00",
+    "reviewed_application_commit": "11a1df54deff041bc68e6187c58ac0c54e3caa87",
+    "database_backup_sha256": "ce7ac1755a7cb87545e00aaf86556e24d7850b50aad85afab8cc06ef89f2744b",
     "host": "172.104.117.114",
-    "release_directory": "/opt/sub2api/releases/mile-20261118-continuation1",
-    "record": "docs/engineering-upgrade/CODING-CONTINUATION-2026-11-18.md",
-    "migration_count": 322,
+    "release_directory": "/opt/sub2api/releases/mile-20261118-experiment-async1",
+    "record": "docs/engineering-upgrade/EXPERIMENT-CONCURRENCY-2026-11-18.md",
+    "migration_count": 323,
     "migration_count_before": 322,
-    "migration_count_after": 322,
+    "migration_count_after": 323,
     "openai_mode": "shadow",
     "grok_mode": "shadow",
     "api_standby_enabled": false,
     "runtime_environment_preserved": true,
     "personal_clocks_preserved": true,
     "audits_preserved": true,
-    "request_rows_preserved": 50933,
-    "settled_imported_preserved": 49295,
+    "request_rows_preserved": 50952,
     "confirmed_events_preserved": true,
     "capacity_events_preserved": true,
     "personal_reset_audits_preserved": true,
     "durable_record_counts": {
-      "coding_quota_reservations": 47960,
-      "coding_quota_reservation_events": 191704,
-      "coding_quota_billing_tasks": 47838,
+      "coding_quota_reservations": 47979,
+      "coding_quota_reservation_events": 191780,
+      "coding_quota_billing_tasks": 47857,
       "coding_quota_async_jobs": 0
     },
     "experiment_counts_preserved": {
-      "experiment_quota_charges": 37539,
-      "experiment_quota_attempts": 11,
-      "experiment_quota_settlement_events": 24071
+      "experiment_quota_charges": 37550,
+      "experiment_quota_attempts": 22,
+      "experiment_quota_settlement_events": 24082
     },
     "public_resources_checked": 202,
     "public_client_all_passed": true,
     "app_healthy": true,
     "memslides_healthy": true,
-    "live_inference_calls": 3,
-    "live_inference_completions": 3,
-    "long_history_probe": {"synthetic": true, "encrypted_items": 101, "before_status": 503, "after_status": 200, "completed": true},
-    "public_model_completions": ["gpt-6.2-sol", "gpt-6.1-sol"],
+    "live_inference_calls": 0,
+    "async_admission_policy": {
+      "max_active": 10,
+      "max_outstanding": 100,
+      "max_pending_age_seconds": 900,
+      "user_ids": [
+        2,
+        3
+      ],
+      "version": 1
+    },
     "validation": {
-      "standby_targeted_race_passed": 91,
-      "quota_postgres_race_passed": 104,
+      "frontend_files": 411,
+      "frontend_tests": 3322,
+      "scoped_go_race_passed": 79,
+      "scoped_go_race_skipped": 0,
+      "quota_postgres_race_passed": 118,
       "quota_postgres_race_skipped": 0,
       "quota_postgres_race_failed": 0,
-      "delivery_tool_passed": 36,
-      "frontend_evidence_reused": true,
-      "artifact_browser_engines": ["chromium", "webkit"],
-      "artifact_feature_scenarios": ["experiment-accounting", "api-fallback", "unified-coding", "personal-quota"]
+      "go_vet_passed": true,
+      "incremental_go_lint_issues": 0,
+      "incremental_go_lint_exit_code": 0,
+      "artifact_browser_engines": [
+        "chromium",
+        "webkit"
+      ],
+      "feature_checks_each_engine": 26,
+      "artifact_feature_scenarios": [
+        "experiment-accounting",
+        "api-fallback",
+        "unified-coding",
+        "personal-quota"
+      ],
+      "full_go_test_rerun": false
     }
   },
   "last_accounting_deployment": {
@@ -136,8 +156,16 @@
       "quota_postgres_race_passed": 104,
       "quota_postgres_race_skipped": 0,
       "quota_postgres_race_failed": 0,
-      "artifact_browser_engines": ["chromium", "webkit"],
-      "artifact_feature_scenarios": ["experiment-accounting", "api-fallback", "unified-coding", "personal-quota"]
+      "artifact_browser_engines": [
+        "chromium",
+        "webkit"
+      ],
+      "artifact_feature_scenarios": [
+        "experiment-accounting",
+        "api-fallback",
+        "unified-coding",
+        "personal-quota"
+      ]
     }
   },
   "last_upstream_deployment": {
@@ -198,8 +226,8 @@
     "action": "merged-validated-and-deployed-pinned-sha",
     "record": "docs/engineering-upgrade/UPSTREAM-SYNC-2026-11-17.md"
   },
-  "deployment_status": "deployed-coding-continuation-fix",
-  "deployment_note": "Deployed the migration-free long subscription conversation compatibility fix. No upstream merge or concurrency changes. Existing accounting guard, ledger, audits, durable tasks, clocks, access and runtime limits were preserved. Codex/Grok remain shadow; API standby and Ultra Fast are disabled. Running source is 2898b7e4b478e581c1ccc34b65a898e98a1ed086; later document commits do not change program identity.",
+  "deployment_status": "deployed-experiment-async-concurrency",
+  "deployment_note": "Deployed opt-in per-user GlobalAI experiment execution limits, separating completed unpriced requests from active capacity. Pending costs remain durable and are reconciled from supplier evidence. Only administrator 2 and tester 3 are initially opted in at 10; administrators can explicitly change individual limits. All clocks, ledgers, audits, runtime limits, access and protected services were preserved. Codex/Grok remain shadow; API standby remains disabled. No upstream merge in this release.",
   "validation": {
     "frontend_tests": 3300,
     "frontend_files": 408,
@@ -283,49 +311,117 @@
   },
   "integration_fixes": [],
   "previous_deployment": {
-    "version": "0.2.20-mile.20261113.coding-ui1",
-    "source_commit": "d44b4c5bf74d5a526798f6be64c29fd25e87d4b9",
-    "sha256": "c9de2dbf2c821d6e6c50298cdb8b4aa708f40ab40d3541a332acef1e0737fcc5",
-    "backup": "/opt/sub2api/backups/before-mile-20261113-coding-ui1-20261113T094030609684Z",
-    "started_at": "2026-11-13T09:40:39.457717+00:00",
+    "version": "0.2.22-mile.20261118.continuation1",
+    "source_commit": "2898b7e4b478e581c1ccc34b65a898e98a1ed086",
+    "reviewed_application_commit": "7624e4b236f85775ebd841c2058458a36b6af2f3",
+    "sha256": "d82cda44b69b1f32adf4f3da33a62c9de4d03962185007e87c009a16e27af2ef",
+    "backup": "/opt/sub2api/backups/before-mile-20261118-continuation1-20261118T033923080263Z",
+    "database_backup_sha256": "fe4ea0fe298b8acbe30ac83b9af8366a01687d48b15d1b1b163078cd64de484c",
+    "started_at": "2026-11-18T03:39:44.545481+00:00",
     "status": "deployed",
-    "as_of": "2026-11-13T09:40:59.969452+00:00",
-    "finished_at": "2026-11-13T09:41:11.219797+00:00",
+    "as_of": "2026-11-18T03:39:44.965432+00:00",
+    "finished_at": "2026-11-18T03:40:19.034116+00:00",
     "host": "172.104.117.114",
-    "release_directory": "/opt/sub2api/releases/mile-20261113-coding-ui1",
-    "record": "docs/engineering-upgrade/CODING-UI-2026-11-13.md",
-    "migration_count": 317,
-    "migration_count_before": 317,
-    "migration_count_after": 317,
+    "release_directory": "/opt/sub2api/releases/mile-20261118-continuation1",
+    "record": "docs/engineering-upgrade/CODING-CONTINUATION-2026-11-18.md",
+    "migration_count": 322,
+    "migration_count_before": 322,
+    "migration_count_after": 322,
     "openai_mode": "shadow",
     "grok_mode": "shadow",
+    "api_standby_enabled": false,
     "runtime_environment_preserved": true,
     "personal_clocks_preserved": true,
     "audits_preserved": true,
-    "request_rows_preserved": 35973,
-    "settled_imported_preserved": 34326,
+    "request_rows_preserved": 50933,
+    "settled_imported_preserved": 49295,
     "confirmed_events_preserved": true,
     "capacity_events_preserved": true,
     "personal_reset_audits_preserved": true,
     "durable_record_counts": {
-      "coding_quota_async_jobs": 0,
-      "coding_quota_reservations": 32928,
-      "coding_quota_billing_tasks": 32878,
-      "coding_quota_reservation_events": 131668
+      "coding_quota_reservations": 47960,
+      "coding_quota_reservation_events": 191704,
+      "coding_quota_billing_tasks": 47838,
+      "coding_quota_async_jobs": 0
     },
-    "public_resources_checked": 201,
+    "experiment_counts_preserved": {
+      "experiment_quota_charges": 37539,
+      "experiment_quota_attempts": 11,
+      "experiment_quota_settlement_events": 24071
+    },
+    "public_resources_checked": 202,
     "public_client_all_passed": true,
-    "public_server_all_passed": true,
-    "admin_preview_group_id": 17,
-    "ordinary_test_users_granted": 0,
-    "live_inference_calls": 0,
-    "old_key_groups_verified": 5,
-    "live_users_verified": 5
+    "app_healthy": true,
+    "memslides_healthy": true,
+    "live_inference_calls": 3,
+    "live_inference_completions": 3,
+    "long_history_probe": {
+      "synthetic": true,
+      "encrypted_items": 101,
+      "before_status": 503,
+      "after_status": 200,
+      "completed": true
+    },
+    "public_model_completions": [
+      "gpt-6.2-sol",
+      "gpt-6.1-sol"
+    ],
+    "validation": {
+      "standby_targeted_race_passed": 91,
+      "quota_postgres_race_passed": 104,
+      "quota_postgres_race_skipped": 0,
+      "quota_postgres_race_failed": 0,
+      "delivery_tool_passed": 36,
+      "frontend_evidence_reused": true,
+      "artifact_browser_engines": [
+        "chromium",
+        "webkit"
+      ],
+      "artifact_feature_scenarios": [
+        "experiment-accounting",
+        "api-fallback",
+        "unified-coding",
+        "personal-quota"
+      ]
+    }
   },
   "source_changed_files": 32,
   "merge_record": "docs/engineering-upgrade/UPSTREAM-SYNC-2026-11-15.md",
   "business_merge_commit": "539e4ba8b44eaf90ef29f30c0c51e86d23b3aba6",
   "last_custom_upgrade": {
+    "name": "per-user-experiment-async-concurrency",
+    "source_commit": "16ba3ae098dfca67bc3e8b900b4e30702181d4ef",
+    "reviewed_application_commit": "11a1df54deff041bc68e6187c58ac0c54e3caa87",
+    "version": "0.2.22-mile.20261118.experiment-async1",
+    "record": "docs/engineering-upgrade/EXPERIMENT-CONCURRENCY-2026-11-18.md",
+    "new_migrations": 1,
+    "backend_production_unchanged": false,
+    "validation": {
+      "frontend_files": 411,
+      "frontend_tests": 3322,
+      "scoped_go_race_passed": 79,
+      "scoped_go_race_skipped": 0,
+      "quota_postgres_race_passed": 118,
+      "quota_postgres_race_skipped": 0,
+      "quota_postgres_race_failed": 0,
+      "go_vet_passed": true,
+      "incremental_go_lint_issues": 0,
+      "incremental_go_lint_exit_code": 0,
+      "artifact_browser_engines": [
+        "chromium",
+        "webkit"
+      ],
+      "feature_checks_each_engine": 26,
+      "artifact_feature_scenarios": [
+        "experiment-accounting",
+        "api-fallback",
+        "unified-coding",
+        "personal-quota"
+      ],
+      "full_go_test_rerun": false
+    }
+  },
+  "previous_custom_upgrade": {
     "name": "unified-coding-admin-preview",
     "source_commit": "17377e59a0af8d4ba0577f68be5547cf61110323",
     "version": "0.2.20-mile.20261113.coding-preview1",
@@ -348,34 +444,6 @@
       "public_resources": 201,
       "administrator_only": true
     }
-  },
-  "previous_custom_upgrade": {
-    "name": "audited-personal-quota-reset",
-    "base_commit": "6ccfa37200cb521dc8449e7e3df2aea52def560c",
-    "source_commit": "d0322099cb9d47f80c21fa24d1000f12b82c6739",
-    "record": "docs/engineering-upgrade/USER-QUOTA-RESET-2026-11-13.md",
-    "version": "0.2.20-mile.20261113.quota1",
-    "new_migrations": 1,
-    "backend_production_unchanged": false,
-    "validation": {
-      "frontend_files": 406,
-      "frontend_tests": 3253,
-      "quota_postgres_race_passed": 74,
-      "quota_postgres_race_skipped": 0,
-      "quota_postgres_race_failed": 0,
-      "tool_tests": 49,
-      "scoped_go_passed": 266,
-      "scoped_go_skipped": 4,
-      "browser_passed": [
-        "Chromium",
-        "WebKit"
-      ],
-      "live_users_verified": 5,
-      "live_business_writes": 0,
-      "review": "fresh independent review; 3 important findings fixed RED to GREEN",
-      "full_service_unit": "18766 passed, 10 skipped, 145 failing test nodes across 11 baseline-reproduced roots"
-    },
-    "timing_seconds_to_deployment": 4524.806
   },
   "deployment_history": [
     {
@@ -584,6 +652,159 @@
         "GOGC": "50"
       },
       "runtime_resources_record": "docs/engineering-upgrade/SSH-AND-RESOURCES-2026-11-17.md"
+    },
+    {
+      "version": "0.2.22-mile.20261118.continuation1",
+      "source_commit": "2898b7e4b478e581c1ccc34b65a898e98a1ed086",
+      "reviewed_application_commit": "7624e4b236f85775ebd841c2058458a36b6af2f3",
+      "sha256": "d82cda44b69b1f32adf4f3da33a62c9de4d03962185007e87c009a16e27af2ef",
+      "backup": "/opt/sub2api/backups/before-mile-20261118-continuation1-20261118T033923080263Z",
+      "database_backup_sha256": "fe4ea0fe298b8acbe30ac83b9af8366a01687d48b15d1b1b163078cd64de484c",
+      "started_at": "2026-11-18T03:39:44.545481+00:00",
+      "status": "deployed",
+      "as_of": "2026-11-18T03:39:44.965432+00:00",
+      "finished_at": "2026-11-18T03:40:19.034116+00:00",
+      "host": "172.104.117.114",
+      "release_directory": "/opt/sub2api/releases/mile-20261118-continuation1",
+      "record": "docs/engineering-upgrade/CODING-CONTINUATION-2026-11-18.md",
+      "migration_count": 322,
+      "migration_count_before": 322,
+      "migration_count_after": 322,
+      "openai_mode": "shadow",
+      "grok_mode": "shadow",
+      "api_standby_enabled": false,
+      "runtime_environment_preserved": true,
+      "personal_clocks_preserved": true,
+      "audits_preserved": true,
+      "request_rows_preserved": 50933,
+      "settled_imported_preserved": 49295,
+      "confirmed_events_preserved": true,
+      "capacity_events_preserved": true,
+      "personal_reset_audits_preserved": true,
+      "durable_record_counts": {
+        "coding_quota_reservations": 47960,
+        "coding_quota_reservation_events": 191704,
+        "coding_quota_billing_tasks": 47838,
+        "coding_quota_async_jobs": 0
+      },
+      "experiment_counts_preserved": {
+        "experiment_quota_charges": 37539,
+        "experiment_quota_attempts": 11,
+        "experiment_quota_settlement_events": 24071
+      },
+      "public_resources_checked": 202,
+      "public_client_all_passed": true,
+      "app_healthy": true,
+      "memslides_healthy": true,
+      "live_inference_calls": 3,
+      "live_inference_completions": 3,
+      "long_history_probe": {
+        "synthetic": true,
+        "encrypted_items": 101,
+        "before_status": 503,
+        "after_status": 200,
+        "completed": true
+      },
+      "public_model_completions": [
+        "gpt-6.2-sol",
+        "gpt-6.1-sol"
+      ],
+      "validation": {
+        "standby_targeted_race_passed": 91,
+        "quota_postgres_race_passed": 104,
+        "quota_postgres_race_skipped": 0,
+        "quota_postgres_race_failed": 0,
+        "delivery_tool_passed": 36,
+        "frontend_evidence_reused": true,
+        "artifact_browser_engines": [
+          "chromium",
+          "webkit"
+        ],
+        "artifact_feature_scenarios": [
+          "experiment-accounting",
+          "api-fallback",
+          "unified-coding",
+          "personal-quota"
+        ]
+      }
+    },
+    {
+      "version": "0.2.22-mile.20261118.experiment-async1",
+      "source_commit": "16ba3ae098dfca67bc3e8b900b4e30702181d4ef",
+      "sha256": "8666ce341be6b6955566586420856df6f55812b774a6a0edfa6298966a58fd2c",
+      "backup": "/opt/sub2api/backups/before-mile-20261118-experiment-async1-20261118T045537632627Z",
+      "started_at": "2026-11-18T04:55:58.455267+00:00",
+      "status": "deployed",
+      "as_of": "2026-11-18T04:55:58.821256+00:00",
+      "finished_at": "2026-11-18T04:56:30.760065+00:00",
+      "reviewed_application_commit": "11a1df54deff041bc68e6187c58ac0c54e3caa87",
+      "database_backup_sha256": "ce7ac1755a7cb87545e00aaf86556e24d7850b50aad85afab8cc06ef89f2744b",
+      "host": "172.104.117.114",
+      "release_directory": "/opt/sub2api/releases/mile-20261118-experiment-async1",
+      "record": "docs/engineering-upgrade/EXPERIMENT-CONCURRENCY-2026-11-18.md",
+      "migration_count": 323,
+      "migration_count_before": 322,
+      "migration_count_after": 323,
+      "openai_mode": "shadow",
+      "grok_mode": "shadow",
+      "api_standby_enabled": false,
+      "runtime_environment_preserved": true,
+      "personal_clocks_preserved": true,
+      "audits_preserved": true,
+      "request_rows_preserved": 50952,
+      "confirmed_events_preserved": true,
+      "capacity_events_preserved": true,
+      "personal_reset_audits_preserved": true,
+      "durable_record_counts": {
+        "coding_quota_reservations": 47979,
+        "coding_quota_reservation_events": 191780,
+        "coding_quota_billing_tasks": 47857,
+        "coding_quota_async_jobs": 0
+      },
+      "experiment_counts_preserved": {
+        "experiment_quota_charges": 37550,
+        "experiment_quota_attempts": 22,
+        "experiment_quota_settlement_events": 24082
+      },
+      "public_resources_checked": 202,
+      "public_client_all_passed": true,
+      "app_healthy": true,
+      "memslides_healthy": true,
+      "live_inference_calls": 0,
+      "async_admission_policy": {
+        "max_active": 10,
+        "max_outstanding": 100,
+        "max_pending_age_seconds": 900,
+        "user_ids": [
+          2,
+          3
+        ],
+        "version": 1
+      },
+      "validation": {
+        "frontend_files": 411,
+        "frontend_tests": 3322,
+        "scoped_go_race_passed": 79,
+        "scoped_go_race_skipped": 0,
+        "quota_postgres_race_passed": 118,
+        "quota_postgres_race_skipped": 0,
+        "quota_postgres_race_failed": 0,
+        "go_vet_passed": true,
+        "incremental_go_lint_issues": 0,
+        "incremental_go_lint_exit_code": 0,
+        "artifact_browser_engines": [
+          "chromium",
+          "webkit"
+        ],
+        "feature_checks_each_engine": 26,
+        "artifact_feature_scenarios": [
+          "experiment-accounting",
+          "api-fallback",
+          "unified-coding",
+          "personal-quota"
+        ],
+        "full_go_test_rerun": false
+      }
     }
   ],
   "custom_upgrade_history": [
@@ -649,6 +870,63 @@
         "full_service_unit": "18766 passed, 10 skipped, 145 failing test nodes across 11 baseline-reproduced roots"
       },
       "timing_seconds_to_deployment": 4524.806
+    },
+    {
+      "name": "unified-coding-admin-preview",
+      "source_commit": "17377e59a0af8d4ba0577f68be5547cf61110323",
+      "version": "0.2.20-mile.20261113.coding-preview1",
+      "record": "docs/engineering-upgrade/CODEX-GROK-PREVIEW-2026-11-13.md",
+      "new_migrations": 0,
+      "backend_production_unchanged": false,
+      "validation": {
+        "frontend_files": 406,
+        "frontend_tests": 3260,
+        "scoped_go_passed": 1062,
+        "quota_postgres_race_passed": 74,
+        "quota_postgres_race_skipped": 0,
+        "tool_tests": 73,
+        "real_postgres_tool_tests": 2,
+        "browser_passed": [
+          "Chromium",
+          "WebKit"
+        ],
+        "feature_checks_each_engine": 20,
+        "public_resources": 201,
+        "administrator_only": true
+      }
+    },
+    {
+      "name": "per-user-experiment-async-concurrency",
+      "source_commit": "16ba3ae098dfca67bc3e8b900b4e30702181d4ef",
+      "reviewed_application_commit": "11a1df54deff041bc68e6187c58ac0c54e3caa87",
+      "version": "0.2.22-mile.20261118.experiment-async1",
+      "record": "docs/engineering-upgrade/EXPERIMENT-CONCURRENCY-2026-11-18.md",
+      "new_migrations": 1,
+      "backend_production_unchanged": false,
+      "validation": {
+        "frontend_files": 411,
+        "frontend_tests": 3322,
+        "scoped_go_race_passed": 79,
+        "scoped_go_race_skipped": 0,
+        "quota_postgres_race_passed": 118,
+        "quota_postgres_race_skipped": 0,
+        "quota_postgres_race_failed": 0,
+        "go_vet_passed": true,
+        "incremental_go_lint_issues": 0,
+        "incremental_go_lint_exit_code": 0,
+        "artifact_browser_engines": [
+          "chromium",
+          "webkit"
+        ],
+        "feature_checks_each_engine": 26,
+        "artifact_feature_scenarios": [
+          "experiment-accounting",
+          "api-fallback",
+          "unified-coding",
+          "personal-quota"
+        ],
+        "full_go_test_rerun": false
+      }
     }
   ],
   "last_ui_upgrade": {
@@ -926,5 +1204,83 @@
     },
     "observation_minutes": 3.94,
     "caddy_journal_rows_in_observation": 0
+  },
+  "last_experiment_concurrency_deployment": {
+    "version": "0.2.22-mile.20261118.experiment-async1",
+    "source_commit": "16ba3ae098dfca67bc3e8b900b4e30702181d4ef",
+    "sha256": "8666ce341be6b6955566586420856df6f55812b774a6a0edfa6298966a58fd2c",
+    "backup": "/opt/sub2api/backups/before-mile-20261118-experiment-async1-20261118T045537632627Z",
+    "started_at": "2026-11-18T04:55:58.455267+00:00",
+    "status": "deployed",
+    "as_of": "2026-11-18T04:55:58.821256+00:00",
+    "finished_at": "2026-11-18T04:56:30.760065+00:00",
+    "reviewed_application_commit": "11a1df54deff041bc68e6187c58ac0c54e3caa87",
+    "database_backup_sha256": "ce7ac1755a7cb87545e00aaf86556e24d7850b50aad85afab8cc06ef89f2744b",
+    "host": "172.104.117.114",
+    "release_directory": "/opt/sub2api/releases/mile-20261118-experiment-async1",
+    "record": "docs/engineering-upgrade/EXPERIMENT-CONCURRENCY-2026-11-18.md",
+    "migration_count": 323,
+    "migration_count_before": 322,
+    "migration_count_after": 323,
+    "openai_mode": "shadow",
+    "grok_mode": "shadow",
+    "api_standby_enabled": false,
+    "runtime_environment_preserved": true,
+    "personal_clocks_preserved": true,
+    "audits_preserved": true,
+    "request_rows_preserved": 50952,
+    "confirmed_events_preserved": true,
+    "capacity_events_preserved": true,
+    "personal_reset_audits_preserved": true,
+    "durable_record_counts": {
+      "coding_quota_reservations": 47979,
+      "coding_quota_reservation_events": 191780,
+      "coding_quota_billing_tasks": 47857,
+      "coding_quota_async_jobs": 0
+    },
+    "experiment_counts_preserved": {
+      "experiment_quota_charges": 37550,
+      "experiment_quota_attempts": 22,
+      "experiment_quota_settlement_events": 24082
+    },
+    "public_resources_checked": 202,
+    "public_client_all_passed": true,
+    "app_healthy": true,
+    "memslides_healthy": true,
+    "live_inference_calls": 0,
+    "async_admission_policy": {
+      "max_active": 10,
+      "max_outstanding": 100,
+      "max_pending_age_seconds": 900,
+      "user_ids": [
+        2,
+        3
+      ],
+      "version": 1
+    },
+    "validation": {
+      "frontend_files": 411,
+      "frontend_tests": 3322,
+      "scoped_go_race_passed": 79,
+      "scoped_go_race_skipped": 0,
+      "quota_postgres_race_passed": 118,
+      "quota_postgres_race_skipped": 0,
+      "quota_postgres_race_failed": 0,
+      "go_vet_passed": true,
+      "incremental_go_lint_issues": 0,
+      "incremental_go_lint_exit_code": 0,
+      "artifact_browser_engines": [
+        "chromium",
+        "webkit"
+      ],
+      "feature_checks_each_engine": 26,
+      "artifact_feature_scenarios": [
+        "experiment-accounting",
+        "api-fallback",
+        "unified-coding",
+        "personal-quota"
+      ],
+      "full_go_test_rerun": false
+    }
   }
 }
