@@ -27,11 +27,12 @@ import (
 
 // ExperimentStandby is scoped to an internal dispatch and is never read from headers.
 type ExperimentStandby struct {
-	UserID, KeyID, GroupID int64
-	Platform               string
-	Model                  string
-	BeforeSend             func(context.Context) error
-	sent                   atomic.Bool
+	UserID, KeyID, GroupID                int64
+	AccountID, SourceKeyID, SourceGroupID int64
+	Platform                              string
+	Model                                 string
+	BeforeSend                            func(context.Context) error
+	sent                                  atomic.Bool
 }
 
 type experimentStandbyContextKey struct{}
@@ -139,7 +140,7 @@ func (s *OpenAIGatewayService) EvaluateAPIFallbackPrimaryPool(ctx context.Contex
 		if a.ParentAccountID != nil {
 			autoExpired := a.AutoPauseOnExpired && a.ExpiresAt != nil && !now.Before(*a.ExpiresAt)
 			if (a.Status != StatusActive && a.Status != StatusError) || (!a.Schedulable && !autoExpired) {
-				if p.ExperimentKeyID > 0 {
+				if p.isExperimentStandby() {
 					view.Reason = "primary_paused"
 					return view, nil
 				}
@@ -167,7 +168,7 @@ func (s *OpenAIGatewayService) EvaluateAPIFallbackPrimaryPool(ctx context.Contex
 		return view, nil
 	}
 	primaryIDs := p.PrimaryAccountIDs
-	if p.ExperimentKeyID > 0 {
+	if p.isExperimentStandby() {
 		primaryIDs = make([]int64, 0, len(actual))
 		for id := range actual {
 			primaryIDs = append(primaryIDs, id)
@@ -201,7 +202,7 @@ func (s *OpenAIGatewayService) EvaluateAPIFallbackPrimaryPool(ctx context.Contex
 		if p.Platform == PlatformGrok {
 			used, reset, observed, _, _ = grokOfficial(a.Extra, now)
 		}
-		if p.ExperimentKeyID > 0 && a.AutoPauseOnExpired && a.ExpiresAt != nil && !now.Before(*a.ExpiresAt) {
+		if p.isExperimentStandby() && a.AutoPauseOnExpired && a.ExpiresAt != nil && !now.Before(*a.ExpiresAt) {
 			check.Passed = true
 			check.Detail = "subscription_expired"
 			view.Checks = append(view.Checks, check)
@@ -305,15 +306,22 @@ func (s *OpenAIGatewayService) TryAPIFallback(ctx context.Context, c *gin.Contex
 			return true, errors.New("standby conversation provenance cannot be verified")
 		}
 	}
+	if p == nil && lineageAccount == 0 && len(experimentDispatch) > 0 && len(hashes) == 0 {
+		p, err = s.findAccountExperimentStandby(ctx, key, platform, model)
+		if err != nil {
+			slog.Warn("account_experiment_standby_lookup_failed", "group", *key.GroupID, "error", err)
+			return false, nil
+		}
+	}
 	if !p.ActiveAt(time.Now()) {
 		if lineageAccount > 0 {
 			return true, errors.New("standby is disabled or expired; start a new conversation to use subscriptions")
 		}
 		return false, nil
 	}
-	if p.ExperimentKeyID > 0 {
+	if p.isExperimentStandby() {
 		if lineageAccount > 0 {
-			return true, errors.New("start a new conversation to use the experiment standby Key")
+			return true, errors.New("start a new conversation to use experiment standby")
 		}
 		if p.ApprovedBy != key.UserID || len(experimentDispatch) == 0 || !p.CapabilitiesVerified {
 			return false, nil
@@ -335,7 +343,7 @@ func (s *OpenAIGatewayService) TryAPIFallback(ctx context.Context, c *gin.Contex
 	if len(hashes) > 0 && lineageAccount == 0 {
 		return true, errors.New("standby cannot migrate encrypted subscription state; start a new conversation")
 	}
-	if p.ExperimentKeyID > 0 {
+	if p.isExperimentStandby() {
 		if key.Quota > 0 || key.HasRateLimits() {
 			return true, errors.New("experiment standby cannot substitute a Key with its own monetary limits")
 		}

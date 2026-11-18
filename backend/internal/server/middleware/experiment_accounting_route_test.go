@@ -44,6 +44,64 @@ func (r experimentStandbyTestKeys) GetByID(_ context.Context, id int64) (*servic
 	return r.key, nil
 }
 
+type experimentStandbyTestGroups struct {
+	service.GroupRepository
+	group *service.Group
+}
+
+func (r experimentStandbyTestGroups) GetByID(_ context.Context, id int64) (*service.Group, error) {
+	if id != r.group.ID {
+		return nil, service.ErrGroupNotFound
+	}
+	return r.group, nil
+}
+
+func TestExperimentAccountStandbyUsesSourceIdentityWithoutChangingKey(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, role := range []string{service.RoleAdmin, service.RoleUser} {
+		t.Run(role, func(t *testing.T) {
+			cfg := &config.Config{RunMode: config.RunModeStandard}
+			store := &experimentRouteStore{}
+			source := &service.Group{ID: 8, Platform: service.PlatformOpenAI, UsageKind: service.UsageKindCoding, Status: service.StatusActive, Hydrated: true}
+			target := &service.Group{ID: 9, Platform: service.PlatformOpenAI, UsageKind: service.UsageKindExperiment, Status: service.StatusActive, Hydrated: true}
+			key := &service.APIKey{ID: 40, UserID: 3, User: &service.User{ID: 3, Status: service.StatusActive, Role: role, Balance: 10},
+				GroupID: &source.ID, Group: source, Key: "test-only", Status: service.StatusActive}
+			keys := experimentStandbyTestKeys{key: key, fakeAPIKeyRepo: fakeAPIKeyRepo{
+				getByKey: func(context.Context, string) (*service.APIKey, error) { return key, nil },
+			}}
+			svc := service.NewAPIKeyService(keys, nil, experimentStandbyTestGroups{group: target}, nil, nil, nil, cfg)
+			svc.SetOfficialPoints(service.NewOfficialPointService(nil, store, nil))
+			router := gin.New()
+			router.Use(gin.HandlerFunc(NewAPIKeyAuthMiddleware(svc, nil, cfg)), GroupModelAllowlist())
+			router.POST("/v1/responses", func(c *gin.Context) {
+				got, _ := GetAPIKeyFromContext(c)
+				require.NotSame(t, key, got)
+				require.Equal(t, target.ID, *got.GroupID)
+				require.Equal(t, service.PurposeExperiment, service.PurposeForRequest(c.Request.Context(), got.Group))
+				out, err := http.NewRequestWithContext(c.Request.Context(), http.MethodPost, "https://globalai.vip/v1/responses", nil)
+				require.NoError(t, err)
+				require.NoError(t, service.BeginExperimentHTTPAttempt(out, 20))
+				c.Status(http.StatusOK)
+			})
+			request := httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(`{"model":"gpt-test","input":"hello"}`))
+			request.Header.Set("Authorization", "Bearer "+key.Key)
+			standby := &service.ExperimentStandby{UserID: 3, KeyID: 40, SourceKeyID: 40, SourceGroupID: 8, GroupID: 9,
+				AccountID: 20, Platform: service.PlatformOpenAI, Model: "gpt-test", BeforeSend: func(context.Context) error { return nil }}
+			recorder := httptest.NewRecorder()
+			router.ServeHTTP(recorder, request.WithContext(service.WithExperimentStandby(request.Context(), standby)))
+			require.Equal(t, source.ID, *key.GroupID)
+			if role == service.RoleAdmin {
+				require.Equal(t, http.StatusOK, recorder.Code, recorder.Body.String())
+				require.Equal(t, key.ID, store.keyID.Load())
+				require.Equal(t, int32(1), store.sent.Load())
+			} else {
+				require.Equal(t, http.StatusForbidden, recorder.Code, recorder.Body.String())
+				require.Zero(t, store.reserved.Load())
+			}
+		})
+	}
+}
+
 func TestExperimentStandbyRoutePreservesKeyAuthorizationAndBillingIdentity(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	for _, tc := range []struct {

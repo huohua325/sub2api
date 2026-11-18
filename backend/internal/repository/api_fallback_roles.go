@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+
+	"github.com/Wei-Shaw/sub2api/internal/service"
 )
 
 type fallbackRoleQueryer interface {
@@ -28,7 +30,14 @@ func listAPIFallbackBackupAccountIDs(ctx context.Context, db fallbackRoleQueryer
  SELECT DISTINCT b.account_id::bigint FROM configs c
  CROSS JOIN LATERAL jsonb_array_elements_text(CASE
  WHEN jsonb_typeof(c.config->'backup_account_ids')='array' THEN c.config->'backup_account_ids'
- ELSE '[]'::jsonb END) b(account_id) ORDER BY 1`, group)
+ ELSE '[]'::jsonb END) b(account_id)
+ UNION
+ SELECT a.id FROM accounts a WHERE a.extra->'coding_standby_group_ids' @> jsonb_build_array($1::bigint)
+ UNION
+ SELECT a.id FROM accounts a JOIN account_groups ag ON ag.account_id=a.id
+ WHERE ag.group_id=$1 AND CASE WHEN jsonb_typeof(a.extra->'coding_standby_group_ids')='array'
+ THEN jsonb_array_length(a.extra->'coding_standby_group_ids') > 0 ELSE false END
+ ORDER BY 1`, group)
 	if err != nil {
 		return nil, err
 	}
@@ -60,4 +69,33 @@ func (r *accountRepository) ListAPIFallbackBackupAccountIDs(ctx context.Context,
 		return nil, errors.New("account repository SQL executor is not configured")
 	}
 	return listAPIFallbackBackupAccountIDs(ctx, r.sql, group)
+}
+
+func (r *accountRepository) ListCodingStandbyAccounts(ctx context.Context, group int64) ([]*service.Account, error) {
+	if r == nil || r.sql == nil {
+		return nil, errors.New("account repository SQL executor is not configured")
+	}
+	rows, err := r.sql.QueryContext(ctx, `SELECT id FROM accounts
+ WHERE platform='openai' AND type='apikey' AND deleted_at IS NULL AND status='active'
+ AND extra->'coding_standby_group_ids' @> jsonb_build_array($1::bigint)
+ ORDER BY priority,id`, group)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	var ids []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	return r.GetByIDs(ctx, ids)
 }

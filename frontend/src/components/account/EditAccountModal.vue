@@ -3348,6 +3348,14 @@
         data-tour="account-form-groups"
       />
 
+      <fieldset v-if="showCodingStandby" data-testid="account-coding-standby" class="space-y-2 border-t border-gray-200 pt-4 dark:border-dark-600">
+        <legend class="form-label">{{ t('admin.accounts.codingStandby') }}</legend>
+        <label v-for="group in codingStandbyGroups" :key="group.id" class="flex min-w-0 items-start gap-2 text-sm">
+          <input v-model="codingStandbyGroupIDs" :value="group.id" :data-testid="`account-coding-standby-${group.id}`" type="checkbox" class="mt-1 shrink-0" />
+          <span class="min-w-0 break-words">{{ group.name }}</span>
+        </label>
+      </fieldset>
+
     </form>
 
     <template #footer>
@@ -3673,6 +3681,25 @@ interface TempUnschedRuleForm {
 
 // State
 const submitting = ref(false)
+const codingStandbyExtraKey = 'coding_standby_group_ids'
+const codingStandbyGroupIDs = ref<number[]>([])
+function readCodingStandbyGroupIDs(extra: Record<string, unknown> | undefined): number[] {
+  const value = extra?.[codingStandbyExtraKey]
+  return Array.isArray(value) ? value.filter(id => Number.isSafeInteger(id) && id > 0) : []
+}
+const codingStandbyGroups = computed(() => {
+  const groups = props.groups.filter(group =>
+    group.usage_kind === 'coding' && (group.platform === 'openai' || group.platform === 'composite') &&
+    (group.status === 'active' || codingStandbyGroupIDs.value.includes(group.id))
+  )
+  const available = new Set(groups.map(group => group.id))
+  return [...groups, ...codingStandbyGroupIDs.value.filter(id => !available.has(id)).map(id => ({ id, name: `#${id}` }))]
+})
+const showCodingStandby = computed(() => props.account?.platform === 'openai' && props.account.type === 'apikey' &&
+  (codingStandbyGroupIDs.value.length > 0 || props.groups.some(group => group.platform === 'openai' &&
+    group.usage_kind === 'experiment' && group.status === 'active' && form.group_ids.includes(group.id))) &&
+  codingStandbyGroups.value.length > 0
+)
 const editBaseUrl = ref('https://api.anthropic.com')
 const editApiKey = ref('')
 
@@ -4637,6 +4664,7 @@ const syncFormFromAccount = (newAccount: Account | null) => {
     ? newAccount.status
     : 'active'
   form.group_ids = newAccount.group_ids || []
+  codingStandbyGroupIDs.value = readCodingStandbyGroupIDs(newAccount.extra)
   form.expires_at = newAccount.expires_at ?? null
 
   // Load intercept warmup requests setting (applies to all account types)
@@ -5635,6 +5663,14 @@ const persistGrokMediaEligibility = async (accountID: number, updatedAccount: Ac
 }
 
 const submitUpdateAccount = async (accountID: number, updatePayload: Record<string, unknown>) => {
+  const previousStandby = readCodingStandbyGroupIDs(props.account?.extra).sort((a, b) => a - b)
+  const nextStandby = [...codingStandbyGroupIDs.value].sort((a, b) => a - b)
+  if (JSON.stringify(previousStandby) !== JSON.stringify(nextStandby)) {
+    updatePayload.extra = {
+      ...((updatePayload.extra as Record<string, unknown> | undefined) ?? props.account?.extra ?? {}),
+      [codingStandbyExtraKey]: nextStandby
+    }
+  }
   submitting.value = true
   try {
     let updatedAccount = await adminAPI.accounts.update(accountID, withAntigravityConfirmFlag(updatePayload))

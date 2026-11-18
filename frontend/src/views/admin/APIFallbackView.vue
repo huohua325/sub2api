@@ -134,7 +134,7 @@ onBeforeUnmount(() => { disposed = true; controller?.abort() })
     <div class="space-y-5" data-testid="fallback-admin-page">
       <header class="card flex flex-wrap items-start justify-between gap-4 px-5 py-4">
         <div><h1 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('admin.apiFallback.title') }}</h1><p class="mt-1 text-sm leading-6 text-gray-500">{{ t('admin.apiFallback.description') }}</p><p class="mt-1 max-w-3xl text-xs leading-5 text-gray-500">{{ t('admin.apiFallback.rules') }}</p></div>
-        <div class="flex flex-wrap items-center gap-2"><button type="button" class="btn btn-secondary" :disabled="loading" data-testid="fallback-refresh" @click="reload">{{ t(loading ? 'common.loading' : 'common.refresh') }}</button><button type="button" class="btn btn-primary" :disabled="loading || editorOpen" data-testid="fallback-new" @click="edit(null)">{{ t('admin.apiFallback.newPolicy') }}</button></div>
+        <div class="flex flex-wrap items-center gap-2"><button type="button" class="btn btn-secondary" :disabled="loading" data-testid="fallback-refresh" @click="reload">{{ t(loading ? 'common.loading' : 'common.refresh') }}</button><RouterLink to="/admin/accounts" class="btn btn-primary" data-testid="fallback-account-settings">{{ t('admin.accounts.title') }}</RouterLink></div>
       </header>
       <p v-if="error" role="alert" class="text-sm text-red-600 dark:text-red-400" data-testid="fallback-page-error">{{ error }}</p>
       <p v-if="loading && !snapshot" role="status" class="text-sm text-gray-500">{{ t('common.loading') }}</p>

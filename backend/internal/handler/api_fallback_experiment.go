@@ -29,17 +29,34 @@ func (h *OpenAIGatewayHandler) dispatchExperimentStandby(c *gin.Context, source 
 		return errors.New("experiment standby owner or group is unavailable")
 	}
 	dispatch := &service.ExperimentStandby{UserID: source.UserID, KeyID: policy.ExperimentKeyID, GroupID: policy.ExperimentGroupID, Platform: policy.Platform, Model: policy.Model}
-	key, err := h.apiKeyService.GetExperimentStandbyKey(c.Request.Context(), dispatch.KeyID)
-	if err != nil || !dispatch.MatchesKey(key) {
-		return errors.New("experiment standby Key is unavailable")
+	var key *service.APIKey
+	if policy.ExperimentAccountID > 0 {
+		dispatch.AccountID, dispatch.KeyID = policy.ExperimentAccountID, source.ID
+		dispatch.SourceKeyID, dispatch.SourceGroupID = source.ID, policy.GroupID
+		if !dispatch.MatchesSourceKey(source) {
+			return service.ErrExperimentAccountingUnavailable
+		}
+		key = source
+	} else {
+		var err error
+		key, err = h.apiKeyService.GetExperimentStandbyKey(c.Request.Context(), dispatch.KeyID)
+		if err != nil || !dispatch.MatchesKey(key) {
+			return errors.New("experiment standby Key is unavailable")
+		}
 	}
+	req := c.Request.Clone(service.WithExperimentStandby(c.Request.Context(), dispatch))
+	req.URL.Path, req.URL.RawPath, req.URL.RawQuery, req.URL.ForceQuery = "/v1/responses", "", "", false
 	dispatch.BeforeSend = func(ctx context.Context) error {
 		if err := c.Request.Context().Err(); err != nil {
 			return err
 		}
 		current, err := h.apiFallback.FindAPIFallbackPolicy(ctx, policy.GroupID, policy.Platform, policy.Model)
-		if err != nil || current == nil || current.ID != policy.ID || current.Version != policy.Version || !current.ActiveAt(time.Now()) {
+		if err != nil || (dispatch.AccountID > 0 && current != nil) ||
+			(dispatch.AccountID == 0 && (current == nil || current.ID != policy.ID || current.Version != policy.Version || !current.ActiveAt(time.Now()))) {
 			return service.ErrExperimentAccountingUnavailable
+		}
+		if dispatch.AccountID > 0 {
+			current = policy
 		}
 		currentSource, err := h.apiKeyService.GetExperimentStandbyKey(ctx, source.ID)
 		if err != nil || currentSource == nil || currentSource.UserID != source.UserID || currentSource.User == nil ||
@@ -49,7 +66,15 @@ func (h *OpenAIGatewayHandler) dispatchExperimentStandby(c *gin.Context, source 
 			currentSource.Group.UsageKind != service.UsageKindCoding || !currentSource.User.CanBindLabGroup(currentSource.Group) && !currentSource.Group.IsSubscriptionType() {
 			return service.ErrExperimentAccountingUnavailable
 		}
-		target, err := h.apiKeyService.GetExperimentStandbyKey(ctx, dispatch.KeyID)
+		var target *service.APIKey
+		if dispatch.AccountID > 0 {
+			target, err = h.apiKeyService.BindAccountStandbyKey(ctx, dispatch, currentSource, req)
+			if err == nil {
+				err = h.gatewayService.CheckAccountExperimentStandby(ctx, policy, currentSource.User)
+			}
+		} else {
+			target, err = h.apiKeyService.GetExperimentStandbyKey(ctx, dispatch.KeyID)
+		}
 		if err != nil || !dispatch.MatchesKey(target) || target.Key != key.Key {
 			return service.ErrExperimentAccountingUnavailable
 		}
@@ -71,8 +96,6 @@ func (h *OpenAIGatewayHandler) dispatchExperimentStandby(c *gin.Context, source 
 		return nil
 	}
 
-	req := c.Request.Clone(service.WithExperimentStandby(c.Request.Context(), dispatch))
-	req.URL.Path, req.URL.RawPath, req.URL.RawQuery, req.URL.ForceQuery = "/v1/responses", "", "", false
 	req.RequestURI = req.URL.Path
 	req.Header.Del("x-api-key")
 	req.Header.Del("x-goog-api-key")

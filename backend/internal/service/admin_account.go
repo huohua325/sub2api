@@ -100,6 +100,7 @@ func cloneAccountJSONMap(value map[string]any) (map[string]any, error) {
 var duplicateAccountDiscardedExtraKeys = map[string]struct{}{
 	// A retry identity belongs to the operation that created one copy, not to later copies.
 	duplicateAccountOperationIDExtraKey: {},
+	AccountStandbyGroupIDsExtra:         {},
 	// External sync identity belongs to one local account only.
 	"crs_account_id": {},
 	"crs_kind":       {},
@@ -852,6 +853,15 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 	}
 
 	// 先验证分组是否存在（在任何写操作之前）
+	standbyGroupBindings := account.GroupIDs
+	if input.GroupIDs != nil {
+		standbyGroupBindings = *input.GroupIDs
+	}
+	if input.Extra != nil || input.GroupIDs != nil || input.Type != "" {
+		if err := s.validateAccountExperimentStandby(ctx, account, standbyGroupBindings); err != nil {
+			return nil, err
+		}
+	}
 	if input.GroupIDs != nil {
 		if err := s.validateGroupIDsExist(ctx, *input.GroupIDs); err != nil {
 			return nil, err

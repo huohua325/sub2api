@@ -55,6 +55,7 @@ const snapshot = (): APIFallbackSnapshot => ({
 })
 const wrappers: ReturnType<typeof mount>[] = []
 const global = { stubs: {
+  RouterLink: { props: ['to'], template: '<a :href="to"><slot /></a>' },
   AppLayout: { template: '<main><slot /></main>' },
   BaseDialog: { props: ['show', 'title'], template: '<section v-if="show"><h2>{{ title }}</h2><slot /></section>' }
 } }
@@ -83,34 +84,32 @@ describe('administrator API backup', () => {
     expect(mocks.getGroups).not.toHaveBeenCalled()
   })
 
-  it('loads policies and spending, and starts new policies disabled without approved pricing', async () => {
+  it('loads policies and spending and routes new setup to account management', async () => {
     const wrapper = track(mount(APIFallbackView, { global }))
     await flushPromises()
     expect(wrapper.get('[data-testid="fallback-policy-policy-1"]').text()).toContain('gpt-6.1-sol')
     expect(wrapper.text()).toContain('0.103')
-    await wrapper.get('[data-testid="fallback-new"]').trigger('click')
-    expect((wrapper.get('[data-testid="fallback-enabled"]').element as HTMLInputElement).checked).toBe(false)
-    expect(wrapper.find('[data-testid="fallback-points_per_usd"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="fallback-account-settings"]').attributes('href')).toBe('/admin/accounts')
+    expect(wrapper.find('[data-testid="fallback-new"]').exists()).toBe(false)
     expect(mocks.savePolicy).not.toHaveBeenCalled()
   })
 
-  it('submits a same-platform experiment key without pricing after explicit confirmation', async () => {
+  it('continues to edit an existing experiment key policy', async () => {
+    mocks.getSnapshot.mockResolvedValue({ ...snapshot(), policies: [{
+      ...policy(), group_id: 19, platform: 'grok', model: 'grok-4.7', experiment_key_id: 42
+    }] })
     const wrapper = track(mount(APIFallbackView, { global }))
     await flushPromises()
-    await wrapper.get('[data-testid="fallback-new"]').trigger('click')
-    await wrapper.get('[data-testid="fallback-group"]').setValue(19)
+    await wrapper.get('[data-testid="fallback-edit-policy-1"]').trigger('click')
     const keys = wrapper.get('[data-testid="fallback-experiment-key"]')
     expect(keys.findAll('option').map(option => option.attributes('value'))).toEqual(['0', '42'])
-    await wrapper.get('[data-testid="fallback-model"]').setValue('grok-4.7')
-    await keys.setValue(42)
-    await wrapper.get('[data-testid="fallback-enabled"]').setValue(true)
     await wrapper.get('form').trigger('submit')
     expect(mocks.savePolicy).not.toHaveBeenCalled()
     await wrapper.get('[data-testid="fallback-verified"]').setValue(true)
     await wrapper.get('form').trigger('submit')
     await flushPromises()
     expect(mocks.savePolicy).toHaveBeenCalledWith({
-      id: '', expected_version: 0, confirm: true, group_id: 19, platform: 'grok', model: 'grok-4.7',
+      id: 'policy-1', expected_version: 3, confirm: true, group_id: 19, platform: 'grok', model: 'grok-4.7',
       experiment_key_id: 42, enabled: true, capabilities_verified: true, expires_at: null
     })
   })

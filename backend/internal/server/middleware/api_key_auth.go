@@ -108,6 +108,13 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 		var err error
 		if standby := service.ExperimentStandbyFromContext(ctx); standby != nil {
 			apiKey, err = apiKeyService.GetExperimentStandbyKey(ctx, standby.KeyID)
+			if err == nil && standby.AccountID > 0 {
+				if cfg.RunMode == config.RunModeSimple {
+					err = service.ErrExperimentAccountingUnavailable
+				} else {
+					apiKey, err = apiKeyService.BindAccountStandbyKey(ctx, standby, apiKey, c.Request)
+				}
+			}
 			if err != nil || !standby.MatchesKey(apiKey) || apiKey.Key != apiKeyString {
 				AbortWithError(c, http.StatusForbidden, "EXPERIMENT_STANDBY_KEY_CHANGED", "Experiment standby Key is unavailable")
 				return

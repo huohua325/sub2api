@@ -22,6 +22,7 @@ type APIFallbackPolicy struct {
 	BackupAccountIDs           []int64                      `json:"backup_account_ids"`
 	ExperimentKeyID            int64                        `json:"experiment_key_id,omitempty"`
 	ExperimentGroupID          int64                        `json:"experiment_group_id,omitempty"`
+	ExperimentAccountID        int64                        `json:"-"`
 	Enabled                    bool                         `json:"enabled"`
 	CostCircuitOpen            bool                         `json:"cost_circuit_open"`
 	CapabilitiesVerified       bool                         `json:"capabilities_verified"`
@@ -184,7 +185,11 @@ func applyAPIFallbackPolicyPreview(preview *APIFallbackPreview, p *APIFallbackPo
 
 // ActiveAt applies the optional expiration of experiment standby policies.
 func (p *APIFallbackPolicy) ActiveAt(now time.Time) bool {
-	return p != nil && p.Enabled && (p.ExpiresAt != nil && p.ExpiresAt.After(now) || p.ExpiresAt == nil && p.ExperimentKeyID > 0)
+	return p != nil && p.Enabled && (p.ExpiresAt != nil && p.ExpiresAt.After(now) || p.ExpiresAt == nil && p.isExperimentStandby())
+}
+
+func (p *APIFallbackPolicy) isExperimentStandby() bool {
+	return p.ExperimentKeyID > 0 || p.ExperimentAccountID > 0
 }
 
 // APIFallbackReservationInput is supplied by the server after capability checks.

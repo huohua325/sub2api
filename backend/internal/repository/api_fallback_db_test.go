@@ -96,6 +96,30 @@ func TestCodingQuotaDBAPIFallbackExperimentKeyPolicy(t *testing.T) {
 	require.Nil(t, found)
 }
 
+func TestCodingQuotaDBAccountStandbyRoleNeverUsesRegularBinding(t *testing.T) {
+	db, repo := fallbackTestDB(t)
+	_, err := db.Exec(`DELETE FROM account_groups WHERE account_id=30;
+ UPDATE accounts SET extra='{"coding_standby_group_ids":[1]}' WHERE id=30`)
+	require.NoError(t, err)
+	ids, err := repo.ListAPIFallbackBackupAccountIDs(t.Context(), 1)
+	require.NoError(t, err)
+	require.Equal(t, []int64{30}, ids, "normal scheduling must exclude the account even without a regular binding")
+	ids, err = repo.ListAPIFallbackBackupAccountIDs(t.Context(), 2)
+	require.NoError(t, err)
+	require.Empty(t, ids)
+	_, err = db.Exec(`INSERT INTO account_groups VALUES(30,1);
+ UPDATE accounts SET extra='{"coding_standby_group_ids":[2]}' WHERE id=30`)
+	require.NoError(t, err)
+	ids, err = repo.ListAPIFallbackBackupAccountIDs(t.Context(), 1)
+	require.NoError(t, err)
+	require.Equal(t, []int64{30}, ids, "an accidental normal binding does not expose a configured paid account")
+	_, err = db.Exec(`UPDATE accounts SET extra='{"coding_standby_group_ids":[]}' WHERE id=30`)
+	require.NoError(t, err)
+	ids, err = repo.ListAPIFallbackBackupAccountIDs(t.Context(), 2)
+	require.NoError(t, err)
+	require.Empty(t, ids)
+}
+
 func TestCodingQuotaDBAPIFallbackAdminAndExplicitApproval(t *testing.T) {
 	db, r := fallbackTestDB(t)
 	_, err := r.ReadAPIFallback(t.Context(), 2)

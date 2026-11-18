@@ -17,6 +17,7 @@ func (s *OpenAIGatewayService) doOpenAIUpstream(request *http.Request, proxyURL 
 	}
 	if standby := ExperimentStandbyFromContext(request.Context()); standby != nil {
 		if account == nil || account.Type != AccountTypeAPIKey || account.Platform != standby.Platform ||
+			standby.AccountID > 0 && account.ID != standby.AccountID ||
 			!account.IsModelSupported(standby.Model) || account.GetMappedModel(standby.Model) != standby.Model ||
 			request.Method != http.MethodPost || request.URL == nil || strings.TrimRight(request.URL.Path, "/") != "/v1/responses" {
 			return nil, ErrExperimentProtocolUnsupported

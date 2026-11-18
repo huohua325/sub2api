@@ -336,6 +336,28 @@ describe('EditAccountModal', () => {
 
   afterEach(() => vi.useRealTimers())
 
+  it('configures standby for Codex and unified GPT independently from normal account groups', async () => {
+    const account = buildAccount()
+    account.group_ids = [7]
+    account.extra = { openai_responses_mode: 'force_responses' }
+    updateAccountMock.mockReset().mockResolvedValue(account)
+    const wrapper = mountModal(account)
+    await wrapper.setProps({ groups: [
+      { id: 7, name: 'GPT experiment', platform: 'openai', usage_kind: 'experiment', status: 'active' },
+      { id: 8, name: 'Codex', platform: 'openai', usage_kind: 'coding', status: 'active' },
+      { id: 9, name: 'Unified', platform: 'composite', usage_kind: 'coding', status: 'active' },
+      { id: 10, name: 'Grok', platform: 'grok', usage_kind: 'coding', status: 'active' }
+    ] as any })
+    expect(wrapper.find('[data-testid="account-coding-standby-10"]').exists()).toBe(false)
+    await wrapper.get('[data-testid="account-coding-standby-8"]').setValue(true)
+    await wrapper.get('[data-testid="account-coding-standby-9"]').setValue(true)
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+    expect(updateAccountMock.mock.calls[0]?.[1]).toMatchObject({
+      group_ids: [7], extra: { coding_standby_group_ids: [8, 9], openai_responses_mode: 'force_responses' }
+    })
+    wrapper.unmount()
+  })
+
   it.each(['apikey', 'oauth'])('can opt a passthrough %s account into model filtering without changing groups', async (type) => {
     const account = buildAccount()
     account.type = type

@@ -669,6 +669,15 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 	firstOutputTimeoutSwitchCount := 0
 	profitVetoCount := 0
 	failedAccountIDs := make(map[int64]struct{})
+	if standby != nil && standby.AccountID > 0 {
+		excluded, err := h.gatewayService.AccountStandbyExclusions(c.Request.Context(), standby)
+		if err != nil {
+			h.handleStreamingAwareError(c, http.StatusServiceUnavailable, "experiment_standby_account_unavailable", "Experiment standby account unavailable", streamStarted)
+			return
+		}
+		failedAccountIDs = excluded
+		sessionHash = ""
+	}
 	if service.IsUnifiedCodingGroup(apiKey.Group) && apiKey.GroupID != nil {
 		failedAccountIDs, err = h.gatewayService.CodingSubscriptionExclusions(c.Request.Context(), *apiKey.GroupID)
 		if err != nil {
@@ -803,6 +812,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 		)
 		account := selection.Account
 		if standby != nil && (account.Type != service.AccountTypeAPIKey || account.Platform != standby.Platform ||
+			standby.AccountID > 0 && account.ID != standby.AccountID ||
 			service.ResolveOpenAIAccountUpstreamModelForRequest(account, forwardModel, false) != standby.Model) {
 			if selection.ReleaseFunc != nil {
 				selection.ReleaseFunc()
