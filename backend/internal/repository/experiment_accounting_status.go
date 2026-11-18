@@ -23,11 +23,11 @@ func (r *UsageMonitorRepository) ReadExperimentAccountingStatus(ctx context.Cont
 	defer func() { _ = tx.Rollback() }() // Successful read ends with Commit.
 	policy, err := readExperimentAdmissionPolicy(ctx, tx, userID)
 	if err == nil {
-		out, err = readExperimentAdmissionCounts(ctx, tx, userID)
+		out, err = readExperimentAdmissionCounts(ctx, tx, userID, now.Add(-time.Duration(policy.MaxPendingAgeSeconds)*time.Second))
 	}
 	if err != nil {
 		return out, fmt.Errorf("%w: %v", service.ErrExperimentAccountingUnavailable, err)
 	}
-	applyExperimentAdmissionPolicy(&out, policy, now)
+	out.ActiveLimit = policy.MaxActive
 	return out, tx.Commit()
 }

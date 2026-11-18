@@ -12,8 +12,8 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-// ReserveExperimentRequest atomically bounds execution and outstanding billing
-// across every key belonging to the same user. No upstream I/O runs in the transaction.
+// ReserveExperimentRequest atomically bounds execution across the user's keys.
+// Unsettled bills never participate in admission.
 func (r *UsageMonitorRepository) ReserveExperimentRequest(ctx context.Context, in service.ExperimentAdmissionInput) error {
 	if r == nil || r.db == nil || strings.TrimSpace(in.RequestID) == "" || len(in.RequestID) > 256 || in.UserID <= 0 || in.APIKeyID <= 0 || in.AccountID <= 0 || in.StartedAt.IsZero() {
 		return service.ErrExperimentAccountingUnavailable
@@ -71,15 +71,13 @@ func (r *UsageMonitorRepository) ReserveExperimentRequest(ctx context.Context, i
 	if err != nil {
 		return fmt.Errorf("%w: %v", service.ErrExperimentAccountingUnavailable, err)
 	}
-	status, err := readExperimentAdmissionCounts(ctx, tx, in.UserID)
+	var active int64
+	err = tx.QueryRowContext(ctx, `SELECT count(*) FROM experiment_quota_attempts
+ WHERE user_id=$1 AND state IN ('reserved','sent') AND completed_at IS NULL`, in.UserID).Scan(&active)
 	if err != nil {
 		return fmt.Errorf("%w: %v", service.ErrExperimentAccountingUnavailable, err)
 	}
-	applyExperimentAdmissionPolicy(&status, policy, now)
-	if status.AccountingBlocked {
-		return service.ErrExperimentAccountingPending
-	}
-	if status.InFlightRequests >= status.ActiveLimit {
+	if active >= policy.MaxActive {
 		return service.ErrExperimentRequestInFlight
 	}
 	_, err = tx.ExecContext(ctx, `INSERT INTO experiment_quota_attempts(request_id,api_key_id,user_id,account_id,started_at)

@@ -53,7 +53,7 @@ func TestExperimentTransportFailuresNeverRetryOrEvictAccounts(t *testing.T) {
 		for _, sent := range []bool{false, true} {
 			t.Run(protocol+map[bool]string{false: "/local-admission", true: "/unknown-network"}[sent], func(t *testing.T) {
 				req, c, w := experimentTestRequest(t, &experimentAdmissionSpy{})
-				original := error(ErrExperimentAccountingPending)
+				original := error(ErrExperimentAlreadySent)
 				if sent {
 					if err := BeginExperimentHTTPAttempt(req, 8); err != nil {
 						t.Fatal(err)

@@ -400,8 +400,8 @@ export interface PurposeAllowanceItem {
   point_limit?: string
   reset_scope?: 'shared' | 'personal' | 'month' | 'week'
   blocked?: boolean
-  blocked_reason?: 'EXPERIMENT_ACCOUNTING_PENDING'
   pending_requests?: number
+  billing_anomaly_requests?: number
   in_flight_requests?: number
   active_limit?: number
   unit?: 'points' | 'yuan'

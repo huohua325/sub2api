@@ -1,7 +1,7 @@
 async page => {
   const options = __MILE_REVIEW_OPTIONS__, base = options.base, fixtures = (__MILE_FIXTURES__)(base)
   const user = { ...fixtures.auth, balance: 0 }, errors = [], apiMutations = [], requests = [], checks = []
-  let state = 'accounting-pending', reads = 0, adminMode = false
+  let state = 'anomaly-pending', reads = 0, adminMode = false
   let concurrency = { enabled: false, max_active: 1 }
   const concurrencyWrites = []
   const check = (name, value) => { checks.push({ name, pass: !!value }); if (!value) throw Error(name) }
@@ -12,8 +12,8 @@ async page => {
       used_amount: state === 'settled' ? 224.00884 : state === 'exhausted' ? 500 : 150.45967,
       display_percent: state === 'settled' ? 45 : state === 'exhausted' ? 100 : 30,
       reset_scope: 'month', data_status: state.includes('pending') ? 'pending' : 'current',
-      blocked: state === 'accounting-pending' || state === 'exhausted',
-      ...(state === 'accounting-pending' ? { blocked_reason: 'EXPERIMENT_ACCOUNTING_PENDING', pending_requests: 12909 } : {}),
+      blocked: state === 'exhausted',
+      ...(state === 'anomaly-pending' ? { billing_anomaly_requests: 12909, pending_requests: 3 } : {}),
       ...(state === 'async-pending' ? { pending_requests: 12, in_flight_requests: 10, active_limit: 10 } : {}) }
     return { server_now: time, platform_quotas: [], purpose_allowances: [
       { ...common, purpose: 'openai', unit: 'points', point_used: '15', point_limit: '50', display_percent: 30,
@@ -64,13 +64,13 @@ async page => {
   await page.setViewportSize({ width: 1440, height: 1000 })
   await page.goto(base + '/dashboard', { waitUntil: 'domcontentloaded', timeout: 90000 })
   const experiment = page.getByTestId('experiment-purpose-card'), codex = page.getByTestId('openai-purpose-card'), grok = page.getByTestId('grok-purpose-card')
-  await experiment.getByText('对账中', { exact: true }).waitFor()
+  await experiment.getByText('待确认', { exact: true }).waitFor()
   let text = await experiment.innerText()
   check('settled-amount-retained', text.includes('150.46') && text.includes('500'))
   check('settled-amount-labelled', text.includes('已结算'))
-  check('unknown-request-count-visible', /12[,\s]?909/.test(text))
-  check('new-experiments-paused', text.includes('暂停') && text.includes('实验'))
-  check('accounting-pause-is-not-quota-exhaustion', !text.includes('已到上限') && !text.includes('有剩余额度'))
+  check('unknown-request-count-visible', text.includes('3 条请求的费用待核实'))
+  check('overdue-requests-marked-without-pausing', /12[,\s]?909 条账单异常/.test(text) && !text.includes('暂停'))
+  check('billing-anomaly-is-not-quota-exhaustion', !text.includes('已到上限'))
   check('codex-still-ready', (await codex.locator('.quota-badge').innerText()).includes('有剩余额度'))
   check('grok-still-ready', (await grok.locator('.quota-badge').innerText()).includes('有剩余额度'))
   await page.screenshot({ path: options.output + '/accounting-pending-desktop.png', fullPage: true })
@@ -88,8 +88,8 @@ async page => {
   await experiment.getByText('正在运行 10 / 10 条。', { exact: true }).waitFor()
   text = await experiment.innerText()
   check('execution-and-backlog-separated', text.includes('12 条请求的费用待核实') && text.includes('10 / 10'))
-  check('background-billing-allows-more-requests', text.includes('可继续请求') && !text.includes('暂停') && !text.includes('已到上限'))
-  check('pending-money-not-counted-as-free', text.includes('待结算费用尚未计入') && text.includes('150.46'))
+  check('background-billing-is-not-a-block', !text.includes('暂停') && !text.includes('已到上限'))
+  check('pending-money-not-counted-as-free', text.includes('待核实费用尚未计入') && text.includes('150.46'))
   await experiment.screenshot({ path: options.output + '/async-billing.png' })
   state = 'settled'
   await reload.click()

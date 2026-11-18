@@ -115,6 +115,11 @@ func applyGlobalAIExperimentCharge(
 		cost = &CostBreakdown{}
 	}
 	requestID := globalAIRequestID(headers)
+	// The durable handoff records the usage and receipt before the background
+	// worker looks up supplier prices. Supplier latency stays off this path.
+	if HasExperimentAccounting(ctx) {
+		return pendingGlobalAIExperimentCharge(cost, requestID)
+	}
 	quota, found, err := lookupGlobalAIQuota(ctx, account, requestID)
 	if err != nil || !found {
 		slog.Warn("globalai_quota.missing",
@@ -122,10 +127,7 @@ func applyGlobalAIExperimentCharge(
 			"request_id", requestID,
 			"error", errString(err),
 		)
-		cost = clearExperimentCost(cost)
-		cost.GlobalAIChargePending = true
-		cost.GlobalAIRequestID = requestID
-		return cost
+		return pendingGlobalAIExperimentCharge(cost, requestID)
 	}
 	yuan := globalAIYuan(quota)
 	slog.Info("globalai_quota.applied",
@@ -145,6 +147,13 @@ func applyGlobalAIExperimentCharge(
 	cost.LongContextBillingApplied = false
 	cost.BillingMode = globalAIQuotaBillingMode
 	cost.GlobalAIChargePending = false
+	cost.GlobalAIRequestID = requestID
+	return cost
+}
+
+func pendingGlobalAIExperimentCharge(cost *CostBreakdown, requestID string) *CostBreakdown {
+	cost = clearExperimentCost(cost)
+	cost.GlobalAIChargePending = true
 	cost.GlobalAIRequestID = requestID
 	return cost
 }

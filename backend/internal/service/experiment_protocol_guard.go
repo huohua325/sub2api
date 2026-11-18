@@ -43,7 +43,7 @@ func ValidateGlobalAIExperimentProtocol(ctx context.Context, c *gin.Context, acc
 // IsExperimentAccountingError distinguishes local accounting admission failures
 // from supplier/network faults so scheduling does not retry or evict an account.
 func IsExperimentAccountingError(err error) bool {
-	return errors.Is(err, ErrExperimentAccountingPending) || errors.Is(err, ErrExperimentRequestInFlight) ||
+	return errors.Is(err, ErrExperimentAlreadySent) || errors.Is(err, ErrExperimentRequestInFlight) ||
 		errors.Is(err, ErrExperimentQuotaExhausted) || errors.Is(err, ErrExperimentAccountingUnavailable) ||
 		errors.Is(err, ErrExperimentProtocolUnsupported)
 }

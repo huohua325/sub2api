@@ -68,6 +68,27 @@ func TestApplyGlobalAIExperimentChargeReplacesLocalPrice(t *testing.T) {
 	}
 }
 
+func TestGlobalAIExperimentDurableRequestDoesNotWaitForSupplierLogs(t *testing.T) {
+	original := globalAILogFetch
+	t.Cleanup(func() { globalAILogFetch = original })
+	globalAILogFetch = func(context.Context, string, string) ([]globalAIConsumeLog, error) {
+		t.Fatal("durable experiment queried supplier billing before handing off")
+		return nil, nil
+	}
+	req, _, _ := experimentTestRequest(t, &experimentAdmissionSpy{})
+	if err := BeginExperimentHTTPAttempt(req, 11); err != nil {
+		t.Fatal(err)
+	}
+	account := &Account{ID: 11, Credentials: map[string]any{"base_url": "https://globalai.vip/v1", "api_key": "test"}}
+	group := &Group{Platform: PlatformOpenAI, UsageKind: UsageKindExperiment}
+	headers := make(http.Header)
+	headers.Set(globalAIRequestIDHeader, "supplier-receipt")
+	got := applyGlobalAIExperimentCharge(req.Context(), account, group, headers, &CostBreakdown{ActualCost: 2})
+	if !got.GlobalAIChargePending || got.GlobalAIRequestID != "supplier-receipt" || got.ActualCost != 0 {
+		t.Fatalf("unexpected handoff: %+v", got)
+	}
+}
+
 func TestApplyGlobalAIExperimentChargeLeavesCodingGroups(t *testing.T) {
 	account := &Account{Credentials: map[string]any{"base_url": "https://globalai.vip/v1", "api_key": "sk-test"}}
 	group := &Group{Platform: PlatformOpenAI, UsageKind: UsageKindCoding}

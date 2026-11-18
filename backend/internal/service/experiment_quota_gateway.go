@@ -99,7 +99,7 @@ func BeginExperimentHTTPAttempt(req *http.Request, accountID int64) error {
 	} else if h.store == nil {
 		err = ErrExperimentAccountingUnavailable
 	} else if h.sent {
-		err = ErrExperimentAccountingPending
+		err = ErrExperimentAlreadySent
 	} else if h.reserved && (h.input.AccountID != accountID || !strings.EqualFold(req.URL.Hostname(), globalAIHost)) {
 		err = ErrExperimentAccountingUnavailable
 	} else {
@@ -202,8 +202,8 @@ func writeExperimentAccountingError(c *gin.Context, err error) {
 		status, code, message = http.StatusBadRequest, "EXPERIMENT_PROTOCOL_UNSUPPORTED", "This GlobalAI experiment protocol cannot be safely reconciled; use standard HTTP generation"
 	case errors.Is(err, ErrExperimentQuotaExhausted):
 		status, code, message = http.StatusForbidden, "PURPOSE_QUOTA_EXHAUSTED", "Your API experiment quota is exhausted"
-	case errors.Is(err, ErrExperimentAccountingPending):
-		code, message = "EXPERIMENT_ACCOUNTING_PENDING", "API experiment charges are awaiting reconciliation; new requests are temporarily blocked"
+	case errors.Is(err, ErrExperimentAlreadySent):
+		status, code, message = http.StatusConflict, "EXPERIMENT_ALREADY_SENT", "This experiment request was already sent and will not be replayed"
 	case errors.Is(err, ErrExperimentRequestInFlight):
 		status, code, message = http.StatusTooManyRequests, "EXPERIMENT_REQUEST_IN_FLIGHT", "API experiment execution capacity is busy; retry after a running request completes"
 		c.Header("Retry-After", "2")

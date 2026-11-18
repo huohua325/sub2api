@@ -72,7 +72,7 @@ func TestExperimentAccountingNativeAndCompatibleRoutesReachRealSendGate(t *testi
 				defer proxy.Close()
 				store := &experimentRouteStore{}
 				if scenario.blocked {
-					store.reserveErr = service.ErrExperimentAccountingPending
+					store.reserveErr = service.ErrExperimentRequestInFlight
 				}
 				group := &service.Group{ID: 4, Platform: service.PlatformGemini, UsageKind: service.UsageKindExperiment, Status: service.StatusActive, Hydrated: true, SubscriptionType: service.SubscriptionTypeStandard}
 				user := &service.User{ID: 3, Status: service.StatusActive, Role: service.RoleUser, Balance: 10, Concurrency: 10}
@@ -95,7 +95,7 @@ func TestExperimentAccountingNativeAndCompatibleRoutesReachRealSendGate(t *testi
 					require.NoError(t, err)
 					resp, err := upstream.Do(out, proxy.URL, 13, 100)
 					if blocked {
-						require.ErrorIs(t, err, service.ErrExperimentAccountingPending)
+						require.ErrorIs(t, err, service.ErrExperimentRequestInFlight)
 						return
 					}
 					require.NoError(t, err)
@@ -117,8 +117,8 @@ func TestExperimentAccountingNativeAndCompatibleRoutesReachRealSendGate(t *testi
 				}
 				require.Equal(t, int32(1), store.reserved.Load())
 				if blocked {
-					require.Equal(t, http.StatusServiceUnavailable, response.Code)
-					require.Contains(t, response.Body.String(), "EXPERIMENT_ACCOUNTING_PENDING")
+					require.Equal(t, http.StatusTooManyRequests, response.Code)
+					require.Contains(t, response.Body.String(), "EXPERIMENT_REQUEST_IN_FLIGHT")
 					require.Zero(t, store.sent.Load())
 					require.Zero(t, networkCalls.Load())
 				} else {

@@ -132,27 +132,19 @@ func (h *UserHandler) GetMyPlatformQuotas(c *gin.Context) {
 				item["unit"] = "yuan"
 				item["data_status"] = "current"
 				if h.officialPoints != nil {
-					state, stateErr := h.officialPoints.ExperimentState(c.Request.Context(), subject.UserID, nowUsage)
-					item["data_status"] = state
-					if stateErr != nil {
-						item["blocked"] = true
-					}
 					status, statusErr := h.officialPoints.ExperimentAccountingStatus(c.Request.Context(), subject.UserID, nowUsage)
 					if statusErr != nil {
-						item["data_status"], item["blocked"] = "error", true
+						item["data_status"] = "error"
 					} else {
-						pending := status.PendingRequests + status.UnresolvedRequests
-						item["pending_requests"] = pending
+						item["pending_requests"] = status.PendingRequests
+						item["billing_anomaly_requests"] = status.UnresolvedRequests
 						item["in_flight_requests"] = status.InFlightRequests
 						item["active_limit"] = status.ActiveLimit
 						if status.UpdatedAt != nil {
 							item["updated_at"] = status.UpdatedAt
 						}
-						if pending > 0 {
+						if status.PendingRequests > 0 || status.UnresolvedRequests > 0 {
 							item["data_status"] = "pending"
-						}
-						if status.AccountingBlocked && !(row.LimitAmount >= 0 && used >= row.LimitAmount) {
-							item["blocked"], item["blocked_reason"] = true, "EXPERIMENT_ACCOUNTING_PENDING"
 						}
 					}
 				}

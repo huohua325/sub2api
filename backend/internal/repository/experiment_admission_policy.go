@@ -17,7 +17,7 @@ type experimentAdmissionPolicy struct {
 	Version              int              `json:"version"`
 	UserIDs              []int64          `json:"user_ids"`
 	MaxActive            int64            `json:"max_active"`
-	MaxOutstanding       int64            `json:"max_outstanding"`
+	MaxOutstanding       int64            `json:"max_outstanding"` // Retained for rollback compatibility.
 	MaxPendingAgeSeconds int64            `json:"max_pending_age_seconds"`
 	UserLimits           map[string]int64 `json:"user_limits,omitempty"`
 }
@@ -27,7 +27,7 @@ type experimentQueryer interface {
 }
 
 func readExperimentAdmissionPolicy(ctx context.Context, db experimentQueryer, userID int64) (experimentAdmissionPolicy, error) {
-	strict := experimentAdmissionPolicy{MaxActive: 1, MaxOutstanding: 1}
+	strict := experimentAdmissionPolicy{MaxActive: 1, MaxPendingAgeSeconds: 900}
 	var raw string
 	err := db.QueryRowContext(ctx, `SELECT value FROM settings WHERE key='experiment_async_admission_policy'`).Scan(&raw)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -44,7 +44,6 @@ func readExperimentAdmissionPolicy(ctx context.Context, db experimentQueryer, us
 		if id == userID {
 			if limit, ok := policy.UserLimits[strconv.FormatInt(userID, 10)]; ok {
 				policy.MaxActive = limit
-				policy.MaxOutstanding = max(policy.MaxOutstanding, limit*10)
 			}
 			return policy, nil
 		}
@@ -85,8 +84,8 @@ func decodeExperimentAdmissionPolicy(raw string) (experimentAdmissionPolicy, err
 	return policy, nil
 }
 
-// The same disjoint counts drive admission and the dashboard. Include old-period
-// liabilities: a month boundary must never erase an outstanding supplier bill.
+// The dashboard counts active, pending and exceptional records separately.
+// An overdue bill remains eligible for automatic settlement.
 const experimentAdmissionCountsSQL = `WITH active AS (
  SELECT request_id,api_key_id,updated_at FROM experiment_quota_attempts
  WHERE user_id=$1 AND state IN ('reserved','sent') AND completed_at IS NULL
@@ -104,15 +103,15 @@ const experimentAdmissionCountsSQL = `WITH active AS (
  AND NOT EXISTS(SELECT 1 FROM experiment_quota_charges c WHERE c.request_id=a.request_id AND c.api_key_id=a.api_key_id)
 )
  SELECT (SELECT count(*) FROM active),
- (SELECT count(*) FROM waiting WHERE state='pending'),
- (SELECT count(*) FROM waiting WHERE state='unresolved'),
+ (SELECT count(*) FROM waiting WHERE state='pending' AND waiting_since>$2),
+ (SELECT count(*) FROM waiting WHERE state='unresolved' OR waiting_since<=$2),
  (SELECT min(waiting_since) FROM waiting),
  GREATEST((SELECT max(updated_at) FROM waiting),(SELECT max(updated_at) FROM active))`
 
-func readExperimentAdmissionCounts(ctx context.Context, db experimentQueryer, userID int64) (service.ExperimentAccountingStatus, error) {
+func readExperimentAdmissionCounts(ctx context.Context, db experimentQueryer, userID int64, overdueBefore time.Time) (service.ExperimentAccountingStatus, error) {
 	var out service.ExperimentAccountingStatus
 	var oldest, updated sql.NullTime
-	err := db.QueryRowContext(ctx, experimentAdmissionCountsSQL, userID).Scan(
+	err := db.QueryRowContext(ctx, experimentAdmissionCountsSQL, userID, overdueBefore).Scan(
 		&out.InFlightRequests, &out.PendingRequests, &out.UnresolvedRequests, &oldest, &updated)
 	if oldest.Valid {
 		out.OldestPendingAt = &oldest.Time
@@ -121,16 +120,4 @@ func readExperimentAdmissionCounts(ctx context.Context, db experimentQueryer, us
 		out.UpdatedAt = &updated.Time
 	}
 	return out, err
-}
-
-func applyExperimentAdmissionPolicy(out *service.ExperimentAccountingStatus, policy experimentAdmissionPolicy, now time.Time) {
-	out.ActiveLimit = policy.MaxActive
-	out.OutstandingLimit = policy.MaxOutstanding
-	waiting := out.PendingRequests + out.UnresolvedRequests
-	if policy.Version == 0 {
-		out.AccountingBlocked = waiting > 0
-	} else {
-		out.AccountingBlocked = out.InFlightRequests+waiting >= policy.MaxOutstanding ||
-			(out.OldestPendingAt != nil && !now.Before(out.OldestPendingAt.Add(time.Duration(policy.MaxPendingAgeSeconds)*time.Second)))
-	}
 }

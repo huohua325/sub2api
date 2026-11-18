@@ -58,8 +58,8 @@ func experimentTestRequest(t *testing.T, store ExperimentAdmissionStore) (*http.
 	return c.Request, c, w
 }
 
-func TestExperimentHTTPAdmissionStopsUnknownSpendBeforeSend(t *testing.T) {
-	for _, reason := range []error{ErrExperimentAccountingPending, ErrExperimentRequestInFlight, ErrExperimentQuotaExhausted} {
+func TestExperimentHTTPAdmissionStopsAtExecutionAndQuotaLimits(t *testing.T) {
+	for _, reason := range []error{ErrExperimentRequestInFlight, ErrExperimentQuotaExhausted} {
 		t.Run(reason.Error(), func(t *testing.T) {
 			spy := &experimentAdmissionSpy{reserveErr: reason}
 			req, c, w := experimentTestRequest(t, spy)
@@ -67,7 +67,7 @@ func TestExperimentHTTPAdmissionStopsUnknownSpendBeforeSend(t *testing.T) {
 				t.Fatalf("admission: %v", err)
 			}
 			if spy.sent != 0 || !c.IsAborted() || w.Code < 400 {
-				t.Fatal("unknown or exhausted charges reached the send checkpoint")
+				t.Fatal("rejected request reached the send checkpoint")
 			}
 			FinishCodingRequest(c)
 			if spy.released != 0 {
@@ -88,11 +88,11 @@ func TestExperimentSentAttemptCannotBeReplayedOrReleased(t *testing.T) {
 	if spy.receipts != 1 || spy.upstreamID != "supplier-receipt" || spy.status != 403 {
 		t.Fatal("a refused or partial response lost its receipt identity")
 	}
-	if err := BeginExperimentHTTPAttempt(req, 13); !errors.Is(err, ErrExperimentAccountingPending) {
+	if err := BeginExperimentHTTPAttempt(req, 13); !errors.Is(err, ErrExperimentAlreadySent) {
 		t.Fatalf("sent attempt was retried on a different account: %v", err)
 	}
 	req.URL.Host = "another-provider.example"
-	if err := BeginExperimentHTTPAttempt(req, 13); !errors.Is(err, ErrExperimentAccountingPending) {
+	if err := BeginExperimentHTTPAttempt(req, 13); !errors.Is(err, ErrExperimentAlreadySent) {
 		t.Fatalf("a mixed group replayed unknown spend through another provider: %v", err)
 	}
 	FinishCodingRequest(c)

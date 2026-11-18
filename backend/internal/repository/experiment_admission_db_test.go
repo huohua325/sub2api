@@ -77,10 +77,11 @@ func TestCodingQuotaDBExperimentStrictAdmissionAcrossKeysAndRestart(t *testing.T
 	r = NewUsageMonitorRepository(db)
 	newInput := experimentAdmissionInput(db, t)
 	newInput.APIKeyID = 3
-	require.ErrorIs(t, r.ReserveExperimentRequest(t.Context(), newInput), service.ErrExperimentAccountingPending)
+	require.NoError(t, r.ReserveExperimentRequest(t.Context(), newInput), "a previously sent and completed attempt does not block another request")
+	require.ErrorIs(t, r.MarkExperimentRequestSent(t.Context(), in.RequestID, in.APIKeyID), service.ErrExperimentRequestInFlight)
 	var state, receipt string
 	var status int
-	require.NoError(t, db.QueryRow(`SELECT state,response_request_id,response_status FROM experiment_quota_attempts`).Scan(&state, &receipt, &status))
+	require.NoError(t, db.QueryRow(`SELECT state,response_request_id,response_status FROM experiment_quota_attempts WHERE request_id=$1`, in.RequestID).Scan(&state, &receipt, &status))
 	require.Equal(t, "unknown", state)
 	require.Equal(t, "receipt", receipt)
 	require.Equal(t, 403, status)
@@ -103,12 +104,12 @@ func TestCodingQuotaDBExperimentUnsentReleaseAndIdentityConflict(t *testing.T) {
 	require.NoError(t, r.ReserveExperimentRequest(t.Context(), other))
 }
 
-func TestCodingQuotaDBExperimentPendingBlocksWithoutInventingPrice(t *testing.T) {
+func TestCodingQuotaDBExperimentPendingDoesNotBlockOrInventPrice(t *testing.T) {
 	db, r := experimentGuardTestDB(t)
 	_, err := db.Exec(`INSERT INTO experiment_quota_charges(request_id,api_key_id,user_id,account_id,upstream_request_id,started_at,amount,state,billing_effects)
  VALUES('unknown-cost',2,1,10,'upstream-unknown',clock_timestamp()-interval '1 minute',NULL,'pending','null')`)
 	require.NoError(t, err)
-	require.ErrorIs(t, r.ReserveExperimentRequest(t.Context(), experimentAdmissionInput(db, t)), service.ErrExperimentAccountingPending)
+	require.NoError(t, r.ReserveExperimentRequest(t.Context(), experimentAdmissionInput(db, t)))
 	var amount sql.NullFloat64
 	require.NoError(t, db.QueryRow(`SELECT amount FROM experiment_quota_charges`).Scan(&amount))
 	require.False(t, amount.Valid)
@@ -132,7 +133,7 @@ func TestCodingQuotaDBExperimentHandoffEvidenceAndAppendOnlyAudit(t *testing.T) 
 	var state string
 	require.NoError(t, db.QueryRow(`SELECT state FROM experiment_quota_attempts`).Scan(&state))
 	require.Equal(t, "handed_off", state)
-	require.ErrorIs(t, r.ReserveExperimentRequest(t.Context(), experimentAdmissionInput(db, t)), service.ErrExperimentAccountingPending)
+	require.NoError(t, r.ReserveExperimentRequest(t.Context(), experimentAdmissionInput(db, t)))
 	var chargeID int64
 	require.NoError(t, db.QueryRow(`SELECT id FROM experiment_quota_charges WHERE request_id=$1`, in.RequestID).Scan(&chargeID))
 	evidence := experimentEvidence(10, "supplier-receipt")
@@ -291,8 +292,8 @@ func TestCodingQuotaDBExperimentAccountingStatusDoesNotDoubleCount(t *testing.T)
 	future := service.ShanghaiMonthStart(quotaDBNow(t, db)).AddDate(0, 1, 0).Add(time.Hour)
 	status, err = r.ReadExperimentAccountingStatus(t.Context(), 1, future)
 	require.NoError(t, err)
-	require.Equal(t, int64(1), status.PendingRequests)
-	require.Equal(t, int64(1), status.UnresolvedRequests)
+	require.Zero(t, status.PendingRequests)
+	require.Equal(t, int64(2), status.UnresolvedRequests)
 	require.Zero(t, status.InFlightRequests)
 }
 
@@ -415,7 +416,6 @@ func TestCodingQuotaDBExperimentAsyncTenActiveAcrossKeysAndRestart(t *testing.T)
 	require.NoError(t, err)
 	require.Equal(t, int64(9), status.InFlightRequests)
 	require.Equal(t, int64(1), status.PendingRequests)
-	require.False(t, status.AccountingBlocked)
 	require.NoError(t, r.ReserveExperimentRequest(t.Context(), experimentAdmissionInput(db, t)), "completed receipt does not occupy execution capacity")
 	// A detached billing worker may run after the HTTP handler has completed.
 	_, err = (&usageBillingRepository{db: db}).Apply(t.Context(), &service.UsageBillingCommand{
@@ -439,7 +439,7 @@ func TestCodingQuotaDBExperimentAsyncTenActiveAcrossKeysAndRestart(t *testing.T)
 	}
 }
 
-func TestCodingQuotaDBExperimentAsyncBacklogAgeAndQuotaBoundaries(t *testing.T) {
+func TestCodingQuotaDBExperimentBacklogOnlyAffectsReporting(t *testing.T) {
 	for _, boundary := range []string{"count", "age", "exhaustion", "unresolved", "rollover"} {
 		t.Run(boundary, func(t *testing.T) {
 			db, r := experimentGuardTestDB(t)
@@ -468,26 +468,35 @@ func TestCodingQuotaDBExperimentAsyncBacklogAgeAndQuotaBoundaries(t *testing.T) 
 			status, err := r.ReadExperimentAccountingStatus(t.Context(), 1, quotaDBNow(t, db))
 			require.NoError(t, err)
 			err = r.ReserveExperimentRequest(t.Context(), experimentAdmissionInput(db, t))
-			switch boundary {
-			case "exhaustion":
+			if boundary == "exhaustion" {
 				require.ErrorIs(t, err, service.ErrExperimentQuotaExhausted)
-			case "unresolved":
-				require.NoError(t, err, "small unresolved backlog is durable but does not serialize execution")
-				require.False(t, status.AccountingBlocked)
+			} else {
+				require.NoError(t, err, "outstanding bills cannot block new execution")
+			}
+			switch boundary {
+			case "age", "unresolved", "rollover":
+				require.Equal(t, int64(count), status.UnresolvedRequests)
+				require.Zero(t, status.PendingRequests)
 			default:
-				require.ErrorIs(t, err, service.ErrExperimentAccountingPending)
-				require.True(t, status.AccountingBlocked)
+				require.Equal(t, int64(count), status.PendingRequests)
+				require.Zero(t, status.UnresolvedRequests)
 			}
 			var unknown int
 			require.NoError(t, db.QueryRow(`SELECT count(*) FROM experiment_quota_charges WHERE amount IS NULL`).Scan(&unknown))
 			require.Equal(t, count, unknown, "no unknown bill was fabricated as zero to unlock capacity")
-			if boundary == "count" {
+			if boundary == "age" {
 				var id int64
 				require.NoError(t, db.QueryRow(`SELECT id FROM experiment_quota_charges WHERE request_id='backlog-1'`).Scan(&id))
 				require.NoError(t, r.CompleteExperimentChargeWithEvidence(t.Context(), id, 0.25, experimentEvidence(10, "receipt-1")))
-				require.NoError(t, r.ReserveExperimentRequest(t.Context(), experimentAdmissionInput(db, t)), "evidenced settlement reopens the bounded backlog")
-				require.ErrorIs(t, r.ReserveExperimentRequest(t.Context(), experimentAdmissionInput(db, t)), service.ErrExperimentAccountingPending,
-					"active sends also reserve a place in the outstanding limit")
+				status, err = r.ReadExperimentAccountingStatus(t.Context(), 1, quotaDBNow(t, db))
+				require.NoError(t, err)
+				require.Zero(t, status.UnresolvedRequests, "a late evidenced bill clears the reported exception")
+			}
+			if boundary == "count" {
+				for range 9 {
+					require.NoError(t, r.ReserveExperimentRequest(t.Context(), experimentAdmissionInput(db, t)))
+				}
+				require.ErrorIs(t, r.ReserveExperimentRequest(t.Context(), experimentAdmissionInput(db, t)), service.ErrExperimentRequestInFlight)
 			}
 		})
 	}

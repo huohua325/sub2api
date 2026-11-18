@@ -7,8 +7,8 @@ import (
 )
 
 var (
-	// ErrExperimentAccountingPending bounds unverified billing exposure.
-	ErrExperimentAccountingPending = errors.New("experiment accounting has unresolved charges")
+	// ErrExperimentAlreadySent prevents replay of the same logical request.
+	ErrExperimentAlreadySent = errors.New("experiment request has already been sent")
 	// ErrExperimentRequestInFlight limits active execution across a user's keys.
 	ErrExperimentRequestInFlight = errors.New("experiment execution capacity is busy")
 	// ErrExperimentQuotaExhausted preserves the existing personal allowance limit.
@@ -73,8 +73,6 @@ type ExperimentAccountingStatus struct {
 	UpdatedAt          *time.Time
 	OldestPendingAt    *time.Time
 	ActiveLimit        int64
-	OutstandingLimit   int64
-	AccountingBlocked  bool
 }
 
 // ExperimentAccountingStatusReader supplies a durable summary for user-facing quota cards.

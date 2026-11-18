@@ -49,8 +49,8 @@
           <p v-if="meter.resetLine" class="quota-meter-reset">{{ meter.resetLine }}</p>
           <p v-if="meter.id === 'experiment' && (meter.row?.pending_requests ?? 0) > 0" class="quota-meter-reset" role="status">{{ t('dashboard.ruler.pendingCount', { count: meter.row?.pending_requests }) }}</p>
           <p v-if="meter.id === 'experiment' && (meter.row?.in_flight_requests ?? 0) > 0" class="quota-meter-reset" role="status">{{ t('dashboard.ruler.inFlightCount', { count: meter.row?.in_flight_requests, limit: meter.row?.active_limit ?? 1 }) }}</p>
-          <p v-if="meter.accountingBlocked" class="quota-meter-reset" role="status">{{ t('dashboard.ruler.accountingBlockedHint') }}</p>
-          <p v-else-if="meter.id === 'experiment' && meter.pending && !meter.exhausted" class="quota-meter-reset">{{ t('dashboard.ruler.asyncAccountingHint') }}</p>
+          <p v-if="meter.id === 'experiment' && (meter.row?.billing_anomaly_requests ?? 0) > 0" class="quota-meter-reset" role="status">{{ t('dashboard.ruler.billingAnomalyCount', { count: meter.row?.billing_anomaly_requests }) }}</p>
+          <p v-if="meter.id === 'experiment' && meter.pending" class="quota-meter-reset">{{ t('dashboard.ruler.asyncAccountingHint') }}</p>
           <p v-else-if="meter.pending" class="quota-meter-reset">{{ t('dashboard.ruler.pendingHint') }}</p>
         </template>
         <p v-if="meter.row?.activity_status && meter.row.activity_status !== 'ready'" class="quota-meter-reset" role="status">{{ t(`codingQuota.student.${meter.row.activity_status}`) }}</p>
@@ -132,8 +132,7 @@ const meters = computed(() => {
     const missing = !row || (usesDisplay && row.display_percent == null) || row.data_status === 'error'
     const rawPercent = usesDisplay ? (row?.display_percent ?? 0) : ratioPercent(row)
     const percent = missing || !Number.isFinite(rawPercent) ? 0 : Math.min(100, Math.max(0, rawPercent))
-    const accountingBlocked = id === 'experiment' && row?.blocked_reason === 'EXPERIMENT_ACCOUNTING_PENDING'
-    const exhausted = !missing && !accountingBlocked && (row?.blocked ?? rawExhausted(row))
+    const exhausted = !missing && (row?.blocked ?? rawExhausted(row))
     const pending = row?.data_status === 'pending' || row?.data_status === 'partial'
     const near = !missing && percent >= 80 && !exhausted
     return {
@@ -148,12 +147,9 @@ const meters = computed(() => {
       near,
       exhausted,
       pending,
-      accountingBlocked,
       tone: exhausted ? 'is-full' : near ? 'is-near' : missing ? 'is-missing' : 'is-ok',
       badge: missing
         ? t('admin.usageMonitor.noReading')
-        : accountingBlocked
-          ? t('dashboard.ruler.accountingPaused')
         : exhausted
           ? t('dashboard.ruler.full')
           : row?.data_status === 'estimated'
