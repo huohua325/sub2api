@@ -79,6 +79,8 @@ export default {
       pendingHint: 'Some usage is being reconciled and may include estimates.',
       settledLabel: 'Settled',
       pendingCount: 'Charges for {count} requests are awaiting verification.',
+      inFlightCount: '{count} / {limit} requests running.',
+      asyncAccountingHint: 'Billing continues in the background. You can send requests; pending charges are not included yet.',
       accountingPaused: 'Reconciling',
       accountingBlockedHint: 'New API experiment requests are paused until charges are verified.',
       stale: 'Refresh failed. These are previous readings; try again shortly.',

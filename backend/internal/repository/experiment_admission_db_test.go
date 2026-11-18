@@ -77,7 +77,7 @@ func TestCodingQuotaDBExperimentStrictAdmissionAcrossKeysAndRestart(t *testing.T
 	r = NewUsageMonitorRepository(db)
 	newInput := experimentAdmissionInput(db, t)
 	newInput.APIKeyID = 3
-	require.ErrorIs(t, r.ReserveExperimentRequest(t.Context(), newInput), service.ErrExperimentRequestInFlight)
+	require.ErrorIs(t, r.ReserveExperimentRequest(t.Context(), newInput), service.ErrExperimentAccountingPending)
 	var state, receipt string
 	var status int
 	require.NoError(t, db.QueryRow(`SELECT state,response_request_id,response_status FROM experiment_quota_attempts`).Scan(&state, &receipt, &status))
@@ -287,13 +287,229 @@ func TestCodingQuotaDBExperimentAccountingStatusDoesNotDoubleCount(t *testing.T)
 	require.Equal(t, int64(1), status.PendingRequests)
 	require.Equal(t, int64(1), status.UnresolvedRequests)
 	require.Zero(t, status.InFlightRequests)
-	// An outstanding sent attempt is still visible after the personal month changes.
+	// Outstanding bills remain visible after the personal month changes.
 	future := service.ShanghaiMonthStart(quotaDBNow(t, db)).AddDate(0, 1, 0).Add(time.Hour)
 	status, err = r.ReadExperimentAccountingStatus(t.Context(), 1, future)
 	require.NoError(t, err)
-	require.Zero(t, status.PendingRequests)
-	require.Zero(t, status.UnresolvedRequests)
-	require.Equal(t, int64(1), status.InFlightRequests)
+	require.Equal(t, int64(1), status.PendingRequests)
+	require.Equal(t, int64(1), status.UnresolvedRequests)
+	require.Zero(t, status.InFlightRequests)
+}
+
+func enableExperimentAsyncTest(t *testing.T, db *sql.DB) {
+	t.Helper()
+	_, err := db.Exec(`INSERT INTO settings(key,value) VALUES('experiment_async_admission_policy',
+ '{"version":1,"user_ids":[1],"max_active":10,"max_outstanding":100,"max_pending_age_seconds":900}')`)
+	require.NoError(t, err)
+}
+
+func TestCodingQuotaDBExperimentAdminAllocatesIndependentLimitsAndLowersSafely(t *testing.T) {
+	db, r := experimentGuardTestDB(t)
+	original := quotaDBNow(t, db)
+	_, err := r.SetExperimentConcurrency(t.Context(), 2, 1, service.ExperimentConcurrencyConfig{Enabled: true, MaxActive: 3})
+	require.NoError(t, err)
+	var active []service.ExperimentAdmissionInput
+	for range 3 {
+		in := experimentAdmissionInput(db, t)
+		require.NoError(t, r.ReserveExperimentRequest(t.Context(), in))
+		active = append(active, in)
+	}
+	require.ErrorIs(t, r.ReserveExperimentRequest(t.Context(), experimentAdmissionInput(db, t)), service.ErrExperimentRequestInFlight)
+	_, err = r.SetExperimentConcurrency(t.Context(), 2, 1, service.ExperimentConcurrencyConfig{Enabled: true, MaxActive: 2})
+	require.NoError(t, err)
+	status, err := r.ReadExperimentAccountingStatus(t.Context(), 1, original)
+	require.NoError(t, err)
+	require.Equal(t, int64(3), status.InFlightRequests, "lowering capacity never cancels existing execution")
+	require.Equal(t, int64(2), status.ActiveLimit)
+	require.ErrorIs(t, r.ReserveExperimentRequest(t.Context(), experimentAdmissionInput(db, t)), service.ErrExperimentRequestInFlight)
+	for _, in := range active[:2] {
+		require.NoError(t, r.ReleaseExperimentRequest(t.Context(), in.RequestID, in.APIKeyID, "never sent"))
+	}
+	require.NoError(t, r.ReserveExperimentRequest(t.Context(), experimentAdmissionInput(db, t)))
+	_, err = r.SetExperimentConcurrency(t.Context(), 2, 2, service.ExperimentConcurrencyConfig{Enabled: true, MaxActive: 37})
+	require.NoError(t, err)
+	r = NewUsageMonitorRepository(db)
+	first, err := r.ReadExperimentConcurrency(t.Context(), 1)
+	require.NoError(t, err)
+	second, err := r.ReadExperimentConcurrency(t.Context(), 2)
+	require.NoError(t, err)
+	require.Equal(t, service.ExperimentConcurrencyConfig{Enabled: true, MaxActive: 2}, first)
+	require.Equal(t, service.ExperimentConcurrencyConfig{Enabled: true, MaxActive: 37}, second)
+	_, err = r.SetExperimentConcurrency(t.Context(), 2, 1, service.ExperimentConcurrencyConfig{Enabled: false, MaxActive: 2})
+	require.NoError(t, err)
+	first, err = r.ReadExperimentConcurrency(t.Context(), 1)
+	require.NoError(t, err)
+	require.False(t, first.Enabled)
+	require.Equal(t, int64(1), first.MaxActive)
+	second, err = r.ReadExperimentConcurrency(t.Context(), 2)
+	require.NoError(t, err)
+	require.Equal(t, int64(37), second.MaxActive)
+	var used string
+	require.NoError(t, db.QueryRow(`SELECT used_amount::text FROM user_purpose_allowances WHERE user_id=1 AND purpose='experiment'`).Scan(&used))
+	require.Equal(t, "0.00000000", used)
+}
+
+func TestCodingQuotaDBExperimentAdminConcurrentGrantsPreserveOtherUsers(t *testing.T) {
+	db, r := experimentGuardTestDB(t)
+	db.SetMaxOpenConns(8)
+	var wg sync.WaitGroup
+	errors := make(chan error, 2)
+	for id := range int64(2) {
+		wg.Go(func() {
+			_, err := r.SetExperimentConcurrency(context.Background(), 2, id+1,
+				service.ExperimentConcurrencyConfig{Enabled: true, MaxActive: 20 + id})
+			errors <- err
+		})
+	}
+	wg.Wait()
+	close(errors)
+	for err := range errors {
+		require.NoError(t, err)
+	}
+	for id := range int64(2) {
+		got, err := r.ReadExperimentConcurrency(t.Context(), id+1)
+		require.NoError(t, err)
+		require.True(t, got.Enabled)
+		require.Equal(t, 20+id, got.MaxActive)
+	}
+	_, err := r.SetExperimentConcurrency(t.Context(), 2, 999, service.ExperimentConcurrencyConfig{Enabled: true, MaxActive: 30})
+	require.Error(t, err, "cannot grant capacity to a nonexistent user")
+}
+
+func TestCodingQuotaDBExperimentAsyncTenActiveAcrossKeysAndRestart(t *testing.T) {
+	db, r := experimentGuardTestDB(t)
+	enableExperimentAsyncTest(t, db)
+	db.SetMaxOpenConns(20)
+	base := experimentAdmissionInput(db, t)
+	accepted := make(chan service.ExperimentAdmissionInput, 20)
+	failures := make(chan error, 20)
+	var wg sync.WaitGroup
+	for i := range 20 {
+		wg.Go(func() {
+			in := base
+			in.RequestID, in.APIKeyID = uuid.NewString(), int64(i+1)
+			if err := r.ReserveExperimentRequest(context.Background(), in); err != nil {
+				failures <- err
+			} else {
+				accepted <- in
+			}
+		})
+	}
+	wg.Wait()
+	close(accepted)
+	close(failures)
+	require.Len(t, accepted, 10)
+	require.Len(t, failures, 10)
+	for err := range failures {
+		require.ErrorIs(t, err, service.ErrExperimentRequestInFlight)
+	}
+	r = NewUsageMonitorRepository(db)
+	require.ErrorIs(t, r.ReserveExperimentRequest(t.Context(), experimentAdmissionInput(db, t)), service.ErrExperimentRequestInFlight)
+	in := <-accepted
+	require.NoError(t, r.MarkExperimentRequestSent(t.Context(), in.RequestID, in.APIKeyID))
+	require.NoError(t, r.RecordExperimentResponse(t.Context(), in.RequestID, in.APIKeyID, "async-receipt", 200))
+	require.NoError(t, r.CompleteExperimentRequest(t.Context(), in.RequestID, in.APIKeyID))
+	require.NoError(t, r.CompleteExperimentRequest(t.Context(), in.RequestID, in.APIKeyID))
+	require.ErrorIs(t, r.ReleaseExperimentRequest(t.Context(), in.RequestID, in.APIKeyID, "cannot waive bill"), service.ErrExperimentRequestInFlight)
+	status, err := r.ReadExperimentAccountingStatus(t.Context(), 1, quotaDBNow(t, db))
+	require.NoError(t, err)
+	require.Equal(t, int64(9), status.InFlightRequests)
+	require.Equal(t, int64(1), status.PendingRequests)
+	require.False(t, status.AccountingBlocked)
+	require.NoError(t, r.ReserveExperimentRequest(t.Context(), experimentAdmissionInput(db, t)), "completed receipt does not occupy execution capacity")
+	// A detached billing worker may run after the HTTP handler has completed.
+	_, err = (&usageBillingRepository{db: db}).Apply(t.Context(), &service.UsageBillingCommand{
+		RequestID: in.RequestID, APIKeyID: in.APIKeyID, UserID: in.UserID, AccountID: in.AccountID,
+		Purpose: "experiment", StartedAt: in.StartedAt, ExperimentPending: true, ExperimentUpstreamRequestID: "async-receipt"})
+	require.NoError(t, err)
+	status, err = r.ReadExperimentAccountingStatus(t.Context(), 1, quotaDBNow(t, db))
+	require.NoError(t, err)
+	require.Equal(t, int64(1), status.PendingRequests, "handoff does not duplicate liability")
+	require.Equal(t, int64(10), status.InFlightRequests)
+	other := experimentAdmissionInput(db, t)
+	other.UserID = 2
+	require.NoError(t, r.ReserveExperimentRequest(t.Context(), other))
+	other.RequestID = uuid.NewString()
+	require.ErrorIs(t, r.ReserveExperimentRequest(t.Context(), other), service.ErrExperimentRequestInFlight, "uninvited users retain strict admission")
+	// Replaying migrations after ten admissions must not recreate the old unique index.
+	for _, name := range []string{"272_experiment_accounting_guard.sql", "273_experiment_async_admission.sql"} {
+		raw, err := migrations.FS.ReadFile(name)
+		require.NoError(t, err)
+		require.NoError(t, applyMigrationsFS(t.Context(), db, fstest.MapFS{name: &fstest.MapFile{Data: raw}}))
+	}
+}
+
+func TestCodingQuotaDBExperimentAsyncBacklogAgeAndQuotaBoundaries(t *testing.T) {
+	for _, boundary := range []string{"count", "age", "exhaustion", "unresolved", "rollover"} {
+		t.Run(boundary, func(t *testing.T) {
+			db, r := experimentGuardTestDB(t)
+			enableExperimentAsyncTest(t, db)
+			count, age, state := 1, "1 minute", "pending"
+			if boundary == "count" {
+				count = 100
+			}
+			if boundary == "age" || boundary == "rollover" {
+				age = "16 minutes"
+			}
+			if boundary == "unresolved" {
+				state = "unresolved"
+			}
+			_, err := db.Exec(`INSERT INTO experiment_quota_charges(request_id,api_key_id,user_id,account_id,upstream_request_id,started_at,amount,state)
+ SELECT 'backlog-'||i,1,1,10,'receipt-'||i,clock_timestamp()-$2::interval,NULL,$3 FROM generate_series(1,$1::int)i`, count, age, state)
+			require.NoError(t, err)
+			if boundary == "rollover" {
+				_, err = db.Exec(`UPDATE experiment_quota_charges SET started_at=started_at-interval '1 month'`)
+				require.NoError(t, err)
+			}
+			if boundary == "exhaustion" {
+				_, err = db.Exec(`UPDATE user_purpose_allowances SET used_amount=500 WHERE user_id=1 AND purpose='experiment'`)
+				require.NoError(t, err)
+			}
+			status, err := r.ReadExperimentAccountingStatus(t.Context(), 1, quotaDBNow(t, db))
+			require.NoError(t, err)
+			err = r.ReserveExperimentRequest(t.Context(), experimentAdmissionInput(db, t))
+			switch boundary {
+			case "exhaustion":
+				require.ErrorIs(t, err, service.ErrExperimentQuotaExhausted)
+			case "unresolved":
+				require.NoError(t, err, "small unresolved backlog is durable but does not serialize execution")
+				require.False(t, status.AccountingBlocked)
+			default:
+				require.ErrorIs(t, err, service.ErrExperimentAccountingPending)
+				require.True(t, status.AccountingBlocked)
+			}
+			var unknown int
+			require.NoError(t, db.QueryRow(`SELECT count(*) FROM experiment_quota_charges WHERE amount IS NULL`).Scan(&unknown))
+			require.Equal(t, count, unknown, "no unknown bill was fabricated as zero to unlock capacity")
+			if boundary == "count" {
+				var id int64
+				require.NoError(t, db.QueryRow(`SELECT id FROM experiment_quota_charges WHERE request_id='backlog-1'`).Scan(&id))
+				require.NoError(t, r.CompleteExperimentChargeWithEvidence(t.Context(), id, 0.25, experimentEvidence(10, "receipt-1")))
+				require.NoError(t, r.ReserveExperimentRequest(t.Context(), experimentAdmissionInput(db, t)), "evidenced settlement reopens the bounded backlog")
+				require.ErrorIs(t, r.ReserveExperimentRequest(t.Context(), experimentAdmissionInput(db, t)), service.ErrExperimentAccountingPending,
+					"active sends also reserve a place in the outstanding limit")
+			}
+		})
+	}
+}
+
+func TestCodingQuotaDBExperimentAsyncPolicyInvalidFailsBeforeSend(t *testing.T) {
+	for _, raw := range []string{
+		`{"version":1,"user_ids":[1],"max_active":10,"max_outstanding":5,"max_pending_age_seconds":900}`,
+		`{"version":1,"user_ids":[-1],"max_active":10,"max_outstanding":100,"max_pending_age_seconds":900}`,
+		`{"version":1,"user_ids":[1],"max_active":10,"max_outstanding":100,"max_pending_age_seconds":0}`,
+		`{"version":1,"public":true}`,
+	} {
+		t.Run(raw, func(t *testing.T) {
+			db, r := experimentGuardTestDB(t)
+			_, err := db.Exec(`INSERT INTO settings(key,value) VALUES('experiment_async_admission_policy',$1)`, raw)
+			require.NoError(t, err)
+			require.ErrorIs(t, r.ReserveExperimentRequest(t.Context(), experimentAdmissionInput(db, t)), service.ErrExperimentAccountingUnavailable)
+			var n int
+			require.NoError(t, db.QueryRow(`SELECT count(*) FROM experiment_quota_attempts`).Scan(&n))
+			require.Zero(t, n)
+		})
+	}
 }
 
 func TestCodingQuotaDBExperimentConcurrentEvidenceSettlementIsOnce(t *testing.T) {

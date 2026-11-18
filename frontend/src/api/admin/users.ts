@@ -402,6 +402,8 @@ export interface PurposeAllowanceItem {
   blocked?: boolean
   blocked_reason?: 'EXPERIMENT_ACCOUNTING_PENDING'
   pending_requests?: number
+  in_flight_requests?: number
+  active_limit?: number
   unit?: 'points' | 'yuan'
   pending_points?: string | null
   data_status?: 'current' | 'estimated' | 'pending' | 'partial' | 'error'
@@ -496,6 +498,21 @@ export async function resetPurposeQuota(id: number, input: PersonalQuotaResetInp
   return data
 }
 
+export interface ExperimentConcurrencyConfig {
+  enabled: boolean
+  max_active: number
+}
+
+export async function getExperimentConcurrency(id: number, signal?: AbortSignal): Promise<ExperimentConcurrencyConfig> {
+  const { data } = await apiClient.get<ExperimentConcurrencyConfig>(`/admin/users/${id}/experiment-concurrency`, { signal })
+  return data
+}
+
+export async function setExperimentConcurrency(id: number, config: ExperimentConcurrencyConfig): Promise<ExperimentConcurrencyConfig> {
+  const { data } = await apiClient.put<ExperimentConcurrencyConfig>(`/admin/users/${id}/experiment-concurrency`, config)
+  return data
+}
+
 export const usersAPI = {
   list,
   getById,
@@ -518,6 +535,8 @@ export const usersAPI = {
   resetPlatformQuotaWindow,
   getPurposeQuotaResets,
   resetPurposeQuota,
+  getExperimentConcurrency,
+  setExperimentConcurrency,
 }
 
 export default usersAPI

@@ -239,7 +239,7 @@ class ExperimentAccountingRuntime(APIFallbackRuntime):
  'immutable_hash',md5((to_jsonb(u)-ARRAY['input_cost','total_cost','actual_cost'])::text)))
  FROM usage_logs u WHERE EXISTS(SELECT 1 FROM experiment_quota_charges c
  WHERE c.request_id=u.request_id AND c.api_key_id=u.api_key_id) ORDER BY u.id;""")
-        sql.append("SELECT json_build_array('" + prefix + "policy',json_build_object('key',key,'value',value)) FROM settings WHERE key='purpose_allowance_policy';")
+        sql.append("SELECT json_build_array('" + prefix + "policy',json_build_object('key',key,'value',value)) FROM settings WHERE key IN ('purpose_allowance_policy','experiment_async_admission_policy') ORDER BY key;")
         return sql
 
     def experiment_snapshot(self):

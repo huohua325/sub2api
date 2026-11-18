@@ -7,10 +7,10 @@ import (
 )
 
 var (
-	// ErrExperimentAccountingPending prevents spending while current-window costs are unknown.
+	// ErrExperimentAccountingPending bounds unverified billing exposure.
 	ErrExperimentAccountingPending = errors.New("experiment accounting has unresolved charges")
-	// ErrExperimentRequestInFlight prevents concurrent unpriced requests across a user's keys.
-	ErrExperimentRequestInFlight = errors.New("another experiment request is awaiting settlement")
+	// ErrExperimentRequestInFlight limits active execution across a user's keys.
+	ErrExperimentRequestInFlight = errors.New("experiment execution capacity is busy")
 	// ErrExperimentQuotaExhausted preserves the existing personal allowance limit.
 	ErrExperimentQuotaExhausted = errors.New("experiment quota exhausted")
 	// ErrExperimentAccountingUnavailable fails closed when durable admission cannot be checked.
@@ -18,8 +18,7 @@ var (
 )
 
 // ExperimentAdmissionInput identifies a request before any chargeable upstream send.
-// It does not contain an estimated cost: absent a verified upper bound, only one
-// unknown-cost request per user may be outstanding.
+// It does not invent an estimated cost; actual charges come from supplier logs.
 type ExperimentAdmissionInput struct {
 	RequestID string
 	UserID    int64
@@ -28,11 +27,16 @@ type ExperimentAdmissionInput struct {
 	StartedAt time.Time
 }
 
-// ExperimentAdmissionStore coordinates the strict accounting gate across keys and processes.
+// ExperimentAdmissionStore coordinates durable admission across keys and processes.
 type ExperimentAdmissionStore interface {
 	ReserveExperimentRequest(context.Context, ExperimentAdmissionInput) error
 	MarkExperimentRequestSent(context.Context, string, int64) error
 	ReleaseExperimentRequest(context.Context, string, int64, string) error
+}
+
+// ExperimentCompletionStore separates finished execution from unknown billing.
+type ExperimentCompletionStore interface {
+	CompleteExperimentRequest(context.Context, string, int64) error
 }
 
 // ExperimentChargeEvidence identifies the exact upstream evidence used for a settlement.
@@ -60,13 +64,17 @@ type ExperimentResponseRecorder interface {
 }
 
 // ExperimentAccountingStatus describes unknown costs separately from settled usage.
-// Counts are disjoint: an attempt with a matching current-period charge is not
-// counted again as an in-flight request.
+// Counts are disjoint and include liabilities from earlier periods. A finished
+// request awaiting its supplier bill does not occupy execution capacity.
 type ExperimentAccountingStatus struct {
 	PendingRequests    int64
 	UnresolvedRequests int64
 	InFlightRequests   int64
 	UpdatedAt          *time.Time
+	OldestPendingAt    *time.Time
+	ActiveLimit        int64
+	OutstandingLimit   int64
+	AccountingBlocked  bool
 }
 
 // ExperimentAccountingStatusReader supplies a durable summary for user-facing quota cards.

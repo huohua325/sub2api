@@ -27,6 +27,21 @@ function mountRuler(allowances: PurposeAllowanceItem[] | null, extra: { loading?
 }
 
 describe('StudentQuotaRuler', () => {
+  it('separates running requests from background bills without claiming an accounting pause', () => {
+    const wrapper = mountRuler([
+      { purpose: 'experiment', display_percent: 82, used_amount: 411.26, limit_amount: 500,
+        blocked: false, pending_requests: 12, in_flight_requests: 10, active_limit: 10, data_status: 'pending' },
+    ])
+    const card = wrapper.get('[data-testid="experiment-purpose-card"]')
+    expect(card.text()).toContain('411.26 / 500')
+    expect(card.text()).toContain('dashboard.ruler.inFlightCount:{"count":10,"limit":10}')
+    expect(card.text()).toContain('dashboard.ruler.pendingCount:{"count":12}')
+    expect(card.text()).toContain('dashboard.ruler.asyncAccountingHint')
+    expect(card.text()).not.toContain('dashboard.ruler.accountingPaused')
+    expect(card.text()).not.toContain('dashboard.ruler.accountingBlockedHint')
+    expect(card.text()).not.toContain('dashboard.ruler.exhausted')
+    wrapper.unmount()
+  })
   it('separates settled experiment money from unknown charges and quota exhaustion', () => {
     const wrapper = mountRuler([
       { purpose: 'openai', display_percent: 30, blocked: false, data_status: 'current' },

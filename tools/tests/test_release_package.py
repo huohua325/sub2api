@@ -104,7 +104,11 @@ class PackageTests(unittest.TestCase):
         import coding_continuation_upgrade as upgrade
         self.check_accounting_package(upgrade, continuation=True)
 
-    def check_accounting_package(self, upgrade, continuation=False):
+    def test_async_admission_lane_packages_the_pinned_migration_and_policy(self):
+        import experiment_concurrency_upgrade as upgrade
+        self.check_accounting_package(upgrade, concurrency=True)
+
+    def check_accounting_package(self, upgrade, continuation=False, concurrency=False):
         from delivery_core import tree_hash, write_json
         from delivery_workflow import application_snapshot
         baseline = self.commit
@@ -134,8 +138,11 @@ class PackageTests(unittest.TestCase):
         next(step for step in self.runner.manifest['steps'] if step['name'] == 'backend-build')['source_commit'] = source
         write_json(self.out / 'manifest.json', self.runner.manifest)
         constants = dict(BASELINE=baseline, APPLICATION=source)
-        constants.update(dict(FILES={'backend/source.go'}) if continuation else dict(
-            STANDBY_APPLICATION=baseline, MIGRATIONS=migrations, DATABASE_MIGRATIONS=migrations))
+        if continuation:
+            constants.update(FILES={'backend/source.go'})
+        else:
+            constants.update(MIGRATIONS=migrations, DATABASE_MIGRATIONS=migrations)
+            if not concurrency: constants.update(STANDBY_APPLICATION=baseline)
         with patch.multiple(upgrade, **constants):
             contract = upgrade.contract_for_release()
             final = dict(status='passed', version='test1', application=application_snapshot(self.root), features=features[:-1])
@@ -149,6 +156,8 @@ class PackageTests(unittest.TestCase):
             for name in ('experiment_accounting_upgrade.py', 'api_fallback_upgrade.py', 'upstream_additive_upgrade.py'):
                 self.assertTrue((self.out / 'release' / name).is_file(), 'Missing server policy dependency: ' + name)
             if continuation: self.assertTrue((self.out / 'release/coding_continuation_upgrade.py').is_file())
+            if concurrency: self.assertTrue((self.out / 'release/experiment_concurrency_upgrade.py').is_file())
+            if concurrency: self.assertTrue((self.out / 'release/experiment_concurrency_policy.py').is_file())
 
     def test_finalized_package_requires_the_selected_feature_evidence(self):
         from delivery_workflow import application_snapshot

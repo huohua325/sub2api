@@ -20,6 +20,7 @@ type experimentAdmissionSpy struct {
 	requestID  string
 	upstreamID string
 	status     int
+	completed  int
 }
 
 func (s *experimentAdmissionSpy) ReserveExperimentRequest(_ context.Context, in ExperimentAdmissionInput) error {
@@ -38,6 +39,11 @@ func (s *experimentAdmissionSpy) ReleaseExperimentRequest(context.Context, strin
 func (s *experimentAdmissionSpy) RecordExperimentResponse(_ context.Context, _ string, _ int64, id string, status int) error {
 	s.receipts++
 	s.upstreamID, s.status = id, status
+	return nil
+}
+
+func (s *experimentAdmissionSpy) CompleteExperimentRequest(context.Context, string, int64) error {
+	s.completed++
 	return nil
 }
 
@@ -90,7 +96,7 @@ func TestExperimentSentAttemptCannotBeReplayedOrReleased(t *testing.T) {
 		t.Fatalf("a mixed group replayed unknown spend through another provider: %v", err)
 	}
 	FinishCodingRequest(c)
-	if spy.sent != 1 || spy.released != 0 {
+	if spy.sent != 1 || spy.released != 0 || spy.completed != 1 {
 		t.Fatal("a sent request was resent or its unknown cost was released")
 	}
 	if got := resolveUsageBillingRequestID(req.Context(), "supplier-response"); got != "local:request" {

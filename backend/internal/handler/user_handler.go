@@ -141,13 +141,18 @@ func (h *UserHandler) GetMyPlatformQuotas(c *gin.Context) {
 					if statusErr != nil {
 						item["data_status"], item["blocked"] = "error", true
 					} else {
-						pending := status.PendingRequests + status.UnresolvedRequests + status.InFlightRequests
+						pending := status.PendingRequests + status.UnresolvedRequests
 						item["pending_requests"] = pending
+						item["in_flight_requests"] = status.InFlightRequests
+						item["active_limit"] = status.ActiveLimit
 						if status.UpdatedAt != nil {
 							item["updated_at"] = status.UpdatedAt
 						}
 						if pending > 0 {
-							item["data_status"], item["blocked"], item["blocked_reason"] = "pending", true, "EXPERIMENT_ACCOUNTING_PENDING"
+							item["data_status"] = "pending"
+						}
+						if status.AccountingBlocked && !(row.LimitAmount >= 0 && used >= row.LimitAmount) {
+							item["blocked"], item["blocked_reason"] = true, "EXPERIMENT_ACCOUNTING_PENDING"
 						}
 					}
 				}
