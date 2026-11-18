@@ -6,8 +6,8 @@ import subprocess
 from delivery_core import DeliveryError, digest
 from experiment_accounting_upgrade import ExperimentAccountingUpgrade, main as accounting_main
 
-BASELINE = 'fa996675e4fc4543e13c2b3fa801566702f5236e'
-APPLICATION = 'b9456681e056956531e1df56a1b2fa8bf8edcee4'
+BASELINE = '2898b7e4b478e581c1ccc34b65a898e98a1ed086'
+APPLICATION = '11a1df54deff041bc68e6187c58ac0c54e3caa87'
 MIGRATIONS = {'273_experiment_async_admission.sql': 'f5674cf8a5e8d4b4c48f9a1d94142cd447a6c47682a2e944fa01140961f60024'}
 DATABASE_MIGRATIONS = {'273_experiment_async_admission.sql': 'e527e4862099d0655006285f1828a1880507978be939256711b7fcb7b7ef7281'}
 
