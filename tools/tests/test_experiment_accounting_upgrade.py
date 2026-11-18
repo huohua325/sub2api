@@ -342,6 +342,24 @@ class AccountingPostgresTests(unittest.TestCase):
             sql('DELETE FROM experiment_quota_settlement_events', fail=True)
             sql('UPDATE usage_logs SET input_tokens=101 WHERE id=4')
             with self.assertRaises(DeliveryError): policy.assert_preserved(before, runtime.snapshot(reference))
+            # Exercise the next release's real index/column migration and MVCC
+            # persistence contract on exactly the same financial data.
+            import experiment_concurrency_upgrade as concurrency
+            name = '273_experiment_async_admission.sql'
+            raw = (root / 'backend/migrations' / name).read_text(encoding='utf-8')
+            file_hash = hashlib.sha256((root / 'backend/migrations' / name).read_bytes()).hexdigest()
+            database_hash = hashlib.sha256(raw.strip().encode()).hexdigest()
+            prior = runtime.snapshot(reference)
+            sql(raw)
+            sql("INSERT INTO schema_migrations VALUES('" + name + "','" + database_hash + "')")
+            with patch.multiple(concurrency, APPLICATION='a' * 40, MIGRATIONS={name: file_hash},
+                                DATABASE_MIGRATIONS={name: database_hash}):
+                next_policy = concurrency.ExperimentConcurrencyUpgrade(concurrency.contract_for_release())
+                next_policy.assert_preserved(prior, runtime.snapshot(reference))
+                sql(raw)
+                next_policy.assert_preserved(prior, runtime.snapshot(reference))
+                sql("INSERT INTO settings VALUES('experiment_async_admission_policy','{}')")
+                with self.assertRaises(DeliveryError): next_policy.assert_preserved(prior, runtime.snapshot(reference))
 
 
 if __name__ == '__main__':

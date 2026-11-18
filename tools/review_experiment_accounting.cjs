@@ -11,7 +11,8 @@ async page => {
       display_percent: state === 'settled' ? 45 : state === 'exhausted' ? 100 : 30,
       reset_scope: 'month', data_status: state.includes('pending') ? 'pending' : 'current',
       blocked: state === 'accounting-pending' || state === 'exhausted',
-      ...(state === 'accounting-pending' ? { blocked_reason: 'EXPERIMENT_ACCOUNTING_PENDING', pending_requests: 12909 } : {}) }
+      ...(state === 'accounting-pending' ? { blocked_reason: 'EXPERIMENT_ACCOUNTING_PENDING', pending_requests: 12909 } : {}),
+      ...(state === 'async-pending' ? { pending_requests: 12, in_flight_requests: 10, active_limit: 10 } : {}) }
     return { server_now: time, platform_quotas: [], purpose_allowances: [
       { ...common, purpose: 'openai', unit: 'points', point_used: '15', point_limit: '50', display_percent: 30,
         data_status: 'current', activity_status: 'ready', blocked: false, reset_scope: 'personal' },
@@ -67,6 +68,14 @@ async page => {
   }
   await page.setViewportSize({ width: 1440, height: 1000 })
   const reload = page.getByRole('button', { name: '重新读取', exact: true })
+  state = 'async-pending'
+  await reload.click()
+  await experiment.getByText('正在运行 10 / 10 条。', { exact: true }).waitFor()
+  text = await experiment.innerText()
+  check('execution-and-backlog-separated', text.includes('12 条请求的费用待核实') && text.includes('10 / 10'))
+  check('background-billing-allows-more-requests', text.includes('可继续请求') && !text.includes('暂停') && !text.includes('已到上限'))
+  check('pending-money-not-counted-as-free', text.includes('待结算费用尚未计入') && text.includes('150.46'))
+  await experiment.screenshot({ path: options.output + '/async-billing.png' })
   state = 'settled'
   await reload.click()
   await experiment.getByText(/224\.01/).waitFor()
