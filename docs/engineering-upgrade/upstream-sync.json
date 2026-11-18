@@ -1374,5 +1374,21 @@
       "live_feature_checks_each_passed_engine": 32,
       "full_go_test_rerun": false
     }
+  },
+  "last_experiment_record_only_deployment": {
+    "version": "0.2.22-mile.20261118.experiment-record1",
+    "source_commit": "c6f4cc0a27d67fb5b8e455a97b5218c17262c103",
+    "baseline_commit": "078c24a63fdcdd28b32990d254f7dde6bc61c0a4",
+    "sha256": "cf69e5084c71a481b7c8e73c04b72837de6bd4ef25e6d54b989fbebd1a91f474",
+    "release_directory": "/opt/sub2api/releases/mile-20261118-experiment-record1",
+    "backup": "/opt/sub2api/backups/before-mile-20261118-experiment-record1-20261118T064010453121Z",
+    "database_backup_sha256": "77b0751c269d36b9479e989e9e1ec825d9e57d77d95c5e8ac54c6eedb79106f9",
+    "as_of": "2026-11-18T06:41:47.179300+00:00",
+    "finished_at": "2026-11-18T06:42:21.144173+00:00",
+    "migration_count": 323,
+    "shadow": ["openai", "grok"],
+    "experiment_policy_preserved": true,
+    "public_verification_passed": true,
+    "record": "docs/engineering-upgrade/EXPERIMENT-RECORD-ONLY-2026-11-18.md"
   }
 }
