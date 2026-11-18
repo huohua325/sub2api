@@ -24,4 +24,12 @@ GlobalAI 继续使用已有供应商请求凭据和后台账单结算。
 - 首次并行 `finalize` 遇到 Windows 浏览器证据路径错误。`finalize --jobs 1` 复用之前的 Linux 程序，在约 5 分 19 秒内完成额度和浏览器复验；没有再次编译。
 - 候选版本 `0.2.22-mile.20261118.experiment-standby1`，应用改动 `b4c6f0537`，程序构建提交 `a8669b4ae750a062e0ac119907ad51f6d9c98e75`，部署基线 `c6f4cc0a27d67fb5b8e455a97b5218c17262c103`。
 - 发布包位于 `D:/Project/sub2api-ek1811/output/releases/mile-20261118-experiment-standby1/`。差量 `app.bsdiff` 为 2,514,210 字节，SHA256 `6bee91a25d893e2fc7617d9c4ab0ce75bcbc8577a315ca68024d4689afd39919`；程序 SHA256 `1ecfbc29ab8d742baa38d2296bb2da011ad89b9c13272926eb1a07929369d309`。
-- 证据：独立发布工作树的 `output/delivery/experiment-key-standby/` 及主工作树同名目录。未部署、未启用任何策略。生产只读检查时没有合格的管理员实验 Key；上线后先在相应实验分组创建 Key，再配置并预览备用策略。
+- 准备证据：独立发布工作树的 `output/delivery/experiment-key-standby/` 及主工作树同名目录。生产只读检查时没有合格的管理员实验 Key；先在相应实验分组创建 Key，再配置并预览备用策略。
+
+## 线上部署
+
+北京时间 2026-11-18 20:57:40 发布通过，运行版本、源码和程序 SHA256 与以上候选完全一致。仅重建 sub2api；应用与 MemSlides 均返回 200。Codex/Grok 保持 `shadow`，备用策略仍为 0，未发送付费请求。
+
+固定参考时刻核对迁移仍为 323 条，保留订阅账本 52,555 行、实验费用 45,437 行、尝试 7,948 行、结算审计 31,969 行，以及原周期、确认事件、权限和持久任务。数据库备份通过 `pg_restore --list`，为 64,069,951 字节，SHA256 `423e42a64d201e8f682f9f29bb9e7d700da6132f615bf598b41bcc50f7523623`。备份目录 `/opt/sub2api/backups/before-mile-20261118-experiment-standby1-20261118T125630550328Z`。
+
+仅部署复用已验证的前端、Linux 程序和发布包。20:50 左右开始核对，差量私有中转用时 18.1 秒（草稿已删除），并行运行的隔离 PostgreSQL 测试 164 项通过、零失败及跳过。20:53:48 完成暂存及只读预检，20:56:30 开始备份（约 25 秒），从固定参考时刻到检查完成约 45 秒。公网 202 项资源通过，Chromium 管理员备用流程用模拟数据通过 32 项检查，未写线上配置；20:58:45 完成公网验收，从开始到公网通过约 8 分半，后续更新发布记录。部署证据位于独立发布工作树的 `output/delivery/deploy-experiment-standby1/`。

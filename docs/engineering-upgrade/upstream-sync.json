@@ -1390,5 +1390,24 @@
     "experiment_policy_preserved": true,
     "public_verification_passed": true,
     "record": "docs/engineering-upgrade/EXPERIMENT-RECORD-ONLY-2026-11-18.md"
+  },
+  "last_experiment_key_standby_deployment": {
+    "version": "0.2.22-mile.20261118.experiment-standby1",
+    "source_commit": "a8669b4ae750a062e0ac119907ad51f6d9c98e75",
+    "baseline_commit": "c6f4cc0a27d67fb5b8e455a97b5218c17262c103",
+    "sha256": "1ecfbc29ab8d742baa38d2296bb2da011ad89b9c13272926eb1a07929369d309",
+    "release_directory": "/opt/sub2api/releases/mile-20261118-experiment-standby1",
+    "backup": "/opt/sub2api/backups/before-mile-20261118-experiment-standby1-20261118T125630550328Z",
+    "database_backup_sha256": "423e42a64d201e8f682f9f29bb9e7d700da6132f615bf598b41bcc50f7523623",
+    "as_of": "2026-11-18T12:56:55.682938+00:00",
+    "finished_at": "2026-11-18T12:57:40.964866+00:00",
+    "migration_count": 323,
+    "shadow": ["openai", "grok"],
+    "standby_policy_count": 0,
+    "quota_race_tests": {"passed": 164, "skipped": 0, "failed": 0},
+    "public_resources_checked": 202,
+    "public_browser_chromium_checks": 32,
+    "live_inference_calls": 0,
+    "record": "docs/engineering-upgrade/EXPERIMENT-KEY-STANDBY-2026-11-18.md"
   }
 }
