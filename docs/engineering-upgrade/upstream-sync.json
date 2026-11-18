@@ -1409,5 +1409,25 @@
     "public_browser_chromium_checks": 32,
     "live_inference_calls": 0,
     "record": "docs/engineering-upgrade/EXPERIMENT-KEY-STANDBY-2026-11-18.md"
+  },
+  "last_experiment_account_standby_deployment": {
+    "version": "0.2.22-mile.20261119.account-standby1",
+    "source_commit": "d9bc47cb0381a3d3f463ef8aa224acb5fd867fba",
+    "baseline_commit": "a8669b4ae750a062e0ac119907ad51f6d9c98e75",
+    "sha256": "d310185aa07c20cd39de67ab75ee7795d21568cbf7ee5ced5dfc3b8095ec57b9",
+    "release_directory": "/opt/sub2api/releases/mile-20261119-account-standby1",
+    "backup": "/opt/sub2api/backups/before-mile-20261119-account-standby1-20261118T172711758405Z",
+    "database_backup_sha256": "62a4be6d0439adcff4a7025b654c1e3d49d5b5fcd25526393481a1f66e1707d4",
+    "as_of": "2026-11-18T17:27:52.000240+00:00",
+    "finished_at": "2026-11-18T17:28:45.138034+00:00",
+    "migration_count": 323,
+    "shadow": ["openai", "grok"],
+    "standby_policy_count": 0,
+    "account_standby_count": 0,
+    "quota_race_tests": {"passed": 165, "skipped": 0, "failed": 0},
+    "public_resources_checked": 202,
+    "public_browser_chromium_checks": 22,
+    "live_inference_calls": 0,
+    "record": "docs/engineering-upgrade/EXPERIMENT-ACCOUNT-STANDBY-2026-11-19.md"
   }
 }
