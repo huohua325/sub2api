@@ -15,6 +15,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from delivery_core import DeliveryError
 import experiment_accounting_upgrade as upgrade
+import experiment_account_standby_upgrade as account_standby
 import experiment_key_standby_upgrade as standby_upgrade
 
 
@@ -45,6 +46,18 @@ class ExperimentKeyStandbyUpgradeTests(unittest.TestCase):
             rows.append({'config': {'experiment_key_id': 7, 'enabled': False}})
             self.assertFalse(policy.can_rollback(runtime))
             rows.clear()
+
+    def test_account_release_has_a_fixed_baseline_and_quarantines_rollback(self):
+        from types import SimpleNamespace
+        root = Path(__file__).resolve().parents[2]
+        contract = account_standby.contract_for_release()
+        policy = account_standby.ExperimentAccountStandbyUpgrade(contract)
+        policy.validate(dict(backend_unchanged=False, upgrade_contract=contract, baseline_commit=account_standby.BASELINE))
+        policy.validate_sources(root, account_standby.BASELINE, account_standby.APPLICATION)
+        with self.assertRaises(DeliveryError):
+            policy.validate_sources(root, standby_upgrade.BASELINE, account_standby.APPLICATION)
+        self.assertTrue(policy.can_rollback(SimpleNamespace(account_standby_snapshot=lambda: [])))
+        self.assertFalse(policy.can_rollback(SimpleNamespace(account_standby_snapshot=lambda: [[8, [17]]])))
 
 
 class AccountingUpgradeTests(unittest.TestCase):

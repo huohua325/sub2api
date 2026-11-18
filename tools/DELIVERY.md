@@ -34,6 +34,10 @@
 
 ## v0.2.22 两迁移上游发布
 
+GPT 实验账号备用使用 `experiment_account_standby_upgrade.py package/deploy`，固定线上
+`a8669b4ae` 基线，无迁移。继续核对实验账本和旧策略，另核对账号级备用配置；存在账号
+级配置时不回退到无法识别该角色的程序。本版不自动加入分组或启用备用。
+
 实验 Key 备用使用 `experiment_key_standby_upgrade.py package/deploy`，固定已部署的
 `c6f4cc0a2` 基线并禁止新增或改写迁移。沿用实验计费的四项产物验收和持久账本快照；
 配置过实验 Key 备用后禁止回退到不理解该策略的程序。发布不自动创建或启用策略。

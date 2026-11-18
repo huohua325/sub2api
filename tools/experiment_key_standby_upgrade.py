@@ -12,6 +12,8 @@ def contract_for_release():
 
 
 class ExperimentKeyStandbyUpgrade(ExperimentAccountingUpgrade):
+    baseline = BASELINE
+    application = APPLICATION
     rollback_block_reason = 'An experiment standby policy was saved. Keep the current database and fix forward.'
 
     def __init__(self, contract):
@@ -29,18 +31,18 @@ class ExperimentKeyStandbyUpgrade(ExperimentAccountingUpgrade):
             except subprocess.CalledProcessError:
                 raise DeliveryError('Experiment standby source ancestry verification failed') from None
 
-        if baseline != BASELINE:
+        if baseline != self.baseline:
             raise DeliveryError('Unexpected live experiment standby baseline')
-        git('merge-base', '--is-ancestor', BASELINE, APPLICATION)
-        git('merge-base', '--is-ancestor', APPLICATION, source)
-        if git('diff', '--name-only', APPLICATION, source, '--', 'backend', 'frontend'):
+        git('merge-base', '--is-ancestor', self.baseline, self.application)
+        git('merge-base', '--is-ancestor', self.application, source)
+        if git('diff', '--name-only', self.application, source, '--', 'backend', 'frontend'):
             raise DeliveryError('Application differs from the reviewed experiment-key standby change')
         if git('diff', '--name-only', baseline, source, '--', 'backend/migrations'):
             raise DeliveryError('Experiment standby release must not change migrations')
 
     def validate(self, manifest):
         if (manifest.get('backend_unchanged') is not False or manifest.get('upgrade_contract') != self.contract
-                or manifest.get('baseline_commit') != BASELINE):
+                or manifest.get('baseline_commit') != self.baseline):
             raise DeliveryError('Explicit pinned experiment-key standby manifest required')
 
     def can_rollback(self, runtime):

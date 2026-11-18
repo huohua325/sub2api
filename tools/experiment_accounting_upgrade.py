@@ -164,6 +164,7 @@ def explain_experiment_settlements(before, after):
 
 
 class ExperimentAccountingUpgrade:
+    require_disabled_standby = True
     rollback_block_reason = 'Experiment attempts or settlement evidence exist; keep the compatible program and fix forward. Never restore an older database.'
 
     def __init__(self, contract):
@@ -208,7 +209,7 @@ class ExperimentAccountingUpgrade:
         assert_preserved(before, adjusted)
         if before['access'] != after['access'] or after['ultrafast_enabled']:
             raise DeliveryError('Existing access or Ultra Fast configuration changed')
-        if before['fallback'] != after['fallback'] or any(
+        if before['fallback'] != after['fallback'] or self.require_disabled_standby and any(
                 row.get('enabled') or row.get('config', {}).get('enabled')
                 for row in after['fallback']['api_fallback_policies']):
             raise DeliveryError('Accounting repair must preserve disabled standby and all prior paid evidence')
@@ -295,7 +296,8 @@ class ExperimentAccountingRuntime(APIFallbackRuntime):
         return result
 
 
-def main(upgrade_class=ExperimentAccountingUpgrade, release_contract=contract_for_release, baseline=BASELINE):
+def main(upgrade_class=ExperimentAccountingUpgrade, release_contract=contract_for_release, baseline=BASELINE,
+         runtime_class=ExperimentAccountingRuntime):
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest='command', required=True)
     package = commands.add_parser('package')
@@ -324,7 +326,7 @@ def main(upgrade_class=ExperimentAccountingUpgrade, release_contract=contract_fo
         if args.stage:
             stage_release(args.root, args.release)
             return
-        result = deploy(args.root, args.release, ExperimentAccountingRuntime(args.root, args.release),
+        result = deploy(args.root, args.release, runtime_class(args.root, args.release),
                         apply=args.apply, upgrade=policy)
     print(json.dumps(result, indent=2))
 
