@@ -34,6 +34,11 @@
 
 ## v0.2.22 两迁移上游发布
 
+实验账单仅记录版使用 `experiment_record_only_upgrade.py package/deploy`，固定已部署
+`078c24a63` 基线及审核过的应用版本，无数据库迁移。继续使用实验计费的四项功能产物
+验收和账本快照，保持现有分配、订阅 shadow 与备用配置。兼容基线仍处理同样的持久账单，
+回退仅切换程序并恢复旧版准入规则，保留当前数据库。
+
 Codex／Grok Build 独立入口续作用 `coding_standby_upgrade.py package/deploy`，固定当前已部署
 `16ba3ae09` 实验并发线上基线和审核合并应用树，强制保留 `7624e4b2` 长会话修复。
 当前 `coding-standby-v2` 保留已部署的 273，新增迁移为零；旧 standby1 包不能代表此合并版本。
