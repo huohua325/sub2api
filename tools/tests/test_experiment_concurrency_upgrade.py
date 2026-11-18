@@ -33,7 +33,7 @@ class ConcurrencyUpgradeTests(unittest.TestCase):
             changed['experiment']['policy'].append({'key': key, 'value': 'unreviewed'})
             with self.subTest(key=key), self.assertRaises(DeliveryError):
                 self.policy.assert_preserved(before, changed)
-        self.assertFalse(self.policy.can_rollback(None), 'old startup migrations must not recreate the single-open index')
+        self.assertTrue(self.policy.can_rollback(None), 'the pinned accounting-compatible baseline may restore strict admission without discarding liabilities')
 
     def test_manifest_is_explicit_and_contract_is_pinned(self):
         manifest = dict(backend_unchanged=False, baseline_commit=upgrade.BASELINE,

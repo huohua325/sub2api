@@ -54,9 +54,12 @@ class ExperimentConcurrencyUpgrade(ExperimentAccountingUpgrade):
             raise DeliveryError('Explicit pinned asynchronous admission manifest required')
 
     def can_rollback(self, runtime):
-        # Migration 273 removes a uniqueness constraint. Old admission programs
-        # must never rerun 272 against new concurrent attempts during startup.
-        return False
+        # The pinned 2898b7e4 baseline already understands every attempt state,
+        # charge and settlement event. Its migration runner skips registered 272
+        # (verified with multiple open attempts), so it will not recreate the
+        # unique index. Keeping 273 and the grant setting safely restores strict
+        # admission while its existing reconciler settles the retained backlog.
+        return True
 
 
 if __name__ == '__main__':

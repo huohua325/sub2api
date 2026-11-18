@@ -36,7 +36,8 @@
 
 实验异步并发使用 `experiment_concurrency_upgrade.py package/deploy`，固定审查后的应用与
 唯一新增迁移 273；复用实验计费的四项功能产物验收、单事务持久数据快照和备份流程。
-移除单用户唯一索引后不自动回退旧启动程序，保留当前数据库并向前修复。
+失败时仅允许回退固定的 `2898b7e4b` 计费兼容程序；已登记的 272 不会重建唯一索引。
+保留当前数据库、273 和用户试用策略，旧版暂时恢复严格准入并继续结算，不回退更早程序。
 发布本身不创建试用名单，原有策略必须原样保留。随后用包内
 `experiment_concurrency_policy.py --release <目录> --expected-sha256 <新程序SHA>
 --actor-user-id <管理员ID> --tester-email <明确授权邮箱>` 只读预演，按已授权范围加 `--apply`。
