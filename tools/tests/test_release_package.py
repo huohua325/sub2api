@@ -98,14 +98,22 @@ class PackageTests(unittest.TestCase):
 
     def test_experiment_lane_requires_its_actual_path_and_packages_pinned_policy(self):
         import experiment_accounting_upgrade as upgrade
+        self.check_accounting_package(upgrade)
+
+    def test_continuation_lane_packages_its_policy_and_all_accounting_dependencies(self):
+        import coding_continuation_upgrade as upgrade
+        self.check_accounting_package(upgrade, continuation=True)
+
+    def check_accounting_package(self, upgrade, continuation=False):
         from delivery_core import tree_hash, write_json
         from delivery_workflow import application_snapshot
         baseline = self.commit
         folder = self.root / 'backend/migrations'; folder.mkdir()
         migrations = {}
-        for name in upgrade.MIGRATIONS:
+        for name in ([] if continuation else upgrade.MIGRATIONS):
             target = folder / name; target.write_text('-- synthetic ' + name)
             migrations[name] = digest(target)
+        if continuation: (self.root / 'backend/source.go').write_text('reviewed continuation fix')
         self.git('add', 'backend')
         self.git('-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'reviewed accounting')
         source = self.git('rev-parse', 'HEAD')
@@ -125,8 +133,10 @@ class PackageTests(unittest.TestCase):
         self.git('-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'review tools')
         next(step for step in self.runner.manifest['steps'] if step['name'] == 'backend-build')['source_commit'] = source
         write_json(self.out / 'manifest.json', self.runner.manifest)
-        with patch.multiple(upgrade, BASELINE=baseline, STANDBY_APPLICATION=baseline, APPLICATION=source,
-                            MIGRATIONS=migrations, DATABASE_MIGRATIONS=migrations):
+        constants = dict(BASELINE=baseline, APPLICATION=source)
+        constants.update(dict(FILES={'backend/source.go'}) if continuation else dict(
+            STANDBY_APPLICATION=baseline, MIGRATIONS=migrations, DATABASE_MIGRATIONS=migrations))
+        with patch.multiple(upgrade, **constants):
             contract = upgrade.contract_for_release()
             final = dict(status='passed', version='test1', application=application_snapshot(self.root), features=features[:-1])
             write_json(self.out / 'finalize.json', final)
@@ -138,6 +148,7 @@ class PackageTests(unittest.TestCase):
             self.assertEqual(manifest['upgrade_contract'], contract)
             for name in ('experiment_accounting_upgrade.py', 'api_fallback_upgrade.py', 'upstream_additive_upgrade.py'):
                 self.assertTrue((self.out / 'release' / name).is_file(), 'Missing server policy dependency: ' + name)
+            if continuation: self.assertTrue((self.out / 'release/coding_continuation_upgrade.py').is_file())
 
     def test_finalized_package_requires_the_selected_feature_evidence(self):
         from delivery_workflow import application_snapshot

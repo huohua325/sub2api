@@ -201,7 +201,7 @@ class ExperimentAccountingUpgrade:
     def assert_preserved(self, before, after):
         prior = {row['filename'] for row in before['migrations']}
         added = [row for row in after['migrations'] if row['filename'] not in prior]
-        if {row['filename']: row['checksum'] for row in added} != DATABASE_MIGRATIONS:
+        if {row['filename']: row['checksum'] for row in added} != self.contract['database_migrations']:
             raise DeliveryError('Unexpected accounting migration addition or database checksum')
         adjusted = explain_experiment_settlements(before, after)
         adjusted['migrations'] = [row for row in after['migrations'] if row['filename'] in prior]
@@ -295,7 +295,7 @@ class ExperimentAccountingRuntime(APIFallbackRuntime):
         return result
 
 
-def main():
+def main(upgrade_class=ExperimentAccountingUpgrade, release_contract=contract_for_release, baseline=BASELINE):
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest='command', required=True)
     package = commands.add_parser('package')
@@ -314,12 +314,12 @@ def main():
     if args.command == 'package':
         from release_package import package_release
         result = package_release(Path(__file__).resolve().parents[1], args.output, args.destination,
-                                 args.output / 'sub2api-linux-amd64', args.version, args.baseline_sha256, BASELINE,
+                                 args.output / 'sub2api-linux-amd64', args.version, args.baseline_sha256, baseline,
                                  baseline_binary=args.baseline_binary, full_upload=args.full_upload,
-                                 upgrade_contract=contract_for_release())
+                                 upgrade_contract=release_contract())
     else:
         manifest = json.loads((args.release / 'manifest.json').read_text())
-        policy = ExperimentAccountingUpgrade(manifest.get('upgrade_contract', {}))
+        policy = upgrade_class(manifest.get('upgrade_contract', {}))
         policy.validate(manifest)
         if args.stage:
             stage_release(args.root, args.release)
