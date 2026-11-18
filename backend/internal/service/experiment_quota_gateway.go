@@ -18,8 +18,7 @@ type experimentRequestContextKey struct{}
 const experimentRequestHandleKey = "mile.experiment-accounting"
 
 // ExperimentRequestHandle preserves an unknown-cost attempt across disconnects.
-// Without a verified supplier price bound, another request cannot spend while
-// this user's preceding request remains unpriced.
+// Its execution slot and unresolved billing liability have separate lifetimes.
 type ExperimentRequestHandle struct {
 	mu       sync.Mutex
 	input    ExperimentAdmissionInput
@@ -173,11 +172,19 @@ func finishExperimentRequest(c *gin.Context) {
 	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if !h.reserved || h.sent || h.store == nil {
+	if !h.reserved || h.store == nil {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+	if h.sent {
+		if store, ok := h.store.(ExperimentCompletionStore); ok {
+			if err := store.CompleteExperimentRequest(ctx, h.input.RequestID, h.input.APIKeyID); err != nil {
+				slog.Error("experiment_execution_completion_failed", "request_id", h.input.RequestID, "error", err)
+			}
+		}
+		return
+	}
 	if err := h.store.ReleaseExperimentRequest(ctx, h.input.RequestID, h.input.APIKeyID, "request ended before send"); err != nil {
 		slog.Error("experiment_unsent_release_failed", "request_id", h.input.RequestID, "error", err)
 	} else {
@@ -198,8 +205,8 @@ func writeExperimentAccountingError(c *gin.Context, err error) {
 	case errors.Is(err, ErrExperimentAccountingPending):
 		code, message = "EXPERIMENT_ACCOUNTING_PENDING", "API experiment charges are awaiting reconciliation; new requests are temporarily blocked"
 	case errors.Is(err, ErrExperimentRequestInFlight):
-		status, code, message = http.StatusTooManyRequests, "EXPERIMENT_REQUEST_IN_FLIGHT", "The previous API experiment request is awaiting settlement; retry after it completes"
-		c.Header("Retry-After", "10")
+		status, code, message = http.StatusTooManyRequests, "EXPERIMENT_REQUEST_IN_FLIGHT", "API experiment execution capacity is busy; retry after a running request completes"
+		c.Header("Retry-After", "2")
 	}
 	c.AbortWithStatusJSON(status, gin.H{"error": gin.H{"type": code, "code": code, "message": message}})
 }

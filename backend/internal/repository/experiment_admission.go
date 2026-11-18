@@ -12,7 +12,7 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-// ReserveExperimentRequest durably serializes unknown-cost GlobalAI requests
+// ReserveExperimentRequest atomically bounds execution and outstanding billing
 // across every key belonging to the same user. No upstream I/O runs in the transaction.
 func (r *UsageMonitorRepository) ReserveExperimentRequest(ctx context.Context, in service.ExperimentAdmissionInput) error {
 	if r == nil || r.db == nil || strings.TrimSpace(in.RequestID) == "" || len(in.RequestID) > 256 || in.UserID <= 0 || in.APIKeyID <= 0 || in.AccountID <= 0 || in.StartedAt.IsZero() {
@@ -67,22 +67,19 @@ func (r *UsageMonitorRepository) ReserveExperimentRequest(ctx context.Context, i
 	if !limit.IsNegative() && used.GreaterThanOrEqual(limit) {
 		return service.ErrExperimentQuotaExhausted
 	}
-	var pending bool
-	err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM experiment_quota_charges
- WHERE user_id=$1 AND state IN ('pending','unresolved') AND started_at>=$2 AND started_at<$3)`, in.UserID, start, end).Scan(&pending)
+	policy, err := readExperimentAdmissionPolicy(ctx, tx, in.UserID)
 	if err != nil {
 		return fmt.Errorf("%w: %v", service.ErrExperimentAccountingUnavailable, err)
 	}
-	if pending {
+	status, err := readExperimentAdmissionCounts(ctx, tx, in.UserID)
+	if err != nil {
+		return fmt.Errorf("%w: %v", service.ErrExperimentAccountingUnavailable, err)
+	}
+	applyExperimentAdmissionPolicy(&status, policy, now)
+	if status.AccountingBlocked {
 		return service.ErrExperimentAccountingPending
 	}
-	var inFlight bool
-	err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM experiment_quota_attempts
- WHERE user_id=$1 AND state IN ('reserved','sent','handed_off','unknown'))`, in.UserID).Scan(&inFlight)
-	if err != nil {
-		return fmt.Errorf("%w: %v", service.ErrExperimentAccountingUnavailable, err)
-	}
-	if inFlight {
+	if status.InFlightRequests >= status.ActiveLimit {
 		return service.ErrExperimentRequestInFlight
 	}
 	_, err = tx.ExecContext(ctx, `INSERT INTO experiment_quota_attempts(request_id,api_key_id,user_id,account_id,started_at)
@@ -91,6 +88,26 @@ func (r *UsageMonitorRepository) ReserveExperimentRequest(ctx context.Context, i
 		return fmt.Errorf("%w: %v", service.ErrExperimentAccountingUnavailable, err)
 	}
 	return tx.Commit()
+}
+
+// CompleteExperimentRequest closes execution, never its billing liability. A
+// late detached billing handoff may still attach the charge to this attempt.
+func (r *UsageMonitorRepository) CompleteExperimentRequest(ctx context.Context, requestID string, keyID int64) error {
+	if r == nil || r.db == nil {
+		return service.ErrExperimentAccountingUnavailable
+	}
+	result, err := r.db.ExecContext(ctx, `UPDATE experiment_quota_attempts
+ SET completed_at=COALESCE(completed_at,clock_timestamp()),
+ state=CASE WHEN state='sent' THEN 'unknown' ELSE state END,updated_at=clock_timestamp()
+ WHERE request_id=$1 AND api_key_id=$2 AND state IN ('sent','handed_off','unknown','settled')`, requestID, keyID)
+	if err != nil {
+		return fmt.Errorf("%w: %v", service.ErrExperimentAccountingUnavailable, err)
+	}
+	n, err := result.RowsAffected()
+	if err != nil || n != 1 {
+		return service.ErrExperimentAccountingUnavailable
+	}
+	return nil
 }
 
 // MarkExperimentRequestSent is a one-way checkpoint immediately before upstream I/O.
@@ -182,7 +199,7 @@ func finishExperimentAttemptForBilling(ctx context.Context, tx *sql.Tx, cmd *ser
 	if err != nil {
 		return err
 	}
-	if userID != cmd.UserID || accountID != cmd.AccountID || state != "sent" {
+	if userID != cmd.UserID || accountID != cmd.AccountID || (state != "sent" && state != "unknown") {
 		return errors.New("experiment billing admission identity or state conflict")
 	}
 	next := "handed_off"

@@ -84,6 +84,9 @@ func quotaTestDB(t *testing.T, seed string) (*sql.DB, *UsageMonitorRepository, t
 	experimentGuard, err := migrations.FS.ReadFile("272_experiment_accounting_guard.sql")
 	require.NoError(t, err)
 	require.NoError(t, applyMigrationsFS(context.Background(), db, fstest.MapFS{"272_experiment_accounting_guard.sql": &fstest.MapFile{Data: experimentGuard}}))
+	asyncAdmission, err := migrations.FS.ReadFile("273_experiment_async_admission.sql")
+	require.NoError(t, err)
+	require.NoError(t, applyMigrationsFS(context.Background(), db, fstest.MapFS{"273_experiment_async_admission.sql": &fstest.MapFile{Data: asyncAdmission}}))
 	var base time.Time
 	require.NoError(t, db.QueryRow(`SELECT window_start FROM user_purpose_allowances WHERE user_id=1 AND purpose='openai'`).Scan(&base))
 	return db, NewUsageMonitorRepository(db), base

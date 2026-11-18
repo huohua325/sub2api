@@ -2,7 +2,7 @@
 // consume log. Do not price those calls from local cards, the USD catalog, or
 // a group rate. One yuan is 500000 quota points. Match the row by
 // X-Oneapi-Request-Id. Unreadable charges remain explicitly pending, and durable
-// admission prevents another unpriced send. Codex and Grok Build are unchanged.
+// admission bounds active work and billing backlog. Codex and Grok Build are unchanged.
 package service
 
 import (

@@ -402,6 +402,8 @@ export interface PurposeAllowanceItem {
   blocked?: boolean
   blocked_reason?: 'EXPERIMENT_ACCOUNTING_PENDING'
   pending_requests?: number
+  in_flight_requests?: number
+  active_limit?: number
   unit?: 'points' | 'yuan'
   pending_points?: string | null
   data_status?: 'current' | 'estimated' | 'pending' | 'partial' | 'error'

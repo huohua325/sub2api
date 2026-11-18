@@ -79,6 +79,8 @@ export default {
       pendingHint: '部分消耗正在对账，当前数值可能包含暂估。',
       settledLabel: '已结算',
       pendingCount: '还有 {count} 条请求的费用待核实。',
+      inFlightCount: '正在运行 {count} / {limit} 条。',
+      asyncAccountingHint: '费用后台核实，可继续请求；待结算费用尚未计入。',
       accountingPaused: '对账中',
       accountingBlockedHint: '费用核实前，暂停新的 API 实验请求。',
       stale: '额度刷新失败，以下为上次读数，请稍后重新读取。',

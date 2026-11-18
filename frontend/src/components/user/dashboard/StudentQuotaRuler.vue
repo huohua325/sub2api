@@ -48,7 +48,9 @@
           </div>
           <p v-if="meter.resetLine" class="quota-meter-reset">{{ meter.resetLine }}</p>
           <p v-if="meter.id === 'experiment' && (meter.row?.pending_requests ?? 0) > 0" class="quota-meter-reset" role="status">{{ t('dashboard.ruler.pendingCount', { count: meter.row?.pending_requests }) }}</p>
+          <p v-if="meter.id === 'experiment' && (meter.row?.in_flight_requests ?? 0) > 0" class="quota-meter-reset" role="status">{{ t('dashboard.ruler.inFlightCount', { count: meter.row?.in_flight_requests, limit: meter.row?.active_limit ?? 1 }) }}</p>
           <p v-if="meter.accountingBlocked" class="quota-meter-reset" role="status">{{ t('dashboard.ruler.accountingBlockedHint') }}</p>
+          <p v-else-if="meter.id === 'experiment' && meter.pending && !meter.exhausted" class="quota-meter-reset">{{ t('dashboard.ruler.asyncAccountingHint') }}</p>
           <p v-else-if="meter.pending" class="quota-meter-reset">{{ t('dashboard.ruler.pendingHint') }}</p>
         </template>
         <p v-if="meter.row?.activity_status && meter.row.activity_status !== 'ready'" class="quota-meter-reset" role="status">{{ t(`codingQuota.student.${meter.row.activity_status}`) }}</p>
