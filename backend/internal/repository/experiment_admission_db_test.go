@@ -86,6 +86,7 @@ func TestCodingQuotaDBExperimentStrictAdmissionAcrossKeysAndRestart(t *testing.T
 	require.Equal(t, "receipt", receipt)
 	require.Equal(t, 403, status)
 	// A request that another user owns has an independent gate.
+	newInput.RequestID = uuid.NewString()
 	newInput.UserID = 2
 	require.NoError(t, r.ReserveExperimentRequest(t.Context(), newInput))
 }
@@ -133,7 +134,9 @@ func TestCodingQuotaDBExperimentHandoffEvidenceAndAppendOnlyAudit(t *testing.T) 
 	var state string
 	require.NoError(t, db.QueryRow(`SELECT state FROM experiment_quota_attempts`).Scan(&state))
 	require.Equal(t, "handed_off", state)
-	require.NoError(t, r.ReserveExperimentRequest(t.Context(), experimentAdmissionInput(db, t)))
+	probe := experimentAdmissionInput(db, t)
+	require.NoError(t, r.ReserveExperimentRequest(t.Context(), probe))
+	require.NoError(t, r.ReleaseExperimentRequest(t.Context(), probe.RequestID, probe.APIKeyID, "probe not sent"))
 	var chargeID int64
 	require.NoError(t, db.QueryRow(`SELECT id FROM experiment_quota_charges WHERE request_id=$1`, in.RequestID).Scan(&chargeID))
 	evidence := experimentEvidence(10, "supplier-receipt")
