@@ -32,6 +32,7 @@ async page => {
   }, user)
   page.setDefaultTimeout(15000)
   page.on('pageerror', error => errors.push(error.message))
+  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()) })
   await page.route('**/*', async route => {
     const req = route.request(), url = new URL(req.url()), path = url.pathname, method = req.method()
     if (url.origin !== base || path.startsWith('/v1/')) { apiMutations.push({ path, method }); return route.abort() }
@@ -51,7 +52,8 @@ async page => {
     }
     else if (adminMode && path === '/api/v1/admin/dashboard/users-usage' && method === 'POST') data = {}
     else if (adminMode && method === 'GET' && (path.includes('/groups') || path.includes('/user-attributes') || path.endsWith('/subscriptions'))) data = []
-    else if (adminMode && method === 'GET' && path.endsWith('/users/99/attributes')) data = {}
+    else if (adminMode && method === 'GET' && path.endsWith('/users/99/attributes')) data = []
+    else if (adminMode && method === 'GET' && path.endsWith('/admin/compliance')) data = { required: false, version: 'synthetic-review' }
     else if (path.endsWith('/user/platform-quotas') && method === 'GET') { reads++; data = allowances() }
     else {
       try { data = fixtures.resolve(path, method) }
