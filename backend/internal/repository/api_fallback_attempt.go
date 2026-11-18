@@ -48,8 +48,20 @@ func (r *UsageMonitorRepository) ResolveAPIFallbackLineage(ctx context.Context, 
 	if len(hashes) == 0 {
 		return 0, nil
 	}
-	if len(hashes) > 100 || user <= 0 || key <= 0 || group <= 0 || len(model) > 256 {
+	if user <= 0 || key <= 0 || group <= 0 || len(model) > 256 {
 		return 0, fallbackInvalid("invalid lineage scope")
+	}
+	if len(hashes) > 100 {
+		// A long subscription conversation needs no paid provenance lookup when
+		// this scope has never produced encrypted standby state.
+		var hasReceipts bool
+		err := r.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM api_fallback_attempts
+ WHERE user_id=$1 AND api_key_id=$2 AND (policy_snapshot->>'group_id')::bigint=$3 AND model=$4 AND state='settled'
+ AND jsonb_typeof(usage->'encrypted_digests')='array' AND usage->'encrypted_digests'<>'[]'::jsonb)`, user, key, group, model).Scan(&hasReceipts)
+		if err != nil || !hasReceipts {
+			return 0, err
+		}
+		return 0, fallbackInvalid("standby conversation exceeds the verified lineage limit")
 	}
 	unique := make(map[string]bool)
 	for _, h := range hashes {

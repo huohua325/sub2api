@@ -254,6 +254,14 @@ func TestCodingQuotaDBAPIFallbackDraftAndSendTimeRevocation(t *testing.T) {
 func TestCodingQuotaDBAPIFallbackLineageNeverCrossesIdentity(t *testing.T) {
 	db, r := fallbackTestDB(t)
 	p := fallbackTestPolicy(t, r, nil)
+	longHistory := make([]string, 101)
+	for i := range longHistory {
+		sum := sha256.Sum256([]byte(fmt.Sprintf("subscription reasoning %d", i)))
+		longHistory[i] = hex.EncodeToString(sum[:])
+	}
+	id, err := r.ResolveAPIFallbackLineage(t.Context(), 1, 1, 1, p.Model, longHistory)
+	require.NoError(t, err, "long subscription history must pass when no standby state exists")
+	require.Zero(t, id)
 	in := fallbackReserveInput(p)
 	a, err := r.ReserveAPIFallback(t.Context(), in)
 	require.NoError(t, err)
@@ -264,9 +272,15 @@ func TestCodingQuotaDBAPIFallbackLineageNeverCrossesIdentity(t *testing.T) {
 	require.NoError(t, err)
 	_, err = r.SettleAPIFallback(t.Context(), service.APIFallbackSettlementInput{ID: a.ID, InputTokens: 100, OutputTokens: 10, Usage: usage})
 	require.NoError(t, err)
-	id, err := r.ResolveAPIFallbackLineage(t.Context(), 1, 1, 1, p.Model, []string{digest})
+	id, err = r.ResolveAPIFallbackLineage(t.Context(), 1, 1, 1, p.Model, []string{digest})
 	require.NoError(t, err)
 	require.Equal(t, int64(30), id)
+	longHistory[0] = digest
+	_, err = r.ResolveAPIFallbackLineage(t.Context(), 1, 1, 1, p.Model, longHistory)
+	require.Error(t, err, "unverified long history may contain standby state")
+	id, err = r.ResolveAPIFallbackLineage(t.Context(), 1, 1, 1, "another-model", longHistory)
+	require.NoError(t, err)
+	require.Zero(t, id)
 	for _, scope := range []struct {
 		user, key, group int64
 		model            string
