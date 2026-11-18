@@ -15,10 +15,36 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from delivery_core import DeliveryError
 import experiment_accounting_upgrade as upgrade
+import experiment_key_standby_upgrade as standby_upgrade
 
 
 def empty_experiment():
     return {**{name: [] for name in upgrade.TABLES}, 'usage': [], 'policy': []}
+
+
+class ExperimentKeyStandbyUpgradeTests(unittest.TestCase):
+    def test_fixed_source_tree_and_manifest(self):
+        root = Path(__file__).resolve().parents[2]
+        policy = standby_upgrade.ExperimentKeyStandbyUpgrade(standby_upgrade.contract_for_release())
+        manifest = {'backend_unchanged': False, 'upgrade_contract': standby_upgrade.contract_for_release(),
+                    'baseline_commit': standby_upgrade.BASELINE}
+        policy.validate(manifest)
+        policy.validate_sources(root, standby_upgrade.BASELINE, standby_upgrade.APPLICATION)
+        with self.assertRaises(DeliveryError):
+            policy.validate_sources(root, standby_upgrade.APPLICATION, standby_upgrade.APPLICATION)
+
+    def test_experiment_key_in_current_or_prior_policy_blocks_rollback(self):
+        from types import SimpleNamespace
+        policy = standby_upgrade.ExperimentKeyStandbyUpgrade(standby_upgrade.contract_for_release())
+        current, histories = [], []
+        runtime = SimpleNamespace(fallback_snapshot=lambda: {
+            'api_fallback_policies': current, 'api_fallback_policy_versions': histories,
+        })
+        self.assertTrue(policy.can_rollback(runtime))
+        for rows in (current, histories):
+            rows.append({'config': {'experiment_key_id': 7, 'enabled': False}})
+            self.assertFalse(policy.can_rollback(runtime))
+            rows.clear()
 
 
 class AccountingUpgradeTests(unittest.TestCase):

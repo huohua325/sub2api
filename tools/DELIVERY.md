@@ -34,6 +34,10 @@
 
 ## v0.2.22 两迁移上游发布
 
+实验 Key 备用使用 `experiment_key_standby_upgrade.py package/deploy`，固定已部署的
+`c6f4cc0a2` 基线并禁止新增或改写迁移。沿用实验计费的四项产物验收和持久账本快照；
+配置过实验 Key 备用后禁止回退到不理解该策略的程序。发布不自动创建或启用策略。
+
 实验账单仅记录版使用 `experiment_record_only_upgrade.py package/deploy`，固定已部署
 `078c24a63` 基线及审核过的应用版本，无数据库迁移。继续使用实验计费的四项功能产物
 验收和账本快照，保持现有分配、订阅 shadow 与备用配置。兼容基线仍处理同样的持久账单，
