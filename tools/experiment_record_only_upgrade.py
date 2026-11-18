@@ -5,7 +5,7 @@ from delivery_core import DeliveryError
 from experiment_accounting_upgrade import ExperimentAccountingUpgrade, main as accounting_main
 
 BASELINE = '078c24a63fdcdd28b32990d254f7dde6bc61c0a4'
-APPLICATION = '2b35940c72a892d594fbb0803797387bbf7dbd26'
+APPLICATION = 'e89082b998815b499464a852b07efdde3acf323c'
 
 
 def contract_for_release():
