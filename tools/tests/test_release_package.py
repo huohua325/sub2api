@@ -108,7 +108,11 @@ class PackageTests(unittest.TestCase):
         import experiment_concurrency_upgrade as upgrade
         self.check_accounting_package(upgrade, concurrency=True)
 
-    def check_accounting_package(self, upgrade, continuation=False, concurrency=False):
+    def test_coding_standby_lane_retains_both_server_dependencies(self):
+        import coding_standby_upgrade as upgrade
+        self.check_accounting_package(upgrade, concurrency=True, standby=True)
+
+    def check_accounting_package(self, upgrade, continuation=False, concurrency=False, standby=False):
         from delivery_core import tree_hash, write_json
         from delivery_workflow import application_snapshot
         baseline = self.commit
@@ -138,6 +142,7 @@ class PackageTests(unittest.TestCase):
         next(step for step in self.runner.manifest['steps'] if step['name'] == 'backend-build')['source_commit'] = source
         write_json(self.out / 'manifest.json', self.runner.manifest)
         constants = dict(BASELINE=baseline, APPLICATION=source)
+        if standby: constants['HOTFIX'] = baseline
         if continuation:
             constants.update(FILES={'backend/source.go'})
         else:
@@ -158,6 +163,7 @@ class PackageTests(unittest.TestCase):
             if continuation: self.assertTrue((self.out / 'release/coding_continuation_upgrade.py').is_file())
             if concurrency: self.assertTrue((self.out / 'release/experiment_concurrency_upgrade.py').is_file())
             if concurrency: self.assertTrue((self.out / 'release/experiment_concurrency_policy.py').is_file())
+            if standby: self.assertTrue((self.out / 'release/coding_standby_upgrade.py').is_file())
 
     def test_finalized_package_requires_the_selected_feature_evidence(self):
         from delivery_workflow import application_snapshot

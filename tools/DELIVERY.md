@@ -35,7 +35,9 @@
 ## v0.2.22 两迁移上游发布
 
 Codex／Grok Build 独立入口续作用 `coding_standby_upgrade.py package/deploy`，固定当前已部署
-`2898b7e4b` 基线和审核应用树，强制保留 `7624e4b2` 长会话修复，禁止新增或修改迁移。
+`2898b7e4b` 基线和审核合并应用树，强制保留 `7624e4b2` 长会话修复。
+当前 `coding-standby-v2` 仅允许已审核的新增迁移 273；旧 standby1 无迁移包不能代表此合并版本。
+禁止修改已有迁移，不通过发布自动开启实验并发或付费备用。
 继承实验计费的同事务快照和逐请求结算核对，最终准备选择 `api-fallback`、
 `experiment-accounting`、`unified-coding`、`personal-quota` 四项场景。已有备用角色或付费尝试
 时阻止不兼容回退；只回退至固定的兼容基线也不恢复数据库。旧 `api_fallback_upgrade.py`

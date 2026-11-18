@@ -1,25 +1,32 @@
-"""Pinned migration-free coding standby extension on the deployed continuation fix."""
+"""Pinned coding standby plus opt-in experiment concurrency; retain continuation fix."""
+from pathlib import Path
 import re
 import subprocess
 
-from delivery_core import DeliveryError
+from delivery_core import DeliveryError, digest
 from experiment_accounting_upgrade import ExperimentAccountingUpgrade, main as accounting_main
+from experiment_concurrency_upgrade import MIGRATIONS, DATABASE_MIGRATIONS
 
 BASELINE = '2898b7e4b478e581c1ccc34b65a898e98a1ed086'
 HOTFIX = '7624e4b236f85775ebd841c2058458a36b6af2f3'
-APPLICATION = 'fabfc074150430c4e47a9d9c13897820b9c3ba4a'
+APPLICATION = 'f3128c0353430660240a46c147a0216a1c5298b2'
 
 
 def contract_for_release():
-    return dict(name='coding-standby-v1', baseline_commit=BASELINE,
-                source_commit=APPLICATION, migrations={}, database_migrations={})
+    return dict(name='coding-standby-v2', baseline_commit=BASELINE,
+                source_commit=APPLICATION, migrations=MIGRATIONS.copy(),
+                database_migrations=DATABASE_MIGRATIONS.copy())
 
 
 class CodingStandbyUpgrade(ExperimentAccountingUpgrade):
     rollback_block_reason = 'Coding standby roles or paid attempts exist; retain the compatible program and fix forward. Never restore a database.'
 
     def __init__(self, contract):
-        if contract != contract_for_release() or not re.fullmatch(r'[0-9a-f]{40}', APPLICATION):
+        if (contract != contract_for_release() or not re.fullmatch(r'[0-9a-f]{40}', APPLICATION)
+                or set(MIGRATIONS) != {'273_experiment_async_admission.sql'}
+                or set(DATABASE_MIGRATIONS) != set(MIGRATIONS)
+                or any(not re.fullmatch(r'[0-9a-f]{64}', value)
+                       for value in (*MIGRATIONS.values(), *DATABASE_MIGRATIONS.values()))):
             raise DeliveryError('Only the pinned reviewed coding standby extension is supported')
         self.contract = contract
 
@@ -36,8 +43,12 @@ class CodingStandbyUpgrade(ExperimentAccountingUpgrade):
             git('merge-base', '--is-ancestor', ancestor, descendant)
         if git('diff', '--name-only', APPLICATION, source, '--', 'backend', 'frontend'):
             raise DeliveryError('Application differs from the reviewed coding standby extension')
-        if git('diff', '--name-only', baseline, source, '--', 'backend/migrations'):
-            raise DeliveryError('Coding standby extension must not change any migration')
+        if git('diff', '--name-status', baseline, source, '--', 'backend/migrations').splitlines() != [
+                'A\tbackend/migrations/273_experiment_async_admission.sql']:
+            raise DeliveryError('Coding standby accepts only additive reviewed migration 273')
+        for name, checksum in MIGRATIONS.items():
+            if digest(Path(root) / 'backend/migrations' / name) != checksum:
+                raise DeliveryError('Reviewed admission migration changed')
 
     def validate(self, manifest):
         if (manifest.get('backend_unchanged') is not False or manifest.get('upgrade_contract') != self.contract

@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import coding_standby_upgrade as upgrade
-from delivery_core import DeliveryError
+from delivery_core import DeliveryError, digest
 import test_experiment_accounting_upgrade as accounting_tests
 
 
@@ -20,13 +20,13 @@ class CodingStandbyUpgradeTests(unittest.TestCase):
         self.addCleanup(patches.stop)
         self.policy = upgrade.CodingStandbyUpgrade(upgrade.contract_for_release())
 
-    def test_zero_migrations_preserve_settlements_and_access(self):
+    def test_only_reviewed_migration_preserves_settlements_and_access(self):
         fixture = accounting_tests.AccountingUpgradeTests()
         fixture.setUp()
         self.addCleanup(fixture.doCleanups)
-        self.policy.assert_preserved(fixture.before, copy.deepcopy(fixture.before))
         after = fixture.settled()
-        after['migrations'] = copy.deepcopy(fixture.before['migrations'])
+        after['migrations'] = copy.deepcopy(fixture.before['migrations']) + [
+            {'filename': name, 'checksum': value} for name, value in upgrade.DATABASE_MIGRATIONS.items()]
         self.policy.assert_preserved(fixture.before, after)
         for field in ('migrations', 'access', 'fallback'):
             changed = copy.deepcopy(after)
@@ -66,7 +66,7 @@ class CodingStandbyUpgradeTests(unittest.TestCase):
             runtime.data[table].append(row)
             with self.subTest(table=table): self.assertFalse(self.policy.can_rollback(runtime))
 
-    def test_ancestry_requires_hotfix_and_all_migrations_are_unchanged(self):
+    def test_ancestry_requires_hotfix_and_exact_additive_migration(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
             def git(*args):
@@ -83,10 +83,15 @@ class CodingStandbyUpgradeTests(unittest.TestCase):
             source.write_text('deployed')
             baseline = commit()
             source.write_text('reviewed extension')
+            migration = root / 'backend/migrations/273_experiment_async_admission.sql'
+            migration.parent.mkdir()
+            migration.write_text('SELECT 1;')
             application = commit()
             (root / 'notes.md').write_text('documentation')
             descendant = commit()
-            with patch.multiple(upgrade, HOTFIX=hotfix, BASELINE=baseline, APPLICATION=application):
+            hashes = {migration.name: digest(migration)}
+            with patch.multiple(upgrade, HOTFIX=hotfix, BASELINE=baseline, APPLICATION=application,
+                                MIGRATIONS=hashes, DATABASE_MIGRATIONS=hashes):
                 policy = upgrade.CodingStandbyUpgrade(upgrade.contract_for_release())
                 policy.validate_sources(root, baseline, descendant)
                 with self.assertRaises(DeliveryError): policy.validate_sources(root, '0' * 40, descendant)
@@ -96,12 +101,24 @@ class CodingStandbyUpgradeTests(unittest.TestCase):
                 changed = commit()
                 with self.assertRaises(DeliveryError): policy.validate_sources(root, baseline, changed)
             migration = root / 'backend/migrations/new.sql'
-            migration.parent.mkdir()
             migration.write_text('SELECT 1')
             changed = commit()
             with patch.multiple(upgrade, HOTFIX=hotfix, BASELINE=baseline, APPLICATION=changed):
                 with self.assertRaises(DeliveryError):
                     upgrade.CodingStandbyUpgrade(upgrade.contract_for_release()).validate_sources(root, baseline, changed)
+
+    def test_migration_checksum_cannot_be_bypassed_by_reviewing_changed_source(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            migration = root / 'backend/migrations/273_experiment_async_admission.sql'
+            migration.parent.mkdir(parents=True)
+            migration.write_text('tampered')
+            def fake_git(command, **kwargs):
+                if command[1:3] == ['diff', '--name-status']:
+                    return 'A\tbackend/migrations/273_experiment_async_admission.sql\n'
+                return ''
+            with patch.object(upgrade.subprocess, 'check_output', side_effect=fake_git), self.assertRaises(DeliveryError):
+                self.policy.validate_sources(root, upgrade.BASELINE, upgrade.APPLICATION)
 
 
 if __name__ == '__main__':
