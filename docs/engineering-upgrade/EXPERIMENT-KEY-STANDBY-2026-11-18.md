@@ -16,3 +16,12 @@ GlobalAI 继续使用已有供应商请求凭据和后台账单结算。
 发送前复核两把 Key、策略及订阅池；单请求只允许一次上游发送。
 
 无数据库迁移；旧计点策略、尝试及费用记录保留。上线不创建或启用策略。
+
+## 验证与发布包
+
+- 相关 Go 竞态测试 416 项、额外鉴权和计费集成测试 7 项，均无失败和跳过；受影响的 Go 包通过 `go vet`。付费链路使用测试数据，未向真实供应商发请求。
+- 前端通过只读 lint、类型、国际化、411 个文件共 3329 项测试及生产构建。生产产物通过 Chromium 和 WebKit 的指南、API 备用、API 实验、统一编程和个人额度回归。打包前隔离 PostgreSQL 额度竞态实际执行 164 项，无失败和跳过。
+- 首次并行 `finalize` 遇到 Windows 浏览器证据路径错误。`finalize --jobs 1` 复用之前的 Linux 程序，在约 5 分 19 秒内完成额度和浏览器复验；没有再次编译。
+- 候选版本 `0.2.22-mile.20261118.experiment-standby1`，应用改动 `b4c6f0537`，程序构建提交 `a8669b4ae750a062e0ac119907ad51f6d9c98e75`，部署基线 `c6f4cc0a27d67fb5b8e455a97b5218c17262c103`。
+- 发布包位于 `D:/Project/sub2api-ek1811/output/releases/mile-20261118-experiment-standby1/`。差量 `app.bsdiff` 为 2,514,210 字节，SHA256 `6bee91a25d893e2fc7617d9c4ab0ce75bcbc8577a315ca68024d4689afd39919`；程序 SHA256 `1ecfbc29ab8d742baa38d2296bb2da011ad89b9c13272926eb1a07929369d309`。
+- 证据：独立发布工作树的 `output/delivery/experiment-key-standby/` 及主工作树同名目录。未部署、未启用任何策略。生产只读检查时没有合格的管理员实验 Key；上线后先在相应实验分组创建 Key，再配置并预览备用策略。
