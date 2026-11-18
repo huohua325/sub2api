@@ -323,6 +323,8 @@ func registerUserManagementRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		users.POST("/:id/platform-quotas/reset", h.Admin.User.ResetUserPlatformQuotaWindow)
 		users.GET("/:id/purpose-quota-resets", h.Admin.UsageMonitor.GetPersonalQuotaResets)
 		users.POST("/:id/purpose-quota-resets", h.Admin.UsageMonitor.ResetPersonalQuota)
+		users.GET("/:id/experiment-concurrency", h.Admin.UsageMonitor.GetExperimentConcurrency)
+		users.PUT("/:id/experiment-concurrency", h.Admin.UsageMonitor.SetExperimentConcurrency)
 
 		// User attribute values
 		users.GET("/:id/attributes", h.Admin.UserAttribute.GetUserAttributes)

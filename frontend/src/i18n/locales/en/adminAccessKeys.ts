@@ -80,6 +80,8 @@ export default {
   "permissions": {
     "users_dpurpose_uquotas_dread": { "label": "Read personal purpose quotas and reset history", "category": "Users" },
     "users_dpurpose_uquotas_dreset": { "label": "Reset ordinary users current-period purpose quotas", "category": "Users" },
+    "users_dexperiment_uconcurrency_dread": { "label": "Read user experiment concurrency grants", "category": "Users" },
+    "users_dexperiment_uconcurrency_dwrite": { "label": "Assign user experiment concurrency grants", "category": "Users" },
     "accounts_didentity_dread": {
       "label": "Read account email, plan, and creation time (no tokens)",
       "category": "Accounts"

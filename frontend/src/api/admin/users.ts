@@ -498,6 +498,21 @@ export async function resetPurposeQuota(id: number, input: PersonalQuotaResetInp
   return data
 }
 
+export interface ExperimentConcurrencyConfig {
+  enabled: boolean
+  max_active: number
+}
+
+export async function getExperimentConcurrency(id: number, signal?: AbortSignal): Promise<ExperimentConcurrencyConfig> {
+  const { data } = await apiClient.get<ExperimentConcurrencyConfig>(`/admin/users/${id}/experiment-concurrency`, { signal })
+  return data
+}
+
+export async function setExperimentConcurrency(id: number, config: ExperimentConcurrencyConfig): Promise<ExperimentConcurrencyConfig> {
+  const { data } = await apiClient.put<ExperimentConcurrencyConfig>(`/admin/users/${id}/experiment-concurrency`, config)
+  return data
+}
+
 export const usersAPI = {
   list,
   getById,
@@ -520,6 +535,8 @@ export const usersAPI = {
   resetPlatformQuotaWindow,
   getPurposeQuotaResets,
   resetPurposeQuota,
+  getExperimentConcurrency,
+  setExperimentConcurrency,
 }
 
 export default usersAPI

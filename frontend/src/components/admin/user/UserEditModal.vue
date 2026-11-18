@@ -54,6 +54,7 @@
         />
         <p class="input-hint">{{ t('admin.users.form.concurrencyHint') }}</p>
       </div>
+      <ExperimentConcurrencyControl v-if="show" :key="user.id" :user-id="user.id" :total-concurrency="user.concurrency" />
       <div>
         <label class="input-label">{{ t('admin.users.form.rpmLimit') }}</label>
         <input
@@ -95,6 +96,7 @@ import UserAttributeForm from '@/components/user/UserAttributeForm.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { useStepUp, isStepUpBlocked, isStepUpCancelled, stepUpBlockReason } from '@/composables/useStepUp'
 import TotpStepUpDialog from '@/components/auth/TotpStepUpDialog.vue'
+import ExperimentConcurrencyControl from './ExperimentConcurrencyControl.vue'
 
 const props = defineProps<{ show: boolean, user: AdminUser | null }>()
 const emit = defineEmits(['close', 'success'])

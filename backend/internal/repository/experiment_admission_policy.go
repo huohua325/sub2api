@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"strconv"
 	"strings"
 	"time"
 
@@ -13,11 +14,12 @@ import (
 )
 
 type experimentAdmissionPolicy struct {
-	Version              int     `json:"version"`
-	UserIDs              []int64 `json:"user_ids"`
-	MaxActive            int64   `json:"max_active"`
-	MaxOutstanding       int64   `json:"max_outstanding"`
-	MaxPendingAgeSeconds int64   `json:"max_pending_age_seconds"`
+	Version              int              `json:"version"`
+	UserIDs              []int64          `json:"user_ids"`
+	MaxActive            int64            `json:"max_active"`
+	MaxOutstanding       int64            `json:"max_outstanding"`
+	MaxPendingAgeSeconds int64            `json:"max_pending_age_seconds"`
+	UserLimits           map[string]int64 `json:"user_limits,omitempty"`
 }
 
 type experimentQueryer interface {
@@ -34,6 +36,24 @@ func readExperimentAdmissionPolicy(ctx context.Context, db experimentQueryer, us
 	if err != nil {
 		return strict, err
 	}
+	policy, err := decodeExperimentAdmissionPolicy(raw)
+	if err != nil {
+		return strict, err
+	}
+	for _, id := range policy.UserIDs {
+		if id == userID {
+			if limit, ok := policy.UserLimits[strconv.FormatInt(userID, 10)]; ok {
+				policy.MaxActive = limit
+				policy.MaxOutstanding = max(policy.MaxOutstanding, limit*10)
+			}
+			return policy, nil
+		}
+	}
+	return strict, nil
+}
+
+func decodeExperimentAdmissionPolicy(raw string) (experimentAdmissionPolicy, error) {
+	var strict experimentAdmissionPolicy
 	var policy experimentAdmissionPolicy
 	decoder := json.NewDecoder(strings.NewReader(raw))
 	decoder.DisallowUnknownFields()
@@ -53,12 +73,16 @@ func readExperimentAdmissionPolicy(ctx context.Context, db experimentQueryer, us
 			return strict, service.ErrExperimentAccountingUnavailable
 		}
 	}
-	for _, id := range policy.UserIDs {
-		if id == userID {
-			return policy, nil
+	if len(policy.UserLimits) > 1000 {
+		return strict, service.ErrExperimentAccountingUnavailable
+	}
+	for id, limit := range policy.UserLimits {
+		user, err := strconv.ParseInt(id, 10, 64)
+		if err != nil || user <= 0 || strconv.FormatInt(user, 10) != id || limit < 1 || limit > 1000 {
+			return strict, service.ErrExperimentAccountingUnavailable
 		}
 	}
-	return strict, nil
+	return policy, nil
 }
 
 // The same disjoint counts drive admission and the dashboard. Include old-period

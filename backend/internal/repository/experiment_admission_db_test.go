@@ -303,6 +303,79 @@ func enableExperimentAsyncTest(t *testing.T, db *sql.DB) {
 	require.NoError(t, err)
 }
 
+func TestCodingQuotaDBExperimentAdminAllocatesIndependentLimitsAndLowersSafely(t *testing.T) {
+	db, r := experimentGuardTestDB(t)
+	original := quotaDBNow(t, db)
+	_, err := r.SetExperimentConcurrency(t.Context(), 2, 1, service.ExperimentConcurrencyConfig{Enabled: true, MaxActive: 3})
+	require.NoError(t, err)
+	var active []service.ExperimentAdmissionInput
+	for range 3 {
+		in := experimentAdmissionInput(db, t)
+		require.NoError(t, r.ReserveExperimentRequest(t.Context(), in))
+		active = append(active, in)
+	}
+	require.ErrorIs(t, r.ReserveExperimentRequest(t.Context(), experimentAdmissionInput(db, t)), service.ErrExperimentRequestInFlight)
+	_, err = r.SetExperimentConcurrency(t.Context(), 2, 1, service.ExperimentConcurrencyConfig{Enabled: true, MaxActive: 2})
+	require.NoError(t, err)
+	status, err := r.ReadExperimentAccountingStatus(t.Context(), 1, original)
+	require.NoError(t, err)
+	require.Equal(t, int64(3), status.InFlightRequests, "lowering capacity never cancels existing execution")
+	require.Equal(t, int64(2), status.ActiveLimit)
+	require.ErrorIs(t, r.ReserveExperimentRequest(t.Context(), experimentAdmissionInput(db, t)), service.ErrExperimentRequestInFlight)
+	for _, in := range active[:2] {
+		require.NoError(t, r.ReleaseExperimentRequest(t.Context(), in.RequestID, in.APIKeyID, "never sent"))
+	}
+	require.NoError(t, r.ReserveExperimentRequest(t.Context(), experimentAdmissionInput(db, t)))
+	_, err = r.SetExperimentConcurrency(t.Context(), 2, 2, service.ExperimentConcurrencyConfig{Enabled: true, MaxActive: 37})
+	require.NoError(t, err)
+	r = NewUsageMonitorRepository(db)
+	first, err := r.ReadExperimentConcurrency(t.Context(), 1)
+	require.NoError(t, err)
+	second, err := r.ReadExperimentConcurrency(t.Context(), 2)
+	require.NoError(t, err)
+	require.Equal(t, service.ExperimentConcurrencyConfig{Enabled: true, MaxActive: 2}, first)
+	require.Equal(t, service.ExperimentConcurrencyConfig{Enabled: true, MaxActive: 37}, second)
+	_, err = r.SetExperimentConcurrency(t.Context(), 2, 1, service.ExperimentConcurrencyConfig{Enabled: false, MaxActive: 2})
+	require.NoError(t, err)
+	first, err = r.ReadExperimentConcurrency(t.Context(), 1)
+	require.NoError(t, err)
+	require.False(t, first.Enabled)
+	require.Equal(t, int64(1), first.MaxActive)
+	second, err = r.ReadExperimentConcurrency(t.Context(), 2)
+	require.NoError(t, err)
+	require.Equal(t, int64(37), second.MaxActive)
+	var used string
+	require.NoError(t, db.QueryRow(`SELECT used_amount::text FROM user_purpose_allowances WHERE user_id=1 AND purpose='experiment'`).Scan(&used))
+	require.Equal(t, "0.00000000", used)
+}
+
+func TestCodingQuotaDBExperimentAdminConcurrentGrantsPreserveOtherUsers(t *testing.T) {
+	db, r := experimentGuardTestDB(t)
+	db.SetMaxOpenConns(8)
+	var wg sync.WaitGroup
+	errors := make(chan error, 2)
+	for id := range int64(2) {
+		wg.Go(func() {
+			_, err := r.SetExperimentConcurrency(context.Background(), 2, id+1,
+				service.ExperimentConcurrencyConfig{Enabled: true, MaxActive: 20 + id})
+			errors <- err
+		})
+	}
+	wg.Wait()
+	close(errors)
+	for err := range errors {
+		require.NoError(t, err)
+	}
+	for id := range int64(2) {
+		got, err := r.ReadExperimentConcurrency(t.Context(), id+1)
+		require.NoError(t, err)
+		require.True(t, got.Enabled)
+		require.Equal(t, 20+id, got.MaxActive)
+	}
+	_, err := r.SetExperimentConcurrency(t.Context(), 2, 999, service.ExperimentConcurrencyConfig{Enabled: true, MaxActive: 30})
+	require.Error(t, err, "cannot grant capacity to a nonexistent user")
+}
+
 func TestCodingQuotaDBExperimentAsyncTenActiveAcrossKeysAndRestart(t *testing.T) {
 	db, r := experimentGuardTestDB(t)
 	enableExperimentAsyncTest(t, db)
