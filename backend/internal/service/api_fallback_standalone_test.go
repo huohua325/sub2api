@@ -49,13 +49,15 @@ func TestAPIFallbackStandaloneResponsesUseExistingClientPaths(t *testing.T) {
 		for _, path := range []string{"/v1/responses", "/responses", "/backend-api/codex/responses"} {
 			t.Run(platform+path, func(t *testing.T) {
 				s, store, key, policy := fallbackGatewayFixture()
+				accounts, ok := s.accountRepo.(*fallbackGatewayAccounts)
+				require.True(t, ok)
 				model := "gpt-6.1-sol"
 				if platform == PlatformGrok {
 					model = "grok-4.7"
 				}
 				key.Group.Platform, policy.Platform, policy.Model = platform, platform, model
-				for i := range s.accountRepo.(*fallbackGatewayAccounts).rows {
-					s.accountRepo.(*fallbackGatewayAccounts).rows[i].Platform = platform
+				for i := range accounts.rows {
+					accounts.rows[i].Platform = platform
 				}
 				upstream := &fallbackGatewayHTTP{status: http.StatusOK, contentType: "application/json", body: `{"id":"paid","model":"` + model + `","usage":{"input_tokens":10,"output_tokens":2}}`}
 				s.httpUpstream = upstream
@@ -78,9 +80,11 @@ type fallbackRoleAccounts struct {
 	*fallbackGatewayAccounts
 	roles map[int64][]int64
 	err   error
+	calls int
 }
 
 func (r *fallbackRoleAccounts) ListAPIFallbackBackupAccountIDs(_ context.Context, group int64) ([]int64, error) {
+	r.calls++
 	return r.roles[group], r.err
 }
 
@@ -97,8 +101,10 @@ func TestAPIFallbackStandaloneNormalForwardCannotUseDeclaredBackup(t *testing.T)
 		for _, method := range []string{"responses", "compact", "chat", "messages", "http_send", "websocket", "websocket_mode_off"} {
 			t.Run(platform+"/"+method, func(t *testing.T) {
 				s, _, key, _ := fallbackGatewayFixture()
+				accounts, ok := s.accountRepo.(*fallbackGatewayAccounts)
+				require.True(t, ok)
 				key.Group.Platform = platform
-				repo := &fallbackRoleAccounts{fallbackGatewayAccounts: s.accountRepo.(*fallbackGatewayAccounts), roles: map[int64][]int64{key.Group.ID: {20}}}
+				repo := &fallbackRoleAccounts{fallbackGatewayAccounts: accounts, roles: map[int64][]int64{key.Group.ID: {20}}}
 				s.accountRepo = repo
 				account := repo.rows[1]
 				account.Platform = platform
@@ -140,7 +146,9 @@ func TestAPIFallbackStandaloneNormalForwardCannotUseDeclaredBackup(t *testing.T)
 
 func TestAPIFallbackStandaloneRoleQueryFailsClosedAndKeepsOtherGroups(t *testing.T) {
 	s, _, key, _ := fallbackGatewayFixture()
-	repo := &fallbackRoleAccounts{fallbackGatewayAccounts: s.accountRepo.(*fallbackGatewayAccounts), roles: map[int64][]int64{key.Group.ID: {20}}}
+	accounts, ok := s.accountRepo.(*fallbackGatewayAccounts)
+	require.True(t, ok)
+	repo := &fallbackRoleAccounts{fallbackGatewayAccounts: accounts, roles: map[int64][]int64{key.Group.ID: {20}}}
 	s.accountRepo = repo
 	account := repo.rows[1]
 	require.ErrorIs(t, guardAPIFallbackNormalAccount(t.Context(), repo, key.Group, &account), ErrCodingQuotaUnavailable)
@@ -192,7 +200,9 @@ func TestAPIFallbackStandaloneRoleChangesInvalidateCatalogCache(t *testing.T) {
 func TestAPIFallbackStandaloneNormalUnconfiguredAPIStillForwards(t *testing.T) {
 	s, _, key, _ := fallbackGatewayFixture()
 	key.Group.Platform = PlatformOpenAI
-	repo := &fallbackRoleAccounts{fallbackGatewayAccounts: s.accountRepo.(*fallbackGatewayAccounts), roles: map[int64][]int64{}}
+	accounts, ok := s.accountRepo.(*fallbackGatewayAccounts)
+	require.True(t, ok)
+	repo := &fallbackRoleAccounts{fallbackGatewayAccounts: accounts, roles: map[int64][]int64{}}
 	s.accountRepo = repo
 	upstream := &fallbackGatewayHTTP{status: http.StatusOK, body: `{"ok":true}`, contentType: "application/json"}
 	s.httpUpstream = upstream
@@ -203,4 +213,35 @@ func TestAPIFallbackStandaloneNormalUnconfiguredAPIStillForwards(t *testing.T) {
 	_, err = io.ReadAll(resp.Body)
 	require.NoError(t, err)
 	require.NoError(t, resp.Body.Close())
+}
+
+func TestAPIFallbackNonCodingNormalTrafficDoesNotReadBackupRoles(t *testing.T) {
+	for _, tc := range []struct{ platform, kind string }{
+		{PlatformOpenAI, UsageKindExperiment}, {PlatformGrok, UsageKindExperiment},
+		{PlatformOpenAI, ""}, {PlatformGrok, ""}, {PlatformAnthropic, UsageKindCoding},
+	} {
+		t.Run(tc.platform+"/"+tc.kind, func(t *testing.T) {
+			s, _, key, _ := fallbackGatewayFixture()
+			accounts, ok := s.accountRepo.(*fallbackGatewayAccounts)
+			require.True(t, ok)
+			key.Group.Platform, key.Group.UsageKind = tc.platform, tc.kind
+			repo := &fallbackRoleAccounts{fallbackGatewayAccounts: accounts, err: errors.New("standby unavailable")}
+			s.accountRepo = repo
+			ctx := context.WithValue(t.Context(), ctxkey.Group, key.Group)
+			upstream := &fallbackGatewayHTTP{status: http.StatusOK, body: `{"ok":true}`, contentType: "application/json"}
+			s.httpUpstream = upstream
+			req := httptest.NewRequest(http.MethodPost, "https://supplier.invalid/v1/responses", strings.NewReader(`{}`)).WithContext(ctx)
+			resp, err := s.doOpenAIUpstream(req, "", &repo.rows[1])
+			require.NoError(t, err)
+			require.NoError(t, resp.Body.Close())
+			ids, err := s.apiFallbackSchedulingExclusions(ctx, &key.Group.ID, nil)
+			require.NoError(t, err)
+			require.Empty(t, ids)
+			cacheKey, err := apiFallbackModelCacheKey(ctx, repo, &key.Group.ID, "original-cache")
+			require.NoError(t, err)
+			require.Equal(t, "original-cache", cacheKey)
+			require.Equal(t, 1, upstream.calls)
+			require.Zero(t, repo.calls)
+		})
+	}
 }

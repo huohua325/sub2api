@@ -42,6 +42,9 @@ func apiFallbackBackupAccountIDs(ctx context.Context, repo AccountRepository, gr
 	if groupID == nil || *groupID <= 0 {
 		return nil, nil
 	}
+	if group := apiFallbackRequestGroup(ctx, nil); group != nil && group.ID == *groupID && !IsAPIFallbackCodingGroup(group) {
+		return nil, nil
+	}
 	reader, ok := repo.(apiFallbackRoleReader)
 	if !ok {
 		return nil, nil
@@ -84,7 +87,7 @@ func apiFallbackRequestGroup(ctx context.Context, c *gin.Context) *Group {
 }
 
 func guardAPIFallbackNormalAccount(ctx context.Context, repo AccountRepository, group *Group, account *Account) error {
-	if account == nil || group == nil {
+	if account == nil || !IsAPIFallbackCodingGroup(group) {
 		return nil
 	}
 	ids, err := apiFallbackBackupAccountIDs(ctx, repo, &group.ID)

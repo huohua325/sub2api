@@ -26,6 +26,9 @@ func (s *GatewayService) codingCatalogAccountsForGroupID(ctx context.Context, gr
 	if err != nil {
 		return nil, err
 	}
+	if !IsAPIFallbackCodingGroup(group) {
+		return accounts, nil
+	}
 	accounts, err = filterAPIFallbackCatalogAccounts(ctx, s.accountRepo, groupID, accounts)
 	if err != nil {
 		return nil, err

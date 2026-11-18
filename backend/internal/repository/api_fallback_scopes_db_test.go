@@ -1,6 +1,9 @@
 package repository
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
 	"testing"
 	"time"
 
@@ -8,6 +11,35 @@ import (
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/require"
 )
+
+func TestCodingQuotaDBAPIFallbackStandaloneLongSubscriptionHasNoPaidIdentity(t *testing.T) {
+	for _, platform := range []string{service.PlatformOpenAI, service.PlatformGrok} {
+		t.Run(platform, func(t *testing.T) {
+			db, r := fallbackTestDB(t)
+			_, err := db.Exec(`UPDATE groups SET platform=$1 WHERE id=1`, platform)
+			require.NoError(t, err)
+			_, err = db.Exec(`UPDATE accounts SET platform=$1`, platform)
+			require.NoError(t, err)
+			hashes := make([]string, 101)
+			for i := range hashes {
+				sum := sha256.Sum256([]byte(fmt.Sprintf("ordinary subscription %d", i)))
+				hashes[i] = hex.EncodeToString(sum[:])
+			}
+			id, err := r.ResolveAPIFallbackLineage(t.Context(), 1, 1, 1, "normal-model", hashes)
+			require.NoError(t, err, "no policy must not turn a long subscription into paid state")
+			require.Zero(t, id)
+			p := fallbackTestPolicy(t, r, func(p *service.APIFallbackPolicy) {
+				p.Platform, p.Enabled = platform, false
+			})
+			id, err = r.ResolveAPIFallbackLineage(t.Context(), 1, 1, 1, p.Model, hashes)
+			require.NoError(t, err, "a disabled policy must retain the deployed long-conversation fix")
+			require.Zero(t, id)
+			var attempts int
+			require.NoError(t, db.QueryRow(`SELECT COUNT(*) FROM api_fallback_attempts`).Scan(&attempts))
+			require.Zero(t, attempts)
+		})
+	}
+}
 
 func TestCodingQuotaDBAPIFallbackSupportedCodingScopes(t *testing.T) {
 	for _, tt := range []struct {
