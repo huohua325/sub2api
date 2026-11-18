@@ -118,10 +118,17 @@ class PackageTests(unittest.TestCase):
         baseline = self.commit
         folder = self.root / 'backend/migrations'; folder.mkdir()
         migrations = {}
-        for name in ([] if continuation else upgrade.MIGRATIONS):
+        if standby:
+            target = folder / '273_experiment_async_admission.sql'
+            target.write_text('-- already deployed migration 273')
+            migrations[target.name] = digest(target)
+            self.git('add', 'backend')
+            self.git('-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'deployed concurrency baseline')
+            baseline = self.git('rev-parse', 'HEAD')
+        for name in ([] if continuation or standby else upgrade.MIGRATIONS):
             target = folder / name; target.write_text('-- synthetic ' + name)
             migrations[name] = digest(target)
-        if continuation: (self.root / 'backend/source.go').write_text('reviewed continuation fix')
+        if continuation or standby: (self.root / 'backend/source.go').write_text('reviewed continuation fix')
         self.git('add', 'backend')
         self.git('-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'reviewed accounting')
         source = self.git('rev-parse', 'HEAD')
