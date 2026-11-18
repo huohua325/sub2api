@@ -26,10 +26,13 @@ func fallbackTestDB(t *testing.T) (*sql.DB, *UsageMonitorRepository) {
  ALTER TABLE users ADD COLUMN status text NOT NULL DEFAULT 'active';
  ALTER TABLE groups ADD COLUMN platform text NOT NULL DEFAULT 'composite';
  ALTER TABLE groups ADD COLUMN status text NOT NULL DEFAULT 'active';
+ ALTER TABLE groups ADD COLUMN name text NOT NULL DEFAULT 'test';
+ ALTER TABLE groups ADD COLUMN subscription_type text NOT NULL DEFAULT 'standard';
  ALTER TABLE accounts ADD COLUMN status text NOT NULL DEFAULT 'active';
  ALTER TABLE accounts ADD COLUMN updated_at timestamptz NOT NULL DEFAULT 'epoch';
  UPDATE users SET role='admin' WHERE id=1;
  CREATE TABLE api_keys(id bigint PRIMARY KEY,user_id bigint,group_id bigint,deleted_at timestamptz,status text DEFAULT 'active',quota numeric DEFAULT 0,quota_used numeric DEFAULT 0,expires_at timestamptz,rate_limit_5h numeric DEFAULT 0,rate_limit_1d numeric DEFAULT 0,rate_limit_7d numeric DEFAULT 0,usage_5h numeric DEFAULT 0,usage_1d numeric DEFAULT 0,usage_7d numeric DEFAULT 0,window_5h_start timestamptz,window_1d_start timestamptz,window_7d_start timestamptz,updated_at timestamptz DEFAULT now());
+ ALTER TABLE api_keys ADD COLUMN name text NOT NULL DEFAULT 'test key';
  INSERT INTO api_keys(id,user_id,group_id) VALUES(1,1,1),(2,2,1);
  INSERT INTO accounts(id,name,platform,type) VALUES(30,'backup','openai','apikey');
  INSERT INTO account_groups VALUES(30,1);`)
@@ -54,6 +57,43 @@ func fallbackTestPolicy(t *testing.T, r *UsageMonitorRepository, edit func(*serv
 
 func fallbackReserveInput(p *service.APIFallbackPolicy) service.APIFallbackReservationInput {
 	return service.APIFallbackReservationInput{ID: uuid.NewString(), RequestID: uuid.NewString(), PolicyID: p.ID, PolicyVersion: p.Version, UserID: 1, APIKeyID: 1, AccountID: 30, GroupID: 1, Platform: "openai", Model: p.Model, EstimatedInputTokens: 100, MaxOutputTokens: 100, PersonalLimit: "50", StartedAt: time.Now().UTC().Truncate(time.Microsecond), Now: time.Now().UTC()}
+}
+
+func TestCodingQuotaDBAPIFallbackExperimentKeyPolicy(t *testing.T) {
+	db, repo := fallbackTestDB(t)
+	_, err := db.Exec(`INSERT INTO groups(id,usage_kind,platform,name) VALUES(7,'experiment','openai','Experiment'),(8,'experiment','grok','Other');
+ INSERT INTO api_keys(id,user_id,group_id,name) VALUES(7,1,7,'My Key'),(8,2,7,'Other user'),(9,1,8,'Grok Key');`)
+	require.NoError(t, err)
+	in := service.APIFallbackPolicyInput{
+		APIFallbackPolicy: service.APIFallbackPolicy{GroupID: 1, Platform: "openai", Model: "gpt-test", ExperimentKeyID: 7, ExperimentGroupID: 999, Enabled: true, CapabilitiesVerified: true},
+		ActorUserID:       1, Confirm: true,
+	}
+	for _, id := range []int64{1, 8, 9} {
+		bad := in
+		bad.ExperimentKeyID = id
+		_, err = repo.SaveAPIFallbackPolicy(t.Context(), bad)
+		require.ErrorContains(t, err, "active API experiment Key")
+	}
+	saved, err := repo.SaveAPIFallbackPolicy(t.Context(), in)
+	require.NoError(t, err)
+	require.Equal(t, int64(7), saved.ExperimentGroupID)
+	require.Equal(t, "0", saved.PointsPerUSD)
+	found, err := repo.FindAPIFallbackPolicy(t.Context(), 1, "openai", "gpt-test")
+	require.NoError(t, err)
+	require.Equal(t, saved.ID, found.ID)
+	view, err := repo.ReadAPIFallback(t.Context(), 1)
+	require.NoError(t, err)
+	require.Equal(t, []service.APIFallbackExperimentKey{
+		{ID: 9, Name: "Grok Key", GroupName: "Other", Platform: "grok"},
+		{ID: 7, Name: "My Key", GroupName: "Experiment", Platform: "openai"},
+	}, view.ExperimentKeys)
+	_, err = repo.ReserveAPIFallback(t.Context(), fallbackReserveInput(saved))
+	require.Error(t, err)
+	_, err = repo.DisableAPIFallbackPolicy(t.Context(), saved.ID, saved.Version, 1, "stop")
+	require.NoError(t, err)
+	found, err = repo.FindAPIFallbackPolicy(t.Context(), 1, "openai", "gpt-test")
+	require.NoError(t, err)
+	require.Nil(t, found)
 }
 
 func TestCodingQuotaDBAPIFallbackAdminAndExplicitApproval(t *testing.T) {

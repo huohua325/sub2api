@@ -13,13 +13,92 @@ import (
 	"log/slog"
 	"net/http"
 	"slices"
+	"sort"
 	"strings"
+	"sync/atomic"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/tidwall/gjson"
+	"github.com/tidwall/sjson"
 )
+
+// ExperimentStandby is scoped to an internal dispatch and is never read from headers.
+type ExperimentStandby struct {
+	UserID, KeyID, GroupID int64
+	Platform               string
+	Model                  string
+	BeforeSend             func(context.Context) error
+	sent                   atomic.Bool
+}
+
+type experimentStandbyContextKey struct{}
+
+// WithExperimentStandby removes source route decisions before the experiment route runs.
+func WithExperimentStandby(ctx context.Context, standby *ExperimentStandby) context.Context {
+	for _, key := range []ctxkey.Key{ctxkey.Group, ctxkey.ResolvedTargetPlatform, ctxkey.ResolvedUpstreamModel, ctxkey.RequestedPublicModel, ctxkey.CompositeRouteSource, ctxkey.ForcePlatform} {
+		ctx = context.WithValue(ctx, key, nil)
+	}
+	ctx = context.WithValue(ctx, inflightReservationCtxKey{}, nil)
+	return context.WithValue(ctx, experimentStandbyContextKey{}, standby)
+}
+
+// ExperimentStandbyFromContext returns the authorized internal dispatch, if any.
+func ExperimentStandbyFromContext(ctx context.Context) *ExperimentStandby {
+	if ctx == nil {
+		return nil
+	}
+	value, _ := ctx.Value(experimentStandbyContextKey{}).(*ExperimentStandby)
+	return value
+}
+
+// BeginExperimentStandbySend authorizes exactly one upstream attempt.
+func BeginExperimentStandbySend(ctx context.Context) error {
+	standby := ExperimentStandbyFromContext(ctx)
+	if standby == nil {
+		return nil
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if !standby.sent.CompareAndSwap(false, true) {
+		return ErrExperimentAlreadySent
+	}
+	if standby.BeforeSend == nil {
+		return ErrExperimentAccountingUnavailable
+	}
+	return standby.BeforeSend(ctx)
+}
+
+// MatchesKey pins the destination's freshly loaded identity and billing purpose.
+func (s *ExperimentStandby) MatchesKey(key *APIKey) bool {
+	return s != nil && key != nil && key.ID == s.KeyID && key.UserID == s.UserID &&
+		key.User != nil && key.User.ID == s.UserID && key.User.IsActive() && key.User.IsAdmin() &&
+		key.IsActive() && !key.IsExpired() && !key.IsQuotaExhausted() && key.GroupID != nil &&
+		*key.GroupID == s.GroupID && key.Group != nil && key.Group.ID == s.GroupID &&
+		key.Group.Platform == s.Platform && key.Group.UsageKind == UsageKindExperiment &&
+		key.Group.IsActive() && !key.Group.IsSubscriptionType()
+}
+
+// PrepareExperimentStandbyBody limits switching to stateless text and local tools.
+func PrepareExperimentStandbyBody(policy *APIFallbackPolicy, body []byte) ([]byte, error) {
+	if policy == nil {
+		return nil, ErrExperimentAccountingUnavailable
+	}
+	bounds := *policy
+	bounds.MaxInputTokens, bounds.MaxOutputTokens = 196608, 16384
+	prepared, _, _, err := prepareAPIFallbackBody(&bounds, body)
+	if err != nil {
+		return nil, err
+	}
+	// Do not request provider-bound reasoning state on a switchable route.
+	if gjson.GetBytes(prepared, "include").Exists() {
+		prepared, err = sjson.DeleteBytes(prepared, "include")
+	}
+	return prepared, err
+}
 
 // CodingSubscriptionExclusions keeps API accounts out of the normal unified
 // coding scheduler, including previous-response and sticky selection paths.
@@ -60,6 +139,10 @@ func (s *OpenAIGatewayService) EvaluateAPIFallbackPrimaryPool(ctx context.Contex
 		if a.ParentAccountID != nil {
 			autoExpired := a.AutoPauseOnExpired && a.ExpiresAt != nil && !now.Before(*a.ExpiresAt)
 			if (a.Status != StatusActive && a.Status != StatusError) || (!a.Schedulable && !autoExpired) {
+				if p.ExperimentKeyID > 0 {
+					view.Reason = "primary_paused"
+					return view, nil
+				}
 				continue
 			}
 		}
@@ -83,11 +166,19 @@ func (s *OpenAIGatewayService) EvaluateAPIFallbackPrimaryPool(ctx context.Contex
 		view.Reason = "primary_pool_empty"
 		return view, nil
 	}
-	if len(actual) != len(p.PrimaryAccountIDs) {
+	primaryIDs := p.PrimaryAccountIDs
+	if p.ExperimentKeyID > 0 {
+		primaryIDs = make([]int64, 0, len(actual))
+		for id := range actual {
+			primaryIDs = append(primaryIDs, id)
+		}
+		sort.Slice(primaryIDs, func(i, j int) bool { return primaryIDs[i] < primaryIDs[j] })
+	}
+	if len(actual) != len(primaryIDs) {
 		view.Reason = "primary_pool_changed"
 		return view, nil
 	}
-	for _, id := range p.PrimaryAccountIDs {
+	for _, id := range primaryIDs {
 		a := actual[id]
 		if a == nil {
 			view.Reason = "primary_pool_changed"
@@ -109,6 +200,12 @@ func (s *OpenAIGatewayService) EvaluateAPIFallbackPrimaryPool(ctx context.Contex
 		used, reset, observed, _ := readCodexOfficial(a.Extra, nil, now)
 		if p.Platform == PlatformGrok {
 			used, reset, observed, _, _ = grokOfficial(a.Extra, now)
+		}
+		if p.ExperimentKeyID > 0 && a.AutoPauseOnExpired && a.ExpiresAt != nil && !now.Before(*a.ExpiresAt) {
+			check.Passed = true
+			check.Detail = "subscription_expired"
+			view.Checks = append(view.Checks, check)
+			continue
 		}
 		if evidence == nil || evidence.ObservedAt.After(now) || !now.Before(evidence.ValidUntil) || evidence.ValidUntil.Sub(evidence.ObservedAt) > 24*time.Hour {
 			// A fresh persisted official exhausted reading is independently
@@ -183,7 +280,7 @@ func prepareAPIFallbackBodyWithLineage(p *APIFallbackPolicy, raw []byte, allowEn
 
 // TryAPIFallback runs at most one paid HTTP attempt, outside the normal wallet
 // billing/failover path. False leaves the existing subscription request intact.
-func (s *OpenAIGatewayService) TryAPIFallback(ctx context.Context, c *gin.Context, control *UsageMonitorService, key *APIKey, model string, raw []byte, started time.Time) (bool, error) {
+func (s *OpenAIGatewayService) TryAPIFallback(ctx context.Context, c *gin.Context, control *UsageMonitorService, key *APIKey, model string, raw []byte, started time.Time, experimentDispatch ...func(*APIFallbackPolicy, []byte) error) (bool, error) {
 	if control == nil || key == nil || key.User == nil || !key.User.IsAdmin() || key.GroupID == nil || key.Group == nil || key.Group.ID != *key.GroupID {
 		return false, nil
 	}
@@ -208,11 +305,19 @@ func (s *OpenAIGatewayService) TryAPIFallback(ctx context.Context, c *gin.Contex
 			return true, errors.New("standby conversation provenance cannot be verified")
 		}
 	}
-	if p == nil || !p.Enabled || p.ExpiresAt == nil || !time.Now().Before(*p.ExpiresAt) {
+	if !p.ActiveAt(time.Now()) {
 		if lineageAccount > 0 {
 			return true, errors.New("standby is disabled or expired; start a new conversation to use subscriptions")
 		}
 		return false, nil
+	}
+	if p.ExperimentKeyID > 0 {
+		if lineageAccount > 0 {
+			return true, errors.New("start a new conversation to use the experiment standby Key")
+		}
+		if p.ApprovedBy != key.UserID || len(experimentDispatch) == 0 || !p.CapabilitiesVerified {
+			return false, nil
+		}
 	}
 	decision, err := s.EvaluateAPIFallbackPrimaryPool(ctx, p)
 	if err != nil {
@@ -229,6 +334,16 @@ func (s *OpenAIGatewayService) TryAPIFallback(ctx context.Context, c *gin.Contex
 	}
 	if len(hashes) > 0 && lineageAccount == 0 {
 		return true, errors.New("standby cannot migrate encrypted subscription state; start a new conversation")
+	}
+	if p.ExperimentKeyID > 0 {
+		if key.Quota > 0 || key.HasRateLimits() {
+			return true, errors.New("experiment standby cannot substitute a Key with its own monetary limits")
+		}
+		body, err := PrepareExperimentStandbyBody(p, raw)
+		if err != nil {
+			return true, err
+		}
+		return true, experimentDispatch[0](p, body)
 	}
 	var body []byte
 	var input, output int64

@@ -2,6 +2,13 @@ import { apiClient } from '../client'
 
 export type APIFallbackPlatform = 'openai' | 'grok'
 
+export interface APIFallbackExperimentKey {
+  id: number
+  name: string
+  group_name: string
+  platform: APIFallbackPlatform
+}
+
 export interface APIFallbackPrimaryEvidence {
   account_id: number
   reason: 'subscription_expired' | 'quota_exhausted' | 'auth_invalid'
@@ -18,6 +25,7 @@ export interface APIFallbackPolicy {
   model: string
   primary_account_ids: number[]
   backup_account_ids: number[]
+  experiment_key_id?: number
   primary_evidence: APIFallbackPrimaryEvidence[]
   enabled: boolean
   capabilities_verified: boolean
@@ -77,6 +85,7 @@ export interface APIFallbackSnapshot {
   policies: APIFallbackPolicy[]
   attempts: APIFallbackAttempt[]
   summary: APIFallbackSummary
+  experiment_keys?: APIFallbackExperimentKey[]
 }
 
 export interface APIFallbackPreview {
@@ -90,7 +99,9 @@ export async function getSnapshot(signal?: AbortSignal): Promise<APIFallbackSnap
   return data
 }
 
-export async function savePolicy(policy: APIFallbackPolicyInput): Promise<APIFallbackPolicy> {
+export type ExperimentStandbyInput = Pick<APIFallbackPolicyInput, 'id' | 'expected_version' | 'group_id' | 'platform' | 'model' | 'enabled' | 'capabilities_verified' | 'expires_at' | 'confirm'> & { experiment_key_id: number }
+
+export async function savePolicy(policy: APIFallbackPolicyInput | ExperimentStandbyInput): Promise<APIFallbackPolicy> {
   const { data } = await apiClient.post<APIFallbackPolicy>('/admin/api-fallback/policies', policy)
   return data
 }

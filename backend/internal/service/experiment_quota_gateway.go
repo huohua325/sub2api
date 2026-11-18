@@ -85,6 +85,12 @@ func BeginExperimentHTTPAttempt(req *http.Request, accountID int64) error {
 		return nil
 	}
 	h := experimentRequestFromContext(req.Context())
+	if err := BeginExperimentStandbySend(req.Context()); err != nil {
+		if h != nil {
+			writeExperimentAccountingError(h.gin, err)
+		}
+		return err
+	}
 	if h == nil {
 		return nil
 	}

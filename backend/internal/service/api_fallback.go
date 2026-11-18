@@ -20,6 +20,8 @@ type APIFallbackPolicy struct {
 	PrimaryAccountIDs          []int64                      `json:"primary_account_ids"`
 	PrimaryEvidence            []APIFallbackPrimaryEvidence `json:"primary_evidence"`
 	BackupAccountIDs           []int64                      `json:"backup_account_ids"`
+	ExperimentKeyID            int64                        `json:"experiment_key_id,omitempty"`
+	ExperimentGroupID          int64                        `json:"experiment_group_id,omitempty"`
 	Enabled                    bool                         `json:"enabled"`
 	CostCircuitOpen            bool                         `json:"cost_circuit_open"`
 	CapabilitiesVerified       bool                         `json:"capabilities_verified"`
@@ -103,9 +105,18 @@ type APIFallbackSummary struct {
 
 // APIFallbackView is exposed only through administrator APIs.
 type APIFallbackView struct {
-	Policies []APIFallbackPolicy  `json:"policies"`
-	Attempts []APIFallbackAttempt `json:"attempts"`
-	Summary  APIFallbackSummary   `json:"summary"`
+	Policies       []APIFallbackPolicy        `json:"policies"`
+	Attempts       []APIFallbackAttempt       `json:"attempts"`
+	Summary        APIFallbackSummary         `json:"summary"`
+	ExperimentKeys []APIFallbackExperimentKey `json:"experiment_keys,omitempty"`
+}
+
+// APIFallbackExperimentKey exposes a selectable Key without its credential.
+type APIFallbackExperimentKey struct {
+	ID        int64  `json:"id"`
+	Name      string `json:"name"`
+	GroupName string `json:"group_name"`
+	Platform  string `json:"platform"`
 }
 
 // APIFallbackPreview is a read-only decision; it never reserves money or calls a model.
@@ -151,7 +162,7 @@ func (s *UsageMonitorService) PreviewAPIFallback(ctx context.Context, actor int6
 
 func applyAPIFallbackPolicyPreview(preview *APIFallbackPreview, p *APIFallbackPolicy, now time.Time) *APIFallbackPreview {
 	preview.RequestChecksPending = true
-	expires := p.ExpiresAt != nil && p.ExpiresAt.After(now)
+	expires := p.ActiveAt(now)
 	preview.Checks = append(preview.Checks, APIFallbackCheck{Name: "policy_enabled", Passed: p.Enabled}, APIFallbackCheck{Name: "policy_validity", Passed: expires}, APIFallbackCheck{Name: "capabilities_verified", Passed: p.CapabilitiesVerified})
 	preview.Checks = append(preview.Checks, APIFallbackCheck{Name: "cost_circuit_closed", Passed: !p.CostCircuitOpen})
 	switch {
@@ -169,6 +180,11 @@ func applyAPIFallbackPolicyPreview(preview *APIFallbackPreview, p *APIFallbackPo
 		preview.Reason = "cost_bound_exceeded"
 	}
 	return preview
+}
+
+// ActiveAt applies the optional expiration of experiment standby policies.
+func (p *APIFallbackPolicy) ActiveAt(now time.Time) bool {
+	return p != nil && p.Enabled && (p.ExpiresAt != nil && p.ExpiresAt.After(now) || p.ExpiresAt == nil && p.ExperimentKeyID > 0)
 }
 
 // APIFallbackReservationInput is supplied by the server after capability checks.

@@ -104,6 +104,31 @@ func TestExperimentSentAttemptCannotBeReplayedOrReleased(t *testing.T) {
 	}
 }
 
+func TestExperimentStandbyOnlySendsOnce(t *testing.T) {
+	for _, host := range []string{"globalai.vip", "other.example"} {
+		t.Run(host, func(t *testing.T) {
+			spy := &experimentAdmissionSpy{}
+			req, c, _ := experimentTestRequest(t, spy)
+			req.URL.Host, req.URL.Path = host, "/v1/responses"
+			checks := 0
+			req = req.WithContext(WithExperimentStandby(req.Context(), &ExperimentStandby{BeforeSend: func(context.Context) error {
+				checks++
+				return nil
+			}}))
+			if err := BeginExperimentHTTPAttempt(req, 8); err != nil {
+				t.Fatal(err)
+			}
+			if err := BeginExperimentHTTPAttempt(req, 13); !errors.Is(err, ErrExperimentAlreadySent) {
+				t.Fatalf("standby retried: %v", err)
+			}
+			FinishCodingRequest(c)
+			if checks != 1 || host == "globalai.vip" && (spy.sent != 1 || spy.completed != 1 || spy.released != 0) {
+				t.Fatalf("invalid standby accounting: checks=%d, %#v", checks, spy)
+			}
+		})
+	}
+}
+
 func TestExperimentUnsentAttemptCanRelease(t *testing.T) {
 	spy := &experimentAdmissionSpy{sendErr: ErrExperimentAccountingUnavailable}
 	req, c, _ := experimentTestRequest(t, spy)

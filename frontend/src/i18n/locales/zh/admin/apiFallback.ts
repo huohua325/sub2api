@@ -4,6 +4,10 @@ export default {
     description: '订阅全部明确失效时，临时使用付费 API。仅管理员可见、可用。',
     rules: '订阅繁忙、普通限流或网络异常不转付费；订阅恢复后优先使用订阅。',
     newPolicy: '新增策略',
+    experimentKey: 'API 实验 Key',
+    noExperimentKeys: '没有同平台的可用实验 Key。请先用管理员账号创建一把。',
+    experimentRequired: '请选择入口分组、型号和同平台的 API 实验 Key。',
+    experimentConfirm: '确认该 Key 支持同型号 Responses；备用调用按 API 实验扣费。',
     editPolicy: '编辑策略',
     policies: '备用策略',
     empty: '尚未配置备用策略。新增后默认关闭。',
@@ -22,6 +26,7 @@ export default {
     reasons: {
       primary_pool_changed: '主账号绑定已变化，请重新核实。',
       primary_paused: '主账号已暂停，不触发付费。',
+      subscription_expired: '主订阅已到期。',
       subscription_recovered: '订阅已恢复，继续使用订阅。',
       primary_credentials_or_state_changed: '主账号凭证或状态已变化，请重新核实。',
       all_subscriptions_unavailable: '所有主订阅均已确认失效。',

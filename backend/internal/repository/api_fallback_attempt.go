@@ -186,7 +186,7 @@ func (r *UsageMonitorRepository) ReserveAPIFallback(ctx context.Context, in serv
 	if err != nil {
 		return nil, err
 	}
-	if !p.Enabled || p.Version != in.PolicyVersion || p.GroupID != in.GroupID || p.Platform != in.Platform || p.Model != in.Model || p.ExpiresAt == nil || !p.ExpiresAt.After(in.Now) || !p.CapabilitiesVerified || !containsFallbackID(p.BackupAccountIDs, in.AccountID) {
+	if p.ExperimentKeyID > 0 || !p.Enabled || p.Version != in.PolicyVersion || p.GroupID != in.GroupID || p.Platform != in.Platform || p.Model != in.Model || p.ExpiresAt == nil || !p.ExpiresAt.After(in.Now) || !p.CapabilitiesVerified || !containsFallbackID(p.BackupAccountIDs, in.AccountID) {
 		return nil, fallbackConflict()
 	}
 	if err = validateFallbackMembers(ctx, tx, p); err != nil {

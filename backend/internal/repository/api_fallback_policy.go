@@ -58,11 +58,14 @@ func fallbackInvalid(message string) error {
 
 func normalizeFallbackPolicy(p *service.APIFallbackPolicy, now time.Time) error {
 	p.CostCircuitOpen = false // Derived from immutable receipts, never supplied by a caller.
-	if p.Enabled && strings.TrimSpace(p.CachedInputPricePerMillion) == "" {
+	if p.ExperimentKeyID == 0 && p.Enabled && strings.TrimSpace(p.CachedInputPricePerMillion) == "" {
 		return fallbackInvalid("enabling standby requires an explicitly approved cached input price; use 0 only for verified free cache")
 	}
 	p.Model = strings.TrimSpace(p.Model)
 	p.Note = strings.TrimSpace(p.Note)
+	if p.ExperimentKeyID > 0 && p.Note == "" {
+		p.Note = "API experiment Key standby"
+	}
 	if p.GroupID <= 0 || (p.Platform != "openai" && p.Platform != "grok") || p.Model == "" || len(p.Model) > 256 || strings.ContainsAny(p.Model, "*?\r\n") || p.Note == "" || utf8.RuneCountInString(p.Note) > 1000 {
 		return fallbackInvalid("group, exact model and reason (1–1000 characters) are required")
 	}
@@ -87,6 +90,23 @@ func normalizeFallbackPolicy(p *service.APIFallbackPolicy, now time.Time) error 
 	if p.PrimaryEvidence == nil {
 		p.PrimaryEvidence = []service.APIFallbackPrimaryEvidence{}
 	}
+	if p.ExperimentKeyID < 0 {
+		return fallbackInvalid("invalid experiment Key")
+	}
+	if p.ExperimentKeyID > 0 {
+		if len(p.BackupAccountIDs) != 0 || len(p.PrimaryAccountIDs) != 0 || len(p.PrimaryEvidence) != 0 {
+			return fallbackInvalid("experiment Key standby uses the current subscription pool")
+		}
+		p.PointsPerUSD, p.SupplierMultiplier = "0", "0"
+		p.InputPricePerMillion, p.CachedInputPricePerMillion, p.OutputPricePerMillion = "0", "0", "0"
+		p.PerRequestBudgetUSD, p.DailyBudgetUSD, p.TotalBudgetUSD = "0", "0", "0"
+		p.MaxInputTokens, p.MaxOutputTokens = 0, 0
+		if p.Enabled && (!p.CapabilitiesVerified || p.ExpiresAt != nil && !p.ExpiresAt.After(now)) {
+			return fallbackInvalid("enabling experiment standby requires verified Responses support")
+		}
+		return nil
+	}
+	p.ExperimentGroupID = 0
 	evidenceSeen := make(map[int64]bool)
 	for _, e := range p.PrimaryEvidence {
 		if !containsFallbackID(p.PrimaryAccountIDs, e.AccountID) || evidenceSeen[e.AccountID] || (e.Reason != "subscription_expired" && e.Reason != "quota_exhausted" && e.Reason != "auth_invalid") || e.ObservedAt.IsZero() || e.ObservedAt.After(now.Add(time.Minute)) || !e.ValidUntil.After(e.ObservedAt) || e.ValidUntil.Sub(e.ObservedAt) > 24*time.Hour || strings.TrimSpace(e.Note) == "" || utf8.RuneCountInString(e.Note) > 1000 {
@@ -241,6 +261,12 @@ func (r *UsageMonitorRepository) saveAPIFallbackPolicy(ctx context.Context, in s
 		if err = validateFallbackSelectedMembers(ctx, tx, &p); err != nil {
 			return nil, err
 		}
+		if p.ExperimentKeyID > 0 {
+			p.ExperimentGroupID, err = experimentStandbyKeyGroup(ctx, tx, in.ActorUserID, p.ExperimentKeyID, p.Platform)
+			if err != nil {
+				return nil, err
+			}
+		}
 	}
 	if p.ID == "" {
 		if in.ExpectedVersion != 0 {
@@ -257,7 +283,8 @@ func (r *UsageMonitorRepository) saveAPIFallbackPolicy(ctx context.Context, in s
 		if e != nil {
 			return nil, e
 		}
-		if old.Version != in.ExpectedVersion || old.GroupID != p.GroupID || old.Platform != p.Platform || old.Model != p.Model {
+		if old.Version != in.ExpectedVersion || old.GroupID != p.GroupID || old.Platform != p.Platform || old.Model != p.Model ||
+			!disableOnly && (old.ExperimentKeyID > 0) != (p.ExperimentKeyID > 0) {
 			return nil, fallbackConflict()
 		}
 		if disableOnly {
@@ -311,7 +338,8 @@ func (r *UsageMonitorRepository) DisableAPIFallbackPolicy(ctx context.Context, i
 
 func (r *UsageMonitorRepository) FindAPIFallbackPolicy(ctx context.Context, group int64, platform, model string) (*service.APIFallbackPolicy, error) {
 	var id string
-	err := r.db.QueryRowContext(ctx, `SELECT id FROM api_fallback_policies WHERE group_id=$1 AND platform=$2 AND model=$3 AND enabled AND expires_at>clock_timestamp()`, group, platform, model).Scan(&id)
+	err := r.db.QueryRowContext(ctx, `SELECT id FROM api_fallback_policies WHERE group_id=$1 AND platform=$2 AND model=$3 AND enabled
+ AND (expires_at>clock_timestamp() OR (expires_at IS NULL AND config ? 'experiment_key_id'))`, group, platform, model).Scan(&id)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -326,6 +354,11 @@ func (r *UsageMonitorRepository) ReadAPIFallback(ctx context.Context, actor int6
 		return nil, err
 	}
 	out := &service.APIFallbackView{Policies: []service.APIFallbackPolicy{}, Attempts: []service.APIFallbackAttempt{}}
+	keys, err := r.listExperimentStandbyKeys(ctx, actor)
+	if err != nil {
+		return nil, err
+	}
+	out.ExperimentKeys = keys
 	rows, err := r.db.QueryContext(ctx, `SELECT config||jsonb_build_object('cost_circuit_open',EXISTS(SELECT 1 FROM api_fallback_attempts a WHERE a.policy_id=p.id AND (a.policy_version>=p.version OR a.completed_at>=p.updated_at) AND a.state='settled' AND a.reason='cost_bound_exceeded')) FROM api_fallback_policies p ORDER BY created_at DESC,id`)
 	if err != nil {
 		return nil, err

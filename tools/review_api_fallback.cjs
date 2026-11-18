@@ -59,7 +59,10 @@ async page => {
     else if (path.endsWith('/settings/public')) data = fixtures.resolve(path, method)
     else if (path.endsWith('/admin/compliance/status')) data = { required: false }
     else if (path === '/api/v1/admin/api-fallback' && method === 'GET') data = {
-      policies, attempts,
+      policies, attempts, experiment_keys: [
+        { id: 71, name: 'GPT lab Key', group_name: 'GPT', platform: 'openai' },
+        { id: 72, name: 'Grok lab Key', group_name: 'Grok', platform: 'grok' }
+      ],
       summary: { settled_usd: '0', reserved_usd: '0', unresolved_usd: attempts[0].state === 'unresolved' ? '0.1' : '0', today_usd: '0.1', settled_count: 0, unresolved_count: attempts[0].state === 'unresolved' ? 1 : 0 }
     }
     else if (path === '/api/v1/admin/api-fallback/policies' && method === 'POST') {
@@ -152,41 +155,38 @@ async page => {
 
   await page.getByTestId('fallback-new').click()
   check('new-policy-disabled', !await page.getByTestId('fallback-enabled').isChecked())
-  check('new-pricing-unapproved', await page.getByTestId('fallback-points_per_usd').inputValue() === '')
+  check('new-policy-has-no-price-inputs', await page.getByTestId('fallback-points_per_usd').count() === 0)
   check('only-active-coding-entrances-offered', JSON.stringify(await page.getByTestId('fallback-group').locator('option').evaluateAll(options => options.map(option => option.value))) === JSON.stringify(['0', '17', '18', '19']))
   await page.getByTestId('fallback-group').selectOption('17')
   await page.getByTestId('fallback-model').fill('gpt-review-draft')
-  await page.getByTestId('fallback-note').fill('Draft only, no paid authorization')
+  await page.getByTestId('fallback-experiment-key').selectOption('71')
   await page.getByTestId('fallback-save').click()
   await page.getByTestId('fallback-policy-review-draft').waitFor()
-  check('incomplete-disabled-draft-saved', policies[1].enabled === false && policies[1].points_per_usd === '0')
+  check('experiment-key-draft-saved', policies[1].enabled === false && policies[1].experiment_key_id === 71 && policies[1].points_per_usd === undefined)
 
   for (const entry of [
-    { groupID: 18, platform: 'openai', model: 'gpt-6.1-sol', primaryID: 11, backupID: 21, name: 'Codex' },
-    { groupID: 19, platform: 'grok', model: 'grok-4.3', primaryID: 30, backupID: 40, name: 'Grok Build' }
+    { groupID: 18, platform: 'openai', model: 'gpt-6.1-sol', keyID: 71, name: 'Codex' },
+    { groupID: 19, platform: 'grok', model: 'grok-4.3', keyID: 72, name: 'Grok Build' }
   ]) {
     await page.getByTestId('fallback-new').click()
     await page.getByTestId('fallback-group').selectOption(String(entry.groupID))
-    await page.getByTestId('fallback-primary-' + entry.primaryID).waitFor()
-    check('standalone-platform-fixed-' + entry.platform, await page.getByTestId('fallback-platform').inputValue() === entry.platform && await page.getByTestId('fallback-platform').isDisabled())
-    await page.getByTestId('fallback-primary-' + entry.primaryID).check()
-    await page.getByTestId('fallback-backup-' + entry.backupID).check()
+    const keySelect = page.getByTestId('fallback-experiment-key')
+    check('standalone-platform-fixed-' + entry.platform, JSON.stringify(await keySelect.locator('option').evaluateAll(options => options.map(option => option.value))) === JSON.stringify(['0', String(entry.keyID)]))
+    await keySelect.selectOption(String(entry.keyID))
     await page.getByTestId('fallback-model').fill(entry.model)
-    await page.getByTestId('fallback-note').fill(entry.name + ' draft, pricing and paid calls not approved')
     await page.getByTestId('fallback-save').click()
     const id = 'review-draft-' + entry.groupID, card = page.getByTestId('fallback-policy-' + id)
     await card.waitFor()
     const saved = policies.find(policy => policy.id === id)
-    check('standalone-draft-saved-' + entry.platform, saved.group_id === entry.groupID && saved.platform === entry.platform && !saved.enabled && saved.primary_account_ids[0] === entry.primaryID && saved.backup_account_ids[0] === entry.backupID)
+    check('standalone-draft-saved-' + entry.platform, saved.group_id === entry.groupID && saved.platform === entry.platform && !saved.enabled && saved.experiment_key_id === entry.keyID)
     check('standalone-entrance-visible-' + entry.platform, (await card.innerText()).includes(entry.name))
     await page.getByTestId('fallback-preview-' + id).click()
     await page.getByTestId('fallback-preview-result').waitFor()
     check('standalone-preview-' + entry.platform, (await page.getByTestId('fallback-preview-result').innerText()).includes('当前不接管') && (await page.getByTestId('fallback-preview-result').innerText()).includes('策略已关闭'))
     await page.getByRole('button', { name: 'Close modal', exact: true }).click()
     await page.getByTestId('fallback-edit-' + id).click()
-    await page.getByTestId('fallback-primary-' + entry.primaryID).waitFor()
-    check('standalone-edit-identity-fixed-' + entry.platform, await page.getByTestId('fallback-group').isDisabled() && await page.getByTestId('fallback-platform').isDisabled() && await page.getByTestId('fallback-model').isDisabled())
-    await page.getByTestId('fallback-policy-form').getByRole('button', { name: '取消', exact: true }).click()
+    check('standalone-edit-identity-fixed-' + entry.platform, await page.getByTestId('fallback-group').isDisabled() && await page.getByTestId('fallback-model').isDisabled())
+    await page.getByTestId('fallback-experiment-form').getByRole('button', { name: '取消', exact: true }).click()
   }
   await page.screenshot({ path: options.output + '/three-entrances-desktop.png' })
 
@@ -206,9 +206,8 @@ async page => {
   await page.setViewportSize({ width: 375, height: 812 })
   await page.getByTestId('fallback-new').click()
   await page.getByTestId('fallback-group').selectOption('19')
-  await page.getByTestId('fallback-primary-30').waitFor()
   await page.getByTestId('fallback-model').fill('grok-4.3')
-  check('mobile-grok-build-purpose-fixed', await page.getByTestId('fallback-platform').isDisabled() && await page.getByTestId('fallback-platform').inputValue() === 'grok')
+  check('mobile-grok-build-purpose-fixed', await page.getByTestId('fallback-experiment-key').locator('option[value="72"]').count() === 1 && await page.getByTestId('fallback-experiment-key').locator('option[value="71"]').count() === 0)
   await page.getByTestId('fallback-group').scrollIntoViewIfNeeded()
   await page.screenshot({ path: options.output + '/grok-build-mobile.png' })
   await page.getByTestId('fallback-save').scrollIntoViewIfNeeded()

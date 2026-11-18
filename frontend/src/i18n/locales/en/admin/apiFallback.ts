@@ -1,5 +1,9 @@
 export default {
   apiFallback: {
+    experimentKey: 'API experiment key',
+    noExperimentKeys: 'Create an active experiment key on the same platform in your administrator account.',
+    experimentRequired: 'Select a coding group, model and experiment key on the same platform.',
+    experimentConfirm: 'Confirm this key supports Responses for the same model. Standby usage is billed to API experiments.',
     title: 'API backup',
     description: 'Use paid APIs temporarily when all subscriptions are confirmed unavailable. Administrators only.',
     rules: 'Busy subscriptions, ordinary rate limits and network errors do not trigger payment. Recovered subscriptions take priority.',
@@ -20,6 +24,7 @@ export default {
     accountCheck: 'Account #{id}',
     policyCheck: 'Policy status',
     reasons: {
+      subscription_expired: 'Subscription expired.',
       primary_pool_changed: 'Primary account bindings changed. Verify them again.',
       primary_paused: 'A primary account is paused; payment is not triggered.',
       subscription_recovered: 'A subscription recovered and will take priority.',

@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import APIFallbackPolicyForm from '@/components/admin/api-fallback/APIFallbackPolicyForm.vue'
+import ExperimentStandbyForm from '@/components/admin/api-fallback/ExperimentStandbyForm.vue'
 import APIFallbackAttempts from '@/components/admin/api-fallback/APIFallbackAttempts.vue'
 import APIFallbackResolveDialog from '@/components/admin/api-fallback/APIFallbackResolveDialog.vue'
 import fallbackAPI, { type APIFallbackAttempt, type APIFallbackPolicy, type APIFallbackPreview, type APIFallbackSnapshot } from '@/api/admin/apiFallback'
@@ -42,8 +43,9 @@ const groupNames = computed(() => new Map(groups.value.map(group => {
 })))
 const knownReasons = new Set([
   'primary_pool_changed', 'primary_paused', 'subscription_recovered', 'primary_credentials_or_state_changed',
-  'all_subscriptions_unavailable', 'policy_disabled', 'policy_expired', 'capabilities_unverified'
+  'all_subscriptions_unavailable', 'policy_disabled', 'policy_expired', 'capabilities_unverified', 'subscription_expired'
 ])
+const experimentKeyNames = computed(() => new Map(snapshot.value?.experiment_keys?.map(key => [key.id, key.name])))
 function reasonLabel(reason: string): string {
   return knownReasons.has(reason) ? t(`admin.apiFallback.reasons.${reason}`) : reason
 }
@@ -139,13 +141,17 @@ onBeforeUnmount(() => { disposed = true; controller?.abort() })
       <div v-if="summaryItems.length" class="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <div v-for="item in summaryItems" :key="item.label" class="card px-4 py-3"><p class="text-xs text-gray-500">{{ t(`admin.apiFallback.${item.label}`) }}</p><p class="mt-2 break-all font-mono text-lg tabular-nums" :class="item.label === 'unresolved' ? 'text-amber-700 dark:text-amber-300' : 'text-gray-900 dark:text-white'">{{ item.value }}</p><p class="mt-1 text-xs text-gray-500">{{ t('admin.apiFallback.nominal') }}</p></div>
       </div>
-      <APIFallbackPolicyForm v-if="editorOpen" :key="editing ? `${editing.id}:${editing.version}` : 'new'" :policy="editing" :groups="groups" @cancel="editorOpen = false" @saved="saved" />
+      <template v-if="editorOpen">
+        <ExperimentStandbyForm v-if="!editing || editing.experiment_key_id" :key="editing?.id ?? 'new'" :policy="editing" :groups="groups" :keys="snapshot?.experiment_keys ?? []" @cancel="editorOpen = false" @saved="saved" />
+        <APIFallbackPolicyForm v-else :key="editing.id" :policy="editing" :groups="groups" @cancel="editorOpen = false" @saved="saved" />
+      </template>
       <section v-if="snapshot" class="card overflow-hidden" data-testid="fallback-policies">
         <div class="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 px-5 py-4 dark:border-dark-700"><h2 class="text-base font-semibold text-gray-900 dark:text-white">{{ t('admin.apiFallback.policies') }}</h2><time v-if="loadedAt" class="text-xs text-gray-500">{{ formatDateTime(loadedAt) }}</time></div>
         <div v-if="snapshot.policies.length" class="divide-y divide-gray-100 dark:divide-dark-700"><article v-for="policy in snapshot.policies" :key="policy.id" class="flex flex-col items-start justify-between gap-4 p-5 sm:flex-row" :data-testid="`fallback-policy-${policy.id}`">
           <div class="min-w-0 flex-1"><div class="flex flex-wrap items-center gap-2"><h3 class="break-all font-medium text-gray-900 dark:text-white">{{ policy.model }}</h3><span class="rounded-full px-2 py-0.5 text-xs" :class="status(policy) === 'enabled' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300' : 'bg-gray-100 text-gray-600 dark:bg-dark-700 dark:text-gray-300'">{{ t(`admin.apiFallback.${status(policy)}`) }}</span><span class="text-xs text-gray-500">{{ policy.platform === 'openai' ? 'Codex' : 'Grok' }} · v{{ policy.version }}</span></div>
-            <p class="mt-2 text-sm text-gray-500">{{ groupNames.get(policy.group_id) ?? `#${policy.group_id}` }} · {{ t('admin.apiFallback.primary') }} {{ policy.primary_account_ids.length }} → {{ t('admin.apiFallback.backup') }} {{ policy.backup_account_ids.length }}</p>
-            <dl class="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-gray-500"><div><dt class="inline">{{ t('admin.apiFallback.pointRate') }}: </dt><dd class="inline font-mono">{{ policy.points_per_usd }}</dd></div><div><dt class="inline">{{ t('admin.apiFallback.daily') }}: </dt><dd class="inline font-mono">{{ policy.daily_budget_usd }}</dd></div><div><dt class="inline">{{ t('admin.apiFallback.total') }}: </dt><dd class="inline font-mono">{{ policy.total_budget_usd }}</dd></div></dl>
+            <p v-if="policy.experiment_key_id" class="mt-2 text-sm text-gray-500">{{ groupNames.get(policy.group_id) ?? `#${policy.group_id}` }} → {{ t('admin.apiFallback.experimentKey') }} · {{ experimentKeyNames.get(policy.experiment_key_id) ?? `#${policy.experiment_key_id}` }}</p>
+            <p v-else class="mt-2 text-sm text-gray-500">{{ groupNames.get(policy.group_id) ?? `#${policy.group_id}` }} · {{ t('admin.apiFallback.primary') }} {{ policy.primary_account_ids.length }} → {{ t('admin.apiFallback.backup') }} {{ policy.backup_account_ids.length }}</p>
+            <dl v-if="!policy.experiment_key_id" class="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-gray-500"><div><dt class="inline">{{ t('admin.apiFallback.pointRate') }}: </dt><dd class="inline font-mono">{{ policy.points_per_usd }}</dd></div><div><dt class="inline">{{ t('admin.apiFallback.daily') }}: </dt><dd class="inline font-mono">{{ policy.daily_budget_usd }}</dd></div><div><dt class="inline">{{ t('admin.apiFallback.total') }}: </dt><dd class="inline font-mono">{{ policy.total_budget_usd }}</dd></div></dl>
             <p v-if="policy.expires_at" class="mt-2 text-xs text-gray-500">{{ t('admin.apiFallback.expires') }}: {{ formatDateTime(policy.expires_at) }}</p>
           </div>
           <div class="flex flex-wrap gap-2"><button type="button" class="btn btn-secondary text-sm" :disabled="!!actionID" :data-testid="`fallback-preview-${policy.id}`" @click="check(policy)">{{ t('admin.apiFallback.preview') }}</button><button type="button" class="btn btn-secondary text-sm" :disabled="editorOpen" :data-testid="`fallback-edit-${policy.id}`" @click="edit(policy)">{{ t('common.edit') }}</button><button v-if="policy.enabled" type="button" class="btn btn-secondary text-sm text-red-600 dark:text-red-400" :disabled="!!actionID" :data-testid="`fallback-disable-${policy.id}`" @click="disable(policy)">{{ t('admin.apiFallback.disable') }}</button></div>

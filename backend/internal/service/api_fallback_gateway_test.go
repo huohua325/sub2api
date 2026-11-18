@@ -146,6 +146,49 @@ func TestAPIFallbackPrimaryPoolStrictReasons(t *testing.T) {
 	}
 }
 
+func TestAPIFallbackExperimentDispatch(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		expired      bool
+		owner        int64
+		body         string
+		wantDispatch bool
+		wantErr      bool
+	}{
+		{"expired", true, 2, `"input":"test","include":["reasoning.encrypted_content"]`, true, false},
+		{"healthy", false, 2, `"input":"test"`, false, false},
+		{"other owner", true, 3, `"input":"test"`, false, false},
+		{"opaque state", true, 2, `"input":[{"type":"reasoning","encrypted_content":"opaque"}]`, false, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s, store, key, p := fallbackGatewayFixture()
+			p.ExperimentKeyID, p.ExperimentGroupID, p.ApprovedBy = 7, 8, tc.owner
+			p.PrimaryAccountIDs, p.PrimaryEvidence, p.BackupAccountIDs, p.ExpiresAt = nil, nil, nil, nil
+			if tc.expired {
+				expiry := time.Now().Add(-time.Hour)
+				primary := &s.accountRepo.(*fallbackGatewayAccounts).rows[0]
+				primary.ExpiresAt, primary.AutoPauseOnExpired = &expiry, true
+			}
+			c, _ := gin.CreateTestContext(httptest.NewRecorder())
+			c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+			ctx := WithResolvedTargetPlatform(c.Request.Context(), PlatformOpenAI)
+			raw := []byte(`{"model":"gpt-6.1-sol",` + tc.body + `}`)
+			dispatched := false
+			handled, err := s.TryAPIFallback(ctx, c, NewUsageMonitorService(store), key, p.Model, raw, time.Now(), func(policy *APIFallbackPolicy, prepared []byte) error {
+				dispatched = true
+				require.Equal(t, int64(7), policy.ExperimentKeyID)
+				require.False(t, gjson.GetBytes(prepared, "include").Exists())
+				require.False(t, gjson.GetBytes(prepared, "store").Bool())
+				return nil
+			})
+			require.Equal(t, tc.wantDispatch, dispatched)
+			require.Equal(t, tc.wantDispatch || tc.wantErr, handled)
+			require.Equal(t, tc.wantErr, err != nil)
+			require.Zero(t, store.reserved)
+		})
+	}
+}
+
 func TestAPIFallbackNativeAttemptAndRecovery(t *testing.T) {
 	usage := `{"id":"resp_test","model":"gpt-6.1-sol","service_tier":"default","usage":{"input_tokens":100,"input_tokens_details":{"cached_tokens":20},"output_tokens":30},"output":[{"type":"reasoning","encrypted_content":"own-encrypted-state"}]}`
 	for _, tc := range []struct {

@@ -47,6 +47,10 @@ const attempt = (state: APIFallbackAttempt['state'] = 'unresolved'): APIFallback
 })
 const snapshot = (): APIFallbackSnapshot => ({
   policies: [policy()], attempts: [attempt(), attempt('settled')],
+  experiment_keys: [
+    { id: 41, name: 'GPT lab', group_name: 'GPT', platform: 'openai' },
+    { id: 42, name: 'Grok lab', group_name: 'Grok', platform: 'grok' }
+  ],
   summary: { settled_usd: '0.003', reserved_usd: '0', unresolved_usd: '0.1', today_usd: '0.103', settled_count: 1, unresolved_count: 1 }
 })
 const wrappers: ReturnType<typeof mount>[] = []
@@ -86,8 +90,29 @@ describe('administrator API backup', () => {
     expect(wrapper.text()).toContain('0.103')
     await wrapper.get('[data-testid="fallback-new"]').trigger('click')
     expect((wrapper.get('[data-testid="fallback-enabled"]').element as HTMLInputElement).checked).toBe(false)
-    expect((wrapper.get('[data-testid="fallback-points_per_usd"]').element as HTMLInputElement).value).toBe('')
+    expect(wrapper.find('[data-testid="fallback-points_per_usd"]').exists()).toBe(false)
     expect(mocks.savePolicy).not.toHaveBeenCalled()
+  })
+
+  it('submits a same-platform experiment key without pricing after explicit confirmation', async () => {
+    const wrapper = track(mount(APIFallbackView, { global }))
+    await flushPromises()
+    await wrapper.get('[data-testid="fallback-new"]').trigger('click')
+    await wrapper.get('[data-testid="fallback-group"]').setValue(19)
+    const keys = wrapper.get('[data-testid="fallback-experiment-key"]')
+    expect(keys.findAll('option').map(option => option.attributes('value'))).toEqual(['0', '42'])
+    await wrapper.get('[data-testid="fallback-model"]').setValue('grok-4.7')
+    await keys.setValue(42)
+    await wrapper.get('[data-testid="fallback-enabled"]').setValue(true)
+    await wrapper.get('form').trigger('submit')
+    expect(mocks.savePolicy).not.toHaveBeenCalled()
+    await wrapper.get('[data-testid="fallback-verified"]').setValue(true)
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(mocks.savePolicy).toHaveBeenCalledWith({
+      id: '', expected_version: 0, confirm: true, group_id: 19, platform: 'grok', model: 'grok-4.7',
+      experiment_key_id: 42, enabled: true, capabilities_verified: true, expires_at: null
+    })
   })
 
   it('shows recovered subscriptions in a read-only preview without sending or saving anything', async () => {

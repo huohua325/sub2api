@@ -38,6 +38,7 @@ import (
 // OpenAIGatewayHandler handles OpenAI API gateway requests
 type OpenAIGatewayHandler struct {
 	apiFallback                *service.UsageMonitorService
+	experimentStandbyGateway   http.Handler
 	compositeResolver          *service.CompositeRouteResolver
 	gatewayService             *service.OpenAIGatewayService
 	billingCacheService        *service.BillingCacheService
@@ -592,6 +593,11 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 	forwardBody := openAIModelMappedBody(body, channelMapping.Mapped, channelMapping.MappedModel, h.gatewayService.ReplaceModelInBody)
 	seedOpenAIForwardImageIntentHint(c, channelMapping.Mapped, imageIntent)
 	forwardModel := openAIChannelForwardModel(channelMapping, reqModel)
+	standby := service.ExperimentStandbyFromContext(c.Request.Context())
+	if standby != nil && (forwardModel != standby.Model || reqModel != standby.Model || imageIntent || nativeV2 || legacyCompact) {
+		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "Experiment standby requires the same model on text Responses")
+		return
+	}
 	c.Request = c.Request.WithContext(service.WithOpenAIForwardModel(
 		c.Request.Context(),
 		forwardModel,
@@ -682,6 +688,9 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 	// 该判断已排除 Codex 被动 image_gen namespace，避免 CC-only 账号被误过滤（#4476）。
 	needsResponses := nativeV2 || legacyCompact
 	requiredCapability := openAIResponsesRequiredCapabilityForRequest(imageIntent, needsResponses, requestPlatform)
+	if standby != nil {
+		requiredCapability = service.OpenAIEndpointCapabilityResponses
+	}
 	imageSizeRouted := imageIntent && requestPlatform == service.PlatformOpenAI
 	imageSize := ""
 	if imageSizeRouted {
@@ -695,7 +704,14 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 	// token 计费部分仍受利润门保护，独立图片/视频端点才在门外。
 	pricingCtx, pricingAt := h.gatewayService.WithOpenAIRequestPricingContext(c.Request.Context(), apiKey.GroupID)
 	c.Request = c.Request.WithContext(pricingCtx)
-	if handled, fallbackErr := h.gatewayService.TryAPIFallback(c.Request.Context(), c, h.apiFallback, apiKey, forwardModel, forwardBody, requestStart); handled {
+	if handled, fallbackErr := h.gatewayService.TryAPIFallback(c.Request.Context(), c, h.apiFallback, apiKey, forwardModel, forwardBody, requestStart, func(p *service.APIFallbackPolicy, body []byte) error {
+		// The experiment request acquires its own limits for the same user.
+		if userReleaseFunc != nil {
+			userReleaseFunc()
+		}
+		inflightRelease()
+		return h.dispatchExperimentStandby(c, apiKey, p, body)
+	}); handled {
 		if fallbackErr != nil {
 			reqLog.Warn("api_fallback_request_failed", zap.Error(fallbackErr))
 			if !c.Writer.Written() {
@@ -786,6 +802,14 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 			zap.Float64("load_skew", scheduleDecision.LoadSkew),
 		)
 		account := selection.Account
+		if standby != nil && (account.Type != service.AccountTypeAPIKey || account.Platform != standby.Platform ||
+			service.ResolveOpenAIAccountUpstreamModelForRequest(account, forwardModel, false) != standby.Model) {
+			if selection.ReleaseFunc != nil {
+				selection.ReleaseFunc()
+			}
+			h.handleStreamingAwareError(c, http.StatusServiceUnavailable, "experiment_standby_account_unavailable", "Experiment Key has no verified API account for the same model", streamStarted)
+			return
+		}
 		if previousResponseID != "" && requestPlatform == service.PlatformOpenAI && !account.IsOpenAIApiKey() {
 			// The public Responses HTTP API supports previous_response_id on API-key
 			// accounts. OAuth/SetupToken upstreams do not, so keep searching instead

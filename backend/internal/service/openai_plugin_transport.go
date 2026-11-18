@@ -1,6 +1,9 @@
 package service
 
-import "net/http"
+import (
+	"net/http"
+	"strings"
+)
 
 func (s *OpenAIGatewayService) SetPluginManager(manager *PluginManager) {
 	s.pluginManager = manager
@@ -11,6 +14,17 @@ func (s *OpenAIGatewayService) SetPluginManager(manager *PluginManager) {
 func (s *OpenAIGatewayService) doOpenAIUpstream(request *http.Request, proxyURL string, account *Account) (*http.Response, error) {
 	if err := guardAPIFallbackNormalAccount(request.Context(), s.accountRepo, apiFallbackRequestGroup(request.Context(), nil), account); err != nil {
 		return nil, err
+	}
+	if standby := ExperimentStandbyFromContext(request.Context()); standby != nil {
+		if account == nil || account.Type != AccountTypeAPIKey || account.Platform != standby.Platform ||
+			!account.IsModelSupported(standby.Model) || account.GetMappedModel(standby.Model) != standby.Model ||
+			request.Method != http.MethodPost || request.URL == nil || strings.TrimRight(request.URL.Path, "/") != "/v1/responses" {
+			return nil, ErrExperimentProtocolUnsupported
+		}
+		ctx := WithHTTPUpstreamRedirectsDisabled(request.Context())
+		request = request.WithContext(ctx)
+		request.GetBody = nil
+		return s.httpUpstream.Do(request, proxyURL, account.ID, account.Concurrency)
 	}
 	if s.pluginManager != nil {
 		response, handled, err := s.pluginManager.RoundTripOpenAIOAuth(request.Context(), request, proxyURL, account)

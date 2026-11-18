@@ -810,6 +810,27 @@ func (s *APIKeyService) GetByID(ctx context.Context, id int64) (*APIKey, error) 
 	return apiKey, nil
 }
 
+// GetExperimentStandbyKey reads current credentials and permissions without the auth cache.
+func (s *APIKeyService) GetExperimentStandbyKey(ctx context.Context, id int64) (*APIKey, error) {
+	key, err := s.apiKeyRepo.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if key == nil || key.Key == "" {
+		return nil, ErrAPIKeyNotFound
+	}
+	auth, err := s.apiKeyRepo.GetByKeyForAuth(ctx, key.Key)
+	if err != nil {
+		return nil, err
+	}
+	if auth == nil || auth.ID != id {
+		return nil, ErrAPIKeyNotFound
+	}
+	auth.Key = key.Key
+	s.compileAPIKeyIPRules(auth)
+	return auth, nil
+}
+
 // GetByKey 根据Key字符串获取API Key（用于认证）
 func (s *APIKeyService) GetByKey(ctx context.Context, key string) (*APIKey, error) {
 	// 非 UTF-8 的 key 不可能存在（生成和自定义的 key 都是 ASCII），且 Postgres 会以

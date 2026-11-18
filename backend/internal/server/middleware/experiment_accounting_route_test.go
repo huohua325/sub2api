@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	"github.com/Wei-Shaw/sub2api/internal/repository"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
@@ -22,11 +23,82 @@ type experimentRouteStore struct {
 	reserved   atomic.Int32
 	sent       atomic.Int32
 	receipts   atomic.Int32
+	keyID      atomic.Int64
 }
 
-func (s *experimentRouteStore) ReserveExperimentRequest(context.Context, service.ExperimentAdmissionInput) error {
+func (s *experimentRouteStore) ReserveExperimentRequest(_ context.Context, in service.ExperimentAdmissionInput) error {
 	s.reserved.Add(1)
+	s.keyID.Store(in.APIKeyID)
 	return s.reserveErr
+}
+
+type experimentStandbyTestKeys struct {
+	fakeAPIKeyRepo
+	key *service.APIKey
+}
+
+func (r experimentStandbyTestKeys) GetByID(_ context.Context, id int64) (*service.APIKey, error) {
+	if id != r.key.ID {
+		return nil, service.ErrAPIKeyNotFound
+	}
+	return r.key, nil
+}
+
+func TestExperimentStandbyRoutePreservesKeyAuthorizationAndBillingIdentity(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, tc := range []struct {
+		name   string
+		edit   func(*service.APIKey, *service.ExperimentStandby)
+		status int
+	}{
+		{"admitted", func(*service.APIKey, *service.ExperimentStandby) {}, http.StatusOK},
+		{"rebound", func(_ *service.APIKey, s *service.ExperimentStandby) { s.GroupID++ }, http.StatusForbidden},
+		{"other administrator", func(_ *service.APIKey, s *service.ExperimentStandby) { s.UserID++ }, http.StatusForbidden},
+		{"restricted client IP", func(k *service.APIKey, _ *service.ExperimentStandby) { k.IPWhitelist = []string{"203.0.113.42"} }, http.StatusForbidden},
+		{"disabled", func(k *service.APIKey, _ *service.ExperimentStandby) { k.Status = service.StatusAPIKeyDisabled }, http.StatusForbidden},
+		{"pool changed before send", func(_ *service.APIKey, s *service.ExperimentStandby) {
+			s.BeforeSend = func(context.Context) error { return service.ErrExperimentAccountingUnavailable }
+		}, http.StatusServiceUnavailable},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := &config.Config{RunMode: config.RunModeStandard}
+			store := &experimentRouteStore{}
+			group := &service.Group{ID: 4, Platform: service.PlatformOpenAI, UsageKind: service.UsageKindExperiment, Status: service.StatusActive, Hydrated: true, SubscriptionType: service.SubscriptionTypeStandard}
+			user := &service.User{ID: 3, Status: service.StatusActive, Role: service.RoleAdmin, Balance: 10}
+			key := &service.APIKey{ID: 40, UserID: 3, User: user, GroupID: &group.ID, Group: group, Key: "synthetic-test-only", Status: service.StatusActive}
+			standby := &service.ExperimentStandby{UserID: 3, KeyID: 40, GroupID: group.ID, Platform: service.PlatformOpenAI, BeforeSend: func(context.Context) error { return nil }}
+			tc.edit(key, standby)
+			repo := experimentStandbyTestKeys{key: key, fakeAPIKeyRepo: fakeAPIKeyRepo{getByKey: func(context.Context, string) (*service.APIKey, error) { return key, nil }}}
+			svc := service.NewAPIKeyService(repo, nil, nil, nil, nil, nil, cfg)
+			svc.SetOfficialPoints(service.NewOfficialPointService(nil, store, nil))
+			router := gin.New()
+			router.Use(gin.HandlerFunc(NewAPIKeyAuthMiddleware(svc, nil, cfg)), GroupModelAllowlist())
+			router.POST("/v1/responses", func(c *gin.Context) {
+				ctx := c.Request.Context()
+				got, _ := GetAPIKeyFromContext(c)
+				require.Same(t, key, got)
+				require.Equal(t, group, ctx.Value(ctxkey.Group))
+				require.Equal(t, service.PurposeExperiment, service.PurposeForRequest(ctx, got.Group))
+				req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://globalai.vip/v1/responses", nil)
+				require.NoError(t, err)
+				if service.BeginExperimentHTTPAttempt(req, 20) == nil {
+					c.Status(http.StatusOK)
+				}
+			})
+			parent := service.WithResolvedTargetPlatform(context.Background(), service.PlatformGrok)
+			r := httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(`{"model":"gpt-test","input":"hello"}`))
+			r.Header.Set("Authorization", "Bearer "+key.Key)
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, r.WithContext(service.WithExperimentStandby(parent, standby)))
+			require.Equal(t, tc.status, w.Code, w.Body.String())
+			if tc.status == http.StatusOK {
+				require.Equal(t, int32(1), store.sent.Load())
+				require.Equal(t, key.ID, store.keyID.Load())
+			} else {
+				require.Zero(t, store.reserved.Load())
+			}
+		})
+	}
 }
 func (s *experimentRouteStore) MarkExperimentRequestSent(context.Context, string, int64) error {
 	s.sent.Add(1)

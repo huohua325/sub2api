@@ -103,7 +103,18 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 
 		// ── 2. 验证 Key 存在 ─────────────────────────────────────────
 
-		apiKey, err := apiKeyService.GetByKey(c.Request.Context(), apiKeyString)
+		ctx := c.Request.Context()
+		var apiKey *service.APIKey
+		var err error
+		if standby := service.ExperimentStandbyFromContext(ctx); standby != nil {
+			apiKey, err = apiKeyService.GetExperimentStandbyKey(ctx, standby.KeyID)
+			if err != nil || !standby.MatchesKey(apiKey) || apiKey.Key != apiKeyString {
+				AbortWithError(c, http.StatusForbidden, "EXPERIMENT_STANDBY_KEY_CHANGED", "Experiment standby Key is unavailable")
+				return
+			}
+		} else {
+			apiKey, err = apiKeyService.GetByKey(ctx, apiKeyString)
+		}
 		if err != nil {
 			if errors.Is(err, service.ErrAPIKeyNotFound) {
 				recordInvalidAuthFailure(c, apiKeyService)
@@ -175,7 +186,7 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 		if abortIfUnifiedCodingProtocolUnsupported(c, apiKey) {
 			return
 		}
-		ctx := context.WithValue(c.Request.Context(), ctxkey.UserID, apiKey.User.ID)
+		ctx = context.WithValue(c.Request.Context(), ctxkey.UserID, apiKey.User.ID)
 		c.Request = c.Request.WithContext(ctx)
 		apiKeyService.PrepareExperimentAccountingContext(c, apiKey)
 		billingInfoRequest := c.Request.URL.Path == "/v1/sub2api/billing"
