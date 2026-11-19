@@ -9,7 +9,10 @@ const apiMocks = vi.hoisted(() => ({
   resetPlatformQuotaWindow: vi.fn(),
   getPurposeQuotaResets: vi.fn(),
   resetPurposeQuota: vi.fn(),
+  auth: { isAdmin: true, user: { id: 99 } },
 }))
+
+vi.mock('@/stores/auth', () => ({ useAuthStore: () => apiMocks.auth }))
 
 vi.mock('@/api/admin', () => ({
   adminAPI: {
@@ -80,6 +83,25 @@ beforeEach(() => {
 })
 
 describe('UserPlatformQuotaModal', () => {
+  it('shows the reset flow for the signed-in administrator, but not another administrator', async () => {
+    const quota = { purpose: 'openai', used: '30', pending: '0', period_start: '2026-11-11T06:35:59Z', period_end: '2026-11-18T06:35:59Z' }
+    apiMocks.getPurposeQuotaResets.mockResolvedValue({ quotas: [quota], events: [] })
+    apiMocks.resetPurposeQuota.mockResolvedValue({ id: 'admin-self' })
+    const w = await mountAndOpen({ user: { ...makeUser(), id: 100, role: 'admin' } })
+    expect(w.find('[data-testid="purpose-reset-openai"]').exists()).toBe(false)
+    expect(apiMocks.getPurposeQuotaResets).not.toHaveBeenCalled()
+    await w.setProps({ user: { ...makeUser(), role: 'admin' } })
+    await flushPromises()
+    await w.get('[data-testid="purpose-reset-openai"]').trigger('click')
+    await w.get('[data-testid="purpose-reset-reason"]').setValue('maintenance test')
+    await w.get('form').trigger('submit')
+    await flushPromises()
+    expect(apiMocks.resetPurposeQuota).toHaveBeenCalledWith(99, expect.objectContaining({
+      purpose: 'openai', period_end: quota.period_end, note: 'maintenance test', confirm: true,
+    }))
+    w.unmount()
+  })
+
   it('refreshes and requires confirmation again when the shared API client reports a changed period', async () => {
     const quota = { purpose: 'openai', used: '30', pending: '0', period_start: '2026-11-11T06:35:59Z', period_end: '2026-11-18T06:35:59Z' }
     apiMocks.getPurposeQuotaResets.mockResolvedValue({ quotas: [quota], events: [] })

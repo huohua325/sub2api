@@ -1,8 +1,10 @@
 async page => {
  const options=__MILE_REVIEW_OPTIONS__,base=options.base,fixtures=(__MILE_FIXTURES__)(base);
  const auth={...fixtures.auth,id:2,role:'admin'},user={...fixtures.auth,id:99,email:'quota-review@example.invalid',created_at:'2026-10-01T00:00:00Z',updated_at:'2026-10-01T00:00:00Z',subscriptions:[]};
+ const self={...user,...auth,email:'self-admin@example.invalid',subscriptions:[]},other={...self,id:3,email:'other-admin@example.invalid'};
  const end='2026-11-18T06:35:59Z',start='2026-11-11T06:35:59Z';
  const quotas=['openai','grok','experiment'].map(purpose=>({purpose,used:'30',pending:'0',period_start:start,period_end:end}));
+ const selfQuotas=quotas.map(quota=>({...quota}));
  const errors=[],calls=[],writes=[],events=[],results=[];
  let timeoutOnce=false;
  page.setDefaultTimeout(15000);
@@ -18,14 +20,16 @@ async page => {
   if(path.startsWith('/api/v1/')){
    calls.push({path,method});let data={};
    if(path.endsWith('/auth/me')||path.endsWith('/user/profile'))data=auth;
-   else if(path==='/api/v1/admin/users'&&method==='GET')data={items:[user],total:1,page:1,page_size:20,pages:1};
+   else if(path==='/api/v1/admin/users'&&method==='GET')data={items:[user,self,other],total:3,page:1,page_size:20,pages:1};
    else if(path.endsWith('/purpose-quota-resets')){
-    if(method==='GET')data={quotas,events};
+    const target=Number(path.split('/').at(-2)),targetQuotas=target===self.id?selfQuotas:quotas;
+    if(target!==user.id&&target!==self.id)throw Error('Quota reset requested for another administrator');
+    if(method==='GET')data={quotas:targetQuotas,events:events.filter(event=>event.target_user_id===target)};
     else if(method==='POST'){
      const body=req.postDataJSON();writes.push(body);
      if(body.period_end!==end||!body.confirm||!body.note?.trim()||!body.id)throw Error('Invalid reset payload');
      let event=events.find(e=>e.id===body.id);
-     if(!event){event={...body,target_user_id:99,actor_user_id:2,period_start:start,created_at:'2026-11-13T00:00:00Z'};events.unshift(event);quotas.find(q=>q.purpose===body.purpose).used='0';}
+     if(!event){event={...body,target_user_id:target,actor_user_id:auth.id,period_start:start,created_at:'2026-11-13T00:00:00Z'};events.unshift(event);targetQuotas.find(q=>q.purpose===body.purpose).used='0';}
      if(timeoutOnce){timeoutOnce=false;return route.abort('failed');}
      data=event;
     }else throw Error('Unexpected reset method');
@@ -43,8 +47,11 @@ async page => {
  });
  await page.setViewportSize({width:1440,height:1000});
  await page.goto(base+'/admin/users',{waitUntil:'domcontentloaded'});
- await page.locator('.action-menu-trigger').first().click();
- await page.locator('.action-menu-content button').filter({hasText:'平台限额'}).click();
+ const openQuota=async account=>{
+  await page.getByRole('row').filter({hasText:account.email}).locator('.action-menu-trigger').click();
+  await page.locator('.action-menu-content button').filter({hasText:'平台限额'}).click();
+ };
+ await openQuota(user);
  await page.getByTestId('purpose-reset-openai').waitFor();
  for(const [index,purpose] of ['openai','grok','experiment'].entries()){
   await page.getByTestId('purpose-reset-'+purpose).click();
@@ -76,5 +83,21 @@ async page => {
  const box=await page.getByTestId('purpose-reset-confirm').boundingBox();
  if(!box||box.x<0||box.x+box.width>375)throw Error('Mobile confirmation out of viewport');
  if(events.length!==3||writes.length!==4||errors.length)throw Error(JSON.stringify({events,writes,errors}));
+ await page.setViewportSize({width:1440,height:1000});
+ await page.reload({waitUntil:'domcontentloaded'});
+ await openQuota(other);
+ await page.getByRole('dialog').waitFor();
+ if(await page.getByTestId('purpose-reset-openai').count())throw Error('Other administrator got the self-reset control');
+ await page.reload({waitUntil:'domcontentloaded'});
+ await openQuota(self);
+ await page.getByTestId('purpose-reset-openai').click();
+ await page.getByTestId('purpose-reset-reason').fill('管理员自助重置回归');
+ await page.screenshot({path:options.output+'/administrator-self-reset.png'});
+ await page.getByTestId('purpose-reset-confirm').click();
+ await page.getByTestId('purpose-reset-confirm').waitFor({state:'detached'});
+ const ownEvents=events.filter(event=>event.target_user_id===auth.id);
+ if(ownEvents.length!==1||ownEvents[0].actor_user_id!==auth.id||ownEvents[0].period_end!==end||events.length!==4||writes.length!==5||errors.length||
+   calls.some(call=>call.path===`/api/v1/admin/users/${other.id}/purpose-quota-resets`))throw Error('Administrator reset scope or audit mismatch');
+ results.push({purpose:'administrator-self',unchangedEnd:ownEvents[0].period_end===end});
  return {errors,apiMutations:[],mockedWrites:writes.length,auditEvents:events.length,results,calls};
 }

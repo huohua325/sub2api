@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -70,7 +71,7 @@ func TestCodingQuotaDBPersonalExperimentResetKeepsRawCounter(t *testing.T) {
 	// Retry must not reset the seven newly billed yuan.
 	_, err = r.ResetPersonalQuota(context.Background(), in)
 	require.NoError(t, err)
-	view, err := r.ReadPersonalQuotaResets(context.Background(), 1)
+	view, err := r.ReadPersonalQuotaResets(context.Background(), 1, 0)
 	require.NoError(t, err)
 	require.Len(t, view.Events, 1)
 	for _, v := range view.Quotas {
@@ -150,6 +151,66 @@ func TestCodingQuotaDBPersonalResetRejectsInvalidAndAdminTargets(t *testing.T) {
 	var count int
 	require.NoError(t, db.QueryRow(`SELECT COUNT(*) FROM personal_quota_resets`).Scan(&count))
 	require.Zero(t, count)
+}
+
+func TestCodingQuotaDBPersonalResetForAdministratorSelf(t *testing.T) {
+	db, r, _ := quotaTestDB(t, "")
+	_, err := db.Exec(`ALTER TABLE users ADD COLUMN role text NOT NULL DEFAULT 'admin'`)
+	require.NoError(t, err)
+	now := quotaDBNow(t, db)
+	_, err = db.Exec(`INSERT INTO coding_quota_requests(request_id,api_key_id,user_id,purpose,account_id,started_at,completed_at,weight,points,state)
+ VALUES('self-codex',2,2,'openai',10,$1,$1,1,8,'settled'),('self-grok',2,2,'grok',10,$1,$1,1,3,'settled'),
+ ('other-admin',1,1,'openai',10,$1,$1,1,4,'settled')`, now.Add(-time.Minute))
+	require.NoError(t, err)
+	monthStart := service.ShanghaiMonthStart(now)
+	_, err = db.Exec(`INSERT INTO user_purpose_allowances(user_id,purpose,limit_amount,used_amount,period,window_start)
+ VALUES(2,'experiment',500,120,'month',$1)`, monthStart)
+	require.NoError(t, err)
+	ctx := t.Context()
+	_, err = r.ReadPersonalQuotaResets(ctx, 2, 0)
+	require.Error(t, err)
+	_, err = r.ReadPersonalQuotaResets(ctx, 1, 2)
+	require.Error(t, err)
+	before, err := r.ReadPersonalQuotaResets(ctx, 2, 2)
+	require.NoError(t, err)
+	require.Len(t, before.Quotas, 3)
+	blocked := service.PersonalQuotaResetInput{ID: uuid.NewString(), ActorUserID: 2, UserID: 1, AllowAdminSelf: true,
+		Purpose: "openai", PeriodEnd: quotaUsed(t, r, 1, now, "openai").End, Note: "other admin", Confirm: true}
+	_, err = r.ResetPersonalQuota(ctx, blocked)
+	require.Error(t, err)
+	for _, quota := range before.Quotas {
+		used, err := strconv.ParseFloat(quota.Used, 64)
+		require.NoError(t, err)
+		require.Positive(t, used)
+		in := service.PersonalQuotaResetInput{ID: uuid.NewString(), ActorUserID: 2, UserID: 2, AllowAdminSelf: true,
+			Purpose: quota.Purpose, PeriodEnd: quota.PeriodEnd, Note: "self test", Confirm: true}
+		event, err := r.ResetPersonalQuota(ctx, in)
+		require.NoError(t, err)
+		require.Equal(t, int64(2), event.ActorUserID)
+		require.Equal(t, int64(2), event.UserID)
+		require.True(t, event.PeriodEnd.Equal(quota.PeriodEnd))
+		again, err := r.ResetPersonalQuota(ctx, in)
+		require.NoError(t, err)
+		require.Equal(t, event.ID, again.ID)
+	}
+	after, err := r.ReadPersonalQuotaResets(ctx, 2, 2)
+	require.NoError(t, err)
+	require.Len(t, after.Events, 3)
+	require.Len(t, after.Quotas, 3)
+	for i, quota := range after.Quotas {
+		require.Equal(t, before.Quotas[i].Purpose, quota.Purpose)
+		used, err := strconv.ParseFloat(quota.Used, 64)
+		require.NoError(t, err)
+		require.Zero(t, used)
+		require.True(t, quota.PeriodStart.Equal(before.Quotas[i].PeriodStart))
+		require.True(t, quota.PeriodEnd.Equal(before.Quotas[i].PeriodEnd))
+	}
+	require.Equal(t, "4.00000000", quotaUsed(t, r, 1, now, "openai").Used)
+	var raw string
+	require.NoError(t, db.QueryRow(`SELECT SUM(points)::text FROM coding_quota_requests WHERE user_id=2`).Scan(&raw))
+	require.Equal(t, "11.00000000", raw)
+	require.NoError(t, db.QueryRow(`SELECT used_amount::text FROM user_purpose_allowances WHERE user_id=2 AND purpose='experiment'`).Scan(&raw))
+	require.Equal(t, "120.00000000", raw)
 }
 
 func TestCodingQuotaDBPersonalResetAfterBackfilledGlobalReset(t *testing.T) {

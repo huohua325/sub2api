@@ -61,7 +61,7 @@ func personalQuotas(ctx context.Context, db codingQuotaQueryer, user int64, now 
 	return out, rows.Err()
 }
 
-func (r *UsageMonitorRepository) ReadPersonalQuotaResets(ctx context.Context, user int64) (*service.PersonalQuotaResetView, error) {
+func (r *UsageMonitorRepository) ReadPersonalQuotaResets(ctx context.Context, user, adminSelfID int64) (*service.PersonalQuotaResetView, error) {
 	var role string
 	err := r.db.QueryRowContext(ctx, `SELECT role FROM users WHERE id=$1 AND deleted_at IS NULL`, user).Scan(&role)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -70,8 +70,8 @@ func (r *UsageMonitorRepository) ReadPersonalQuotaResets(ctx context.Context, us
 	if err != nil {
 		return nil, err
 	}
-	if role != "user" {
-		return nil, infraerrors.BadRequest("ORDINARY_USER_REQUIRED", "only ordinary users can be reset")
+	if err := validatePersonalQuotaTarget(role, user, adminSelfID); err != nil {
+		return nil, err
 	}
 	var now time.Time
 	if err := r.db.QueryRowContext(ctx, `SELECT clock_timestamp()`).Scan(&now); err != nil {
@@ -98,6 +98,13 @@ func (r *UsageMonitorRepository) ReadPersonalQuotaResets(ctx context.Context, us
 		return nil, err
 	}
 	return &service.PersonalQuotaResetView{Quotas: quotas, Events: events}, nil
+}
+
+func validatePersonalQuotaTarget(role string, user, adminSelfID int64) error {
+	if role == "user" || role == "admin" && adminSelfID > 0 && user == adminSelfID {
+		return nil
+	}
+	return infraerrors.BadRequest("ORDINARY_USER_REQUIRED", "only ordinary users or the signed-in administrator can be reset")
 }
 
 func (r *UsageMonitorRepository) ResetPersonalQuota(ctx context.Context, in service.PersonalQuotaResetInput) (*service.PersonalQuotaReset, error) {
@@ -135,8 +142,12 @@ func (r *UsageMonitorRepository) ResetPersonalQuota(ctx context.Context, in serv
 	if err != nil {
 		return nil, err
 	}
-	if targetRole != "user" {
-		return nil, infraerrors.BadRequest("ORDINARY_USER_REQUIRED", "only ordinary users can be reset")
+	var adminSelfID int64
+	if in.AllowAdminSelf {
+		adminSelfID = in.ActorUserID
+	}
+	if err := validatePersonalQuotaTarget(targetRole, in.UserID, adminSelfID); err != nil {
+		return nil, err
 	}
 	prior, err := scanPersonalReset(tx.QueryRowContext(ctx, `SELECT `+personalResetColumns+` FROM personal_quota_resets WHERE id=$1`, in.ID))
 	if err == nil {

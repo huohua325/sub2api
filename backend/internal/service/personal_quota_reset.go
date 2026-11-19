@@ -8,13 +8,14 @@ import (
 )
 
 type PersonalQuotaResetInput struct {
-	ID          string    `json:"id"`
-	ActorUserID int64     `json:"-"`
-	UserID      int64     `json:"-"`
-	Purpose     string    `json:"purpose"`
-	PeriodEnd   time.Time `json:"period_end"`
-	Note        string    `json:"note"`
-	Confirm     bool      `json:"confirm"`
+	ID             string    `json:"id"`
+	ActorUserID    int64     `json:"-"`
+	UserID         int64     `json:"-"`
+	AllowAdminSelf bool      `json:"-"`
+	Purpose        string    `json:"purpose"`
+	PeriodEnd      time.Time `json:"period_end"`
+	Note           string    `json:"note"`
+	Confirm        bool      `json:"confirm"`
 }
 
 type PersonalQuotaReset struct {
@@ -43,16 +44,16 @@ type PersonalQuotaResetView struct {
 }
 
 type PersonalQuotaResetStore interface {
-	ReadPersonalQuotaResets(context.Context, int64) (*PersonalQuotaResetView, error)
+	ReadPersonalQuotaResets(ctx context.Context, userID, adminSelfID int64) (*PersonalQuotaResetView, error)
 	ResetPersonalQuota(context.Context, PersonalQuotaResetInput) (*PersonalQuotaReset, error)
 }
 
-func (s *UsageMonitorService) PersonalQuotaResets(ctx context.Context, user int64) (*PersonalQuotaResetView, error) {
+func (s *UsageMonitorService) PersonalQuotaResets(ctx context.Context, user, adminSelfID int64) (*PersonalQuotaResetView, error) {
 	store, ok := s.store.(PersonalQuotaResetStore)
 	if !ok {
 		return nil, infraerrors.ServiceUnavailable("PERSONAL_QUOTA_UNAVAILABLE", "personal quota service unavailable")
 	}
-	return store.ReadPersonalQuotaResets(ctx, user)
+	return store.ReadPersonalQuotaResets(ctx, user, adminSelfID)
 }
 
 func (s *UsageMonitorService) ResetPersonalQuota(ctx context.Context, in PersonalQuotaResetInput) (*PersonalQuotaReset, error) {

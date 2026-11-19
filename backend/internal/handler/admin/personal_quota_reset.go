@@ -12,8 +12,15 @@ import (
 )
 
 type personalQuotaResetService interface {
-	PersonalQuotaResets(context.Context, int64) (*service.PersonalQuotaResetView, error)
+	PersonalQuotaResets(context.Context, int64, int64) (*service.PersonalQuotaResetView, error)
 	ResetPersonalQuota(context.Context, service.PersonalQuotaResetInput) (*service.PersonalQuotaReset, error)
+}
+
+func personalQuotaAdminSelfID(c *gin.Context) int64 {
+	if subject, ok := middleware.GetAuthSubjectFromContext(c); ok && c.GetString("auth_method") == service.AuditAuthMethodJWT {
+		return subject.UserID
+	}
+	return 0
 }
 
 func (h *UsageMonitorHandler) GetPersonalQuotaResets(c *gin.Context) {
@@ -27,7 +34,7 @@ func (h *UsageMonitorHandler) GetPersonalQuotaResets(c *gin.Context) {
 		response.BadRequest(c, "invalid user ID")
 		return
 	}
-	out, err := svc.PersonalQuotaResets(c.Request.Context(), user)
+	out, err := svc.PersonalQuotaResets(c.Request.Context(), user, personalQuotaAdminSelfID(c))
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
@@ -59,6 +66,7 @@ func (h *UsageMonitorHandler) ResetPersonalQuota(c *gin.Context) {
 	}
 	in.ActorUserID = subject.UserID
 	in.UserID = user
+	in.AllowAdminSelf = personalQuotaAdminSelfID(c) > 0
 	out, err := svc.ResetPersonalQuota(c.Request.Context(), in)
 	if err != nil {
 		response.ErrorFrom(c, err)

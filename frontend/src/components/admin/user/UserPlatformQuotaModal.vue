@@ -6,7 +6,7 @@
     @close="$emit('close')"
   >
     <div v-if="user" class="space-y-4">
-      <PersonalQuotaResetPanel v-if="show && user.role === 'user'" :user-id="user.id" :email="user.email" @success="emit('success')" />
+      <PersonalQuotaResetPanel v-if="show && canResetPurposeQuota" :key="user.id" :user-id="user.id" :email="user.email" @success="emit('success')" />
       <div
         v-if="hasActiveSubscription"
         class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200"
@@ -119,6 +119,7 @@
 import { ref, reactive, watch, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
+import { useAuthStore } from '@/stores/auth'
 import { adminAPI } from '@/api/admin'
 import { platformQuotaPlatforms } from '@/api/admin/users'
 import type { AdminUser, PlatformQuotaItem, PlatformQuotaPlatform, PlatformQuotaWindow } from '@/types'
@@ -130,6 +131,9 @@ const emit = defineEmits(['close', 'success'])
 
 const { t } = useI18n()
 const appStore = useAppStore()
+const authStore = useAuthStore()
+const canResetPurposeQuota = computed(() => props.user?.role === 'user' ||
+  (props.user?.role === 'admin' && authStore.isAdmin && props.user.id === authStore.user?.id))
 
 interface QuotaRow {
   platform: PlatformQuotaPlatform
