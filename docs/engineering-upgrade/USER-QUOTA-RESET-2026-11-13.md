@@ -8,6 +8,12 @@
 - 候选版本 `0.2.22-mile.20261119.admin-quota-self1`，功能提交 `7fd982051`，运行源码 `a2179319e5a1fdc81944a09e26d53c2aecd82fff`，线上基线 `d9bc47cb0381a3d3f463ef8aa224acb5fd867fba`。程序 SHA256 `baf02554d1773f3c270279248a97bcec4bdf5064ffe01b9675a2e7982909d10d`。
 - 发布包位于 `D:/Project/sub2api-ek1811/output/releases/mile-20261119-admin-quota-self1/`。差量 1,091,309 字节，SHA256 `c955972fad442e4d55d964ab1112df5f98258ca25d52353e46dca7a849b6c5a2`；最终验证证据在同一工作树的 `output/delivery/admin-quota-reset-20261119/`。此候选尚未部署，未操作生产额度。
 
+北京时间 2026-11-19 12:35:49 部署通过，仅重建 sub2api。应用与 MemSlides 均返回 200；Codex/Grok 保持 `shadow`。迁移仍为 323 条；53,671 行订阅账本、确认事件、个人周期、3 条个人重置及 10,744 条关联记录、持久计费任务和实验账本核对通过。未执行实际重置或付费请求，备用设置未变。
+
+部署备份目录 `/opt/sub2api/backups/before-mile-20261119-admin-quota-self1-20261119T043436396116Z`；数据库归档通过 `pg_restore --list`，64,744,834 字节，SHA256 `e695c08010f37a2bc5bb5cafe2b5ccb2e0d99299c463dbaab9f8fec713fbf644`。
+
+约 12:31:30 开始核对，复用原前端和程序，无重建。隔离 PostgreSQL 竞态从 12:31:54 至 12:33:38，166 项通过、零失败和跳过；私有中转约 18 秒，草稿已删除，12:33:48 预检通过。备份约 25 秒，12:35:01 开始切换，核对完成约 48 秒。12:36:49 完成公网验收，202 项资源与 Chromium 四个模拟重置场景均通过；从开始至公网验收约 5 分 20 秒，之后提交并推送发布记录。部署证据位于独立工作树 `output/delivery/deploy-admin-quota-self1/`。
+
 用户确认：管理员选择普通用户及 Codex / Grok / API 实验，恢复当前周期可用额度，保留原周期结束时间；保留历史消耗，记录管理员、原因和重置记录。
 
 实现约束：

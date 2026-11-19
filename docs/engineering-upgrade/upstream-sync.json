@@ -1429,5 +1429,24 @@
     "public_browser_chromium_checks": 22,
     "live_inference_calls": 0,
     "record": "docs/engineering-upgrade/EXPERIMENT-ACCOUNT-STANDBY-2026-11-19.md"
+  },
+  "last_admin_quota_self_reset_deployment": {
+    "version": "0.2.22-mile.20261119.admin-quota-self1",
+    "source_commit": "a2179319e5a1fdc81944a09e26d53c2aecd82fff",
+    "baseline_commit": "d9bc47cb0381a3d3f463ef8aa224acb5fd867fba",
+    "sha256": "baf02554d1773f3c270279248a97bcec4bdf5064ffe01b9675a2e7982909d10d",
+    "release_directory": "/opt/sub2api/releases/mile-20261119-admin-quota-self1",
+    "backup": "/opt/sub2api/backups/before-mile-20261119-admin-quota-self1-20261119T043436396116Z",
+    "database_backup_sha256": "e695c08010f37a2bc5bb5cafe2b5ccb2e0d99299c463dbaab9f8fec713fbf644",
+    "as_of": "2026-11-19T04:35:04.404251+00:00",
+    "finished_at": "2026-11-19T04:35:49.436138+00:00",
+    "migration_count": 323,
+    "shadow": ["openai", "grok"],
+    "quota_race_tests": {"passed": 166, "skipped": 0, "failed": 0},
+    "public_resources_checked": 202,
+    "public_browser_chromium_scenarios": 4,
+    "live_quota_resets": 0,
+    "live_inference_calls": 0,
+    "record": "docs/engineering-upgrade/USER-QUOTA-RESET-2026-11-13.md"
   }
 }
