@@ -86,8 +86,10 @@ def package_release(root, evidence, destination, binary, version, baseline_sha25
             APIFallbackUpgrade(upgrade_contract).validate_sources(root, baseline_commit, source)
             if not final_path.exists() or not {'api-fallback', 'unified-coding', 'personal-quota'}.issubset(final.get('features', [])):
                 raise DeliveryError('Administrator standby requires all affected feature artifact reviews')
-        elif upgrade_contract.get('name') in ('experiment-accounting-v1', 'coding-continuation-v1', 'coding-standby-v2', 'experiment-concurrency-v1', 'experiment-record-only-v1', 'experiment-key-standby-v1', 'experiment-account-standby-v1'):
-            if upgrade_contract['name'] == 'experiment-account-standby-v1':
+        elif upgrade_contract.get('name') in ('experiment-accounting-v1', 'coding-continuation-v1', 'coding-standby-v2', 'experiment-concurrency-v1', 'experiment-record-only-v1', 'experiment-key-standby-v1', 'experiment-account-standby-v1', 'admin-quota-self-reset-v1'):
+            if upgrade_contract['name'] == 'admin-quota-self-reset-v1':
+                from admin_quota_self_reset_upgrade import AdminQuotaSelfResetUpgrade as AccountingUpgrade
+            elif upgrade_contract['name'] == 'experiment-account-standby-v1':
                 from experiment_account_standby_upgrade import ExperimentAccountStandbyUpgrade as AccountingUpgrade
             elif upgrade_contract['name'] == 'experiment-key-standby-v1':
                 from experiment_key_standby_upgrade import ExperimentKeyStandbyUpgrade as AccountingUpgrade
@@ -148,7 +150,7 @@ def package_release(root, evidence, destination, binary, version, baseline_sha25
             raise DeliveryError('Stale input evidence: ' + name)
         if stage['artifacts'] != tree_hash(root, list(stage['artifacts'])) or digest(contained(evidence, stage['log'])) != stage['log_sha256']:
             raise DeliveryError('Corrupt artifact or log evidence: ' + name)
-    if upgrade_contract is not None and upgrade_contract.get('name') not in ('upstream-merge-no-migrations-v1', 'upstream-additive-v0222-v1', 'api-fallback-admin-v1', 'experiment-accounting-v1', 'coding-continuation-v1', 'coding-standby-v2', 'experiment-concurrency-v1', 'experiment-record-only-v1', 'experiment-key-standby-v1', 'experiment-account-standby-v1'):
+    if upgrade_contract is not None and upgrade_contract.get('name') not in ('upstream-merge-no-migrations-v1', 'upstream-additive-v0222-v1', 'api-fallback-admin-v1', 'experiment-accounting-v1', 'coding-continuation-v1', 'coding-standby-v2', 'experiment-concurrency-v1', 'experiment-record-only-v1', 'experiment-key-standby-v1', 'experiment-account-standby-v1', 'admin-quota-self-reset-v1'):
         coding_preview = upgrade_contract.get('name') == 'unified-coding-preview-v1'
         name = 'artifact-feature-' + ('unified-coding' if coding_preview else 'personal-quota')
         if name in stages:
@@ -229,7 +231,7 @@ def package_release(root, evidence, destination, binary, version, baseline_sha25
         elif upgrade_contract.get('name') == 'api-fallback-admin-v1':
             for name in ['api_fallback_upgrade.py', 'upstream_additive_upgrade.py']:
                 shutil.copyfile(kit / name, destination / name)
-        elif upgrade_contract.get('name') in ('experiment-accounting-v1', 'coding-continuation-v1', 'coding-standby-v2', 'experiment-concurrency-v1', 'experiment-record-only-v1', 'experiment-key-standby-v1', 'experiment-account-standby-v1'):
+        elif upgrade_contract.get('name') in ('experiment-accounting-v1', 'coding-continuation-v1', 'coding-standby-v2', 'experiment-concurrency-v1', 'experiment-record-only-v1', 'experiment-key-standby-v1', 'experiment-account-standby-v1', 'admin-quota-self-reset-v1'):
             for name in ['experiment_accounting_upgrade.py', 'api_fallback_upgrade.py', 'upstream_additive_upgrade.py']:
                 shutil.copyfile(kit / name, destination / name)
             if upgrade_contract['name'] == 'coding-continuation-v1':
@@ -238,10 +240,12 @@ def package_release(root, evidence, destination, binary, version, baseline_sha25
                 shutil.copyfile(kit / 'coding_standby_upgrade.py', destination / 'coding_standby_upgrade.py')
             elif upgrade_contract['name'] == 'experiment-record-only-v1':
                 shutil.copyfile(kit / 'experiment_record_only_upgrade.py', destination / 'experiment_record_only_upgrade.py')
-            elif upgrade_contract['name'] in ('experiment-key-standby-v1', 'experiment-account-standby-v1'):
+            elif upgrade_contract['name'] in ('experiment-key-standby-v1', 'experiment-account-standby-v1', 'admin-quota-self-reset-v1'):
                 shutil.copyfile(kit / 'experiment_key_standby_upgrade.py', destination / 'experiment_key_standby_upgrade.py')
-                if upgrade_contract['name'] == 'experiment-account-standby-v1':
+                if upgrade_contract['name'] != 'experiment-key-standby-v1':
                     shutil.copyfile(kit / 'experiment_account_standby_upgrade.py', destination / 'experiment_account_standby_upgrade.py')
+                if upgrade_contract['name'] == 'admin-quota-self-reset-v1':
+                    shutil.copyfile(kit / 'admin_quota_self_reset_upgrade.py', destination / 'admin_quota_self_reset_upgrade.py')
             if upgrade_contract['name'] in ('experiment-concurrency-v1', 'coding-standby-v2'):
                 shutil.copyfile(kit / 'experiment_concurrency_upgrade.py', destination / 'experiment_concurrency_upgrade.py')
                 shutil.copyfile(kit / 'experiment_concurrency_policy.py', destination / 'experiment_concurrency_policy.py')

@@ -17,6 +17,7 @@ from delivery_core import DeliveryError
 import experiment_accounting_upgrade as upgrade
 import experiment_account_standby_upgrade as account_standby
 import experiment_key_standby_upgrade as standby_upgrade
+import admin_quota_self_reset_upgrade as self_reset
 
 
 def empty_experiment():
@@ -24,6 +25,16 @@ def empty_experiment():
 
 
 class ExperimentKeyStandbyUpgradeTests(unittest.TestCase):
+    def test_admin_self_reset_preserves_compatible_rollback_and_pins_sources(self):
+        root = Path(__file__).resolve().parents[2]
+        contract = self_reset.contract_for_release()
+        policy = self_reset.AdminQuotaSelfResetUpgrade(contract)
+        policy.validate(dict(backend_unchanged=False, upgrade_contract=contract, baseline_commit=self_reset.BASELINE))
+        policy.validate_sources(root, self_reset.BASELINE, self_reset.APPLICATION)
+        with self.assertRaises(DeliveryError):
+            policy.validate_sources(root, standby_upgrade.BASELINE, self_reset.APPLICATION)
+        self.assertTrue(policy.can_rollback(None))
+
     def test_fixed_source_tree_and_manifest(self):
         root = Path(__file__).resolve().parents[2]
         policy = standby_upgrade.ExperimentKeyStandbyUpgrade(standby_upgrade.contract_for_release())

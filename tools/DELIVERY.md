@@ -34,6 +34,10 @@
 
 ## v0.2.22 两迁移上游发布
 
+管理员自助额度重置使用 `admin_quota_self_reset_upgrade.py package/deploy`，固定线上
+`d9bc47cb0` 基线，无迁移。沿用账号备用保护和四项功能产物验收，保留现有额度审计与实验账本。
+回退只切换程序，不回退数据库；基线仍识别同一结构的自助重置记录。
+
 GPT 实验账号备用使用 `experiment_account_standby_upgrade.py package/deploy`，固定线上
 `a8669b4ae` 基线，无迁移。继续核对实验账本和旧策略，另核对账号级备用配置；存在账号
 级配置时不回退到无法识别该角色的程序。本版不自动加入分组或启用备用。
