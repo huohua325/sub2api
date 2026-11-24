@@ -227,14 +227,17 @@ func TestUserPlatformQuotaRepository_IncrementUsageWithReset_DailyReset(t *testi
 func TestUserPlatformQuotaRepository_IncrementUsageWithReset_WeeklyReset(t *testing.T) {
 	ctx := context.Background()
 	client := testEntClient(t)
-	userID := mustCreateUserForQuota(t, client)
+	// 周窗口从注册时刻起每 7 天滚动，不再按周一切开。
+	registered := time.Date(2026, 5, 18, 10, 0, 0, 0, time.UTC)
+	user := mustCreateUser(t, client, &service.User{
+		Email:     fmt.Sprintf("quota-test-%d@example.com", time.Now().UnixNano()),
+		CreatedAt: registered,
+	})
+	userID := user.ID
 
 	repo := NewUserPlatformQuotaRepository(client)
 	mustSeedQuotaRow(t, ctx, repo, userID, "openai")
 
-	// 周窗口从注册时刻起每 7 天滚动，不再按周一切开。
-	registered := time.Date(2026, 5, 18, 10, 0, 0, 0, time.UTC)
-	require.NoError(t, client.User.UpdateOneID(userID).SetCreatedAt(registered).Exec(ctx))
 	inside := registered.Add(2 * 24 * time.Hour)
 	nextWeek := registered.Add(timezone.WeeklyPeriod).Add(time.Hour)
 
