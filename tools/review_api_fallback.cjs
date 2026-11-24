@@ -111,6 +111,11 @@ async page => {
       data = { items, total: items.length, page: 1, pages: 1, page_size: 100 }
     }
     else if (path === '/api/v1/admin/accounts/51' && method === 'GET') data = experimentAccount
+    else if (path === '/api/v1/admin/accounts/upstream-billing-probe/group-preview' && method === 'POST') {
+      const body = req.postDataJSON()
+      if (body.account_id !== 51 || body.api_key) throw Error('Group preview must use the saved connection')
+      data = { group_description: 'Synthetic upstream group notes' }
+    }
     else if (path === '/api/v1/admin/accounts/check-mixed-channel' && method === 'POST') data = { has_risk: false }
     else if (path === '/api/v1/admin/accounts/today-stats/batch' && method === 'POST') data = { stats: {} }
     else if (path === '/api/v1/admin/accounts/51' && method === 'PUT') {
@@ -193,6 +198,13 @@ async page => {
   await page.getByTestId('account-edit-51').click()
   const standby = page.getByTestId('account-coding-standby')
   await standby.waitFor()
+  const groupSync = page.getByTestId('upstream-billing-group-sync')
+  check('upstream-group-auto-sync-default-off', await groupSync.getAttribute('aria-checked') === 'false')
+  await page.getByRole('button', { name: '同步上游分组名称与备注', exact: true }).click()
+  const notes = page.locator('#edit-account-form textarea').first()
+  await page.waitForFunction(() => document.querySelector('#edit-account-form textarea')?.value === 'Synthetic upstream group notes')
+  check('upstream-group-preview-preserves-account-name', await page.locator('[data-tour="edit-account-form-name"]').inputValue() === experimentAccount.name)
+  check('upstream-group-preview-fills-notes', await notes.inputValue() === 'Synthetic upstream group notes')
   check('account-standby-default-off', !await page.getByTestId('account-coding-standby-17').isChecked() && !await page.getByTestId('account-coding-standby-18').isChecked())
   check('no-grok-or-experiment-entry', await standby.locator('input').count() === 2)
   await page.getByTestId('account-coding-standby-17').check()

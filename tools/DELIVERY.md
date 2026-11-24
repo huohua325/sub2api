@@ -111,6 +111,13 @@ API 备用仍保持全部关闭，Codex/Grok 仍为 shadow，不恢复旧数据�
 Ultra Fast。失败只回退程序；若已人工启用新档位则阻止自动回退并向前修复。
 原程序支持新增列及兼容的汇总触发器，不执行数据库回退。
 
+`upstream_v0225_upgrade.py` 是独立的 v0.2.25 通道，固定前一生产源码、双亲合并和
+`252_channel_pricing_ultrafast_multiplier.sql` 的文件及数据库校验和。其验收沿用额度、实验结算、
+备用账号和既有权限快照，另外核对渠道倍率未因升级改变。通过 `delivery.py finalize` 准备四个
+场景 `experiment-accounting`、`api-fallback`、`unified-coding`、`personal-quota`，再用此入口
+`package`，以及包内同一入口 `deploy --stage`、只读预检、`deploy --apply`。新倍率一旦使用，
+不能自动回退到不认识它的旧程序；不进行数据库回退。
+
 SSH 大文件传输丢包时，可用 `release_transfer.py --package <已校验包> --host <SSH目标>
 --remote-release /opt/sub2api/releases/<目录> --proxy http://127.0.0.1:7897 --output <传输证据.json>`
 中转同一 payload。它只创建 fork 内的临时私有草稿资产，不公开发布；Git 凭证只在本机内存中
