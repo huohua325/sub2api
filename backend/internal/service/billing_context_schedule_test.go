@@ -206,7 +206,7 @@ func scheduleScenarios() []scheduleScenario {
 			},
 		},
 		{
-			name: "分组 token 价卡整张替换渠道定价并剥区间", model: "claude-sonnet-4", platform: PlatformAnthropic, groupPlatform: PlatformAnthropic,
+			name: "分组 token 价卡及其区间替换渠道定价", model: "claude-sonnet-4", platform: PlatformAnthropic, groupPlatform: PlatformAnthropic,
 			group: &Group{ID: 100, Platform: PlatformAnthropic, LongContextPricingEnabled: true, ModelPricing: []ChannelModelPricing{{
 				Models: []string{"claude-sonnet-*"}, BillingMode: BillingModeToken, InputPrice: p(1e-6),
 				Intervals: []PricingInterval{{MinTokens: 200000, InputMultiplier: p(5)}},
@@ -214,8 +214,9 @@ func scheduleScenarios() []scheduleScenario {
 			channel:   sonnetChannel(PricingInterval{MinTokens: 200000, InputMultiplier: p(3)}),
 			wantBasis: ContextPricingBasisWholeRequest,
 			check: func(t *testing.T, s *ContextPricingSchedule) {
-				require.Len(t, s.Tiers, 1)
-				requireTier(t, s.Tiers[0], 0, nil, "", p(1e-6), p(15e-6), p(3.75e-6), p(0.3e-6))
+				require.Len(t, s.Tiers, 2)
+				requireTier(t, s.Tiers[0], 0, intPtr(200000), "≤200K", p(1e-6), p(15e-6), p(3.75e-6), p(0.3e-6))
+				requireTier(t, s.Tiers[1], 200000, nil, ">200K", p(5e-6), p(15e-6), p(3.75e-6), p(0.3e-6))
 			},
 		},
 		{

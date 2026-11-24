@@ -15,8 +15,9 @@ func TestOpenAIGatewayServiceRecordUsage_AggregatorClaudeUsesDefaultPricing(t *t
 		for _, model := range []string{"claude-sonnet-4-6", "anthropic/claude-sonnet-4-6"} {
 			t.Run(platform+"/"+model, func(t *testing.T) {
 				usageRepo := &openAIRecordUsageLogRepoStub{inserted: true}
+				billingRepo := &openAIRecordUsageBillingRepoStub{}
 				userRepo := &openAIRecordUsageUserRepoStub{}
-				svc := newOpenAIRecordUsageServiceForTest(usageRepo, userRepo, &openAIRecordUsageSubRepoStub{}, nil)
+				svc := newOpenAIRecordUsageServiceWithBillingRepoForTest(usageRepo, billingRepo, userRepo, &openAIRecordUsageSubRepoStub{}, nil)
 				svc.resolver = NewModelPricingResolver(nil, svc.billingService)
 				group := &Group{ID: 1, Platform: platform, RateMultiplier: 1.1}
 				usage := OpenAIUsage{InputTokens: 1000, OutputTokens: 200}
@@ -32,8 +33,7 @@ func TestOpenAIGatewayServiceRecordUsage_AggregatorClaudeUsesDefaultPricing(t *t
 				require.Equal(t, usage.OutputTokens, usageRepo.lastLog.OutputTokens)
 				require.InDelta(t, expected.TotalCost, usageRepo.lastLog.TotalCost, 1e-12)
 				require.InDelta(t, expected.ActualCost, usageRepo.lastLog.ActualCost, 1e-12)
-				require.Equal(t, 1, userRepo.deductCalls)
-				require.InDelta(t, expected.ActualCost, userRepo.lastAmount, 1e-12)
+				requireExperimentBilling(t, billingRepo, expected.ActualCost)
 			})
 		}
 	}
@@ -69,8 +69,9 @@ func TestOpenAIGatewayServiceRecordUsage_CNAndOpenCodeClaudeHonorExplicitPricing
 		for _, source := range []string{PricingSourceGroup, PricingSourceChannel} {
 			t.Run(platform+"/"+source, func(t *testing.T) {
 				usageRepo := &openAIRecordUsageLogRepoStub{inserted: true}
+				billingRepo := &openAIRecordUsageBillingRepoStub{}
 				userRepo := &openAIRecordUsageUserRepoStub{}
-				svc := newOpenAIRecordUsageServiceForTest(usageRepo, userRepo, &openAIRecordUsageSubRepoStub{}, nil)
+				svc := newOpenAIRecordUsageServiceWithBillingRepoForTest(usageRepo, billingRepo, userRepo, &openAIRecordUsageSubRepoStub{}, nil)
 				group := &Group{ID: 1, Platform: platform, RateMultiplier: 1.25}
 				inputPrice, outputPrice := 1e-6, 2e-6
 				pricing := ChannelModelPricing{
@@ -99,8 +100,7 @@ func TestOpenAIGatewayServiceRecordUsage_CNAndOpenCodeClaudeHonorExplicitPricing
 				require.NotNil(t, usageRepo.lastLog)
 				require.InDelta(t, expectedTotal, usageRepo.lastLog.TotalCost, 1e-12)
 				require.InDelta(t, expectedActual, usageRepo.lastLog.ActualCost, 1e-12)
-				require.Equal(t, 1, userRepo.deductCalls)
-				require.InDelta(t, expectedActual, userRepo.lastAmount, 1e-12)
+				requireExperimentBilling(t, billingRepo, expectedActual)
 			})
 		}
 	}

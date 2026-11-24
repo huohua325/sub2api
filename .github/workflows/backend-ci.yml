@@ -9,7 +9,8 @@ permissions:
 
 jobs:
   shell:
-    runs-on: macos-15
+    # The Apple container CLI is mocked, so these tests can run on Intel macOS.
+    runs-on: macos-15-intel
     steps:
       - uses: actions/checkout@v6
       - name: Check deployment scripts
@@ -132,6 +133,8 @@ jobs:
       RUN_DELIVERY_POSTGRES: '1'
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v6
         with:
           python-version: '3.13'

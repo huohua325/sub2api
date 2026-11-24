@@ -688,7 +688,7 @@ func formatOptionalTime(v *time.Time) string {
 
 func writeCSV(rows [][]string) ([]byte, error) {
 	var buf bytes.Buffer
-	buf.Write([]byte{0xEF, 0xBB, 0xBF})
+	_, _ = buf.Write([]byte{0xEF, 0xBB, 0xBF})
 	w := csv.NewWriter(&buf)
 	w.UseCRLF = true
 	for _, row := range rows {

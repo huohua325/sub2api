@@ -311,7 +311,7 @@ func TestCodingQuotaDBAPIFallbackDraftAndSendTimeRevocation(t *testing.T) {
 	view, err := r.ReadAPIFallback(t.Context(), 1)
 	require.NoError(t, err)
 	require.Len(t, view.Policies, 2)
-	_, err = r.FindAPIFallbackPolicy(t.Context(), 1, "openai", fmt.Sprint("not-existing"))
+	_, err = r.FindAPIFallbackPolicy(t.Context(), 1, "openai", "not-existing")
 	require.NoError(t, err)
 }
 

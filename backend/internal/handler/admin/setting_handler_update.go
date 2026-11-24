@@ -379,10 +379,10 @@ type UpdateSettingsRequest struct {
 	OpenAIFastPolicySettings *dto.OpenAIFastPolicySettings `json:"openai_fast_policy_settings,omitempty"`
 
 	// 系统全局 platform quota 默认值（整体替换语义：nil = 不修改，non-nil = 整体覆盖）。
-	DefaultPlatformQuotas  map[string]*service.DefaultPlatformQuotaSetting `json:"default_platform_quotas"`
-	PurposeAllowancePolicy *service.PurposeAllowancePolicy                 `json:"purpose_allowance_policy"`
-	OfficialPointBudget *service.OfficialPointBudget                     `json:"official_point_budget"`
-	OfficialPointStudentPercent *bool                                    `json:"official_point_student_percent"`
+	DefaultPlatformQuotas       map[string]*service.DefaultPlatformQuotaSetting `json:"default_platform_quotas"`
+	PurposeAllowancePolicy      *service.PurposeAllowancePolicy                 `json:"purpose_allowance_policy"`
+	OfficialPointBudget         *service.OfficialPointBudget                    `json:"official_point_budget"`
+	OfficialPointStudentPercent *bool                                           `json:"official_point_student_percent"`
 
 	// 各平台账号自动停调阈值（整体替换语义：nil = 不修改，non-nil = 整体覆盖）。
 	AccountSchedulingThresholds map[string]int `json:"account_scheduling_thresholds"`

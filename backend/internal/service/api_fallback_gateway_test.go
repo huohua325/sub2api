@@ -138,7 +138,9 @@ func TestAPIFallbackPrimaryPoolStrictReasons(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			s, _, _, p := fallbackGatewayFixture()
-			tc.mutate(s.accountRepo.(*fallbackGatewayAccounts), p)
+			accounts, ok := s.accountRepo.(*fallbackGatewayAccounts)
+			require.True(t, ok)
+			tc.mutate(accounts, p)
 			v, e := s.EvaluateAPIFallbackPrimaryPool(t.Context(), p)
 			require.NoError(t, e)
 			require.Equal(t, tc.want, v.Eligible)
@@ -166,7 +168,9 @@ func TestAPIFallbackExperimentDispatch(t *testing.T) {
 			p.PrimaryAccountIDs, p.PrimaryEvidence, p.BackupAccountIDs, p.ExpiresAt = nil, nil, nil, nil
 			if tc.expired {
 				expiry := time.Now().Add(-time.Hour)
-				primary := &s.accountRepo.(*fallbackGatewayAccounts).rows[0]
+				accounts, ok := s.accountRepo.(*fallbackGatewayAccounts)
+				require.True(t, ok)
+				primary := &accounts.rows[0]
 				primary.ExpiresAt, primary.AutoPauseOnExpired = &expiry, true
 			}
 			c, _ := gin.CreateTestContext(httptest.NewRecorder())
@@ -282,7 +286,8 @@ func TestAPIFallbackNativeBothPlatformsAndPinnedContinuation(t *testing.T) {
 				model = "grok-4.7"
 			}
 			p.Platform, p.Model = platform, model
-			accounts := s.accountRepo.(*fallbackGatewayAccounts)
+			accounts, ok := s.accountRepo.(*fallbackGatewayAccounts)
+			require.True(t, ok)
 			for i := range accounts.rows {
 				accounts.rows[i].Platform = platform
 			}
@@ -309,7 +314,8 @@ func TestAPIFallbackPausedShadowCannotAuthorizePaidParent(t *testing.T) {
 	for _, state := range []string{"active", "disabled", "unschedulable"} {
 		t.Run(state, func(t *testing.T) {
 			s, _, _, p := fallbackGatewayFixture()
-			r := s.accountRepo.(*fallbackGatewayAccounts)
+			r, ok := s.accountRepo.(*fallbackGatewayAccounts)
+			require.True(t, ok)
 			parent := r.rows[0]
 			shadow := Account{ID: 11, ParentAccountID: &parent.ID, Platform: PlatformOpenAI, Type: AccountTypeOAuth, Status: StatusActive, Schedulable: true}
 			if state == "disabled" {

@@ -20,6 +20,7 @@ func TestRecordUsage_ImageReasoningPricing(t *testing.T) {
 						name := fmt.Sprintf("%s/%s/%s/independent=%t/effort=%s", platform, source, mode, independent, effort)
 						t.Run(name, func(t *testing.T) {
 							usageRepo := &openAIRecordUsageLogRepoStub{inserted: true}
+							billingRepo := &openAIRecordUsageBillingRepoStub{}
 							userRepo := &openAIRecordUsageUserRepoStub{}
 							subRepo := &openAIRecordUsageSubRepoStub{}
 							groupID := int64(77)
@@ -49,7 +50,7 @@ func TestRecordUsage_ImageReasoningPricing(t *testing.T) {
 								forwardedEffort = &effort
 							}
 							if platform == PlatformAnthropic {
-								svc := newGatewayRecordUsageServiceForTest(usageRepo, userRepo, subRepo)
+								svc := newGatewayRecordUsageServiceWithBillingRepoForTest(usageRepo, billingRepo, userRepo, subRepo)
 								svc.resolver = resolver
 								require.NoError(t, svc.RecordUsage(context.Background(), &RecordUsageInput{
 									Result: &ForwardResult{
@@ -59,7 +60,7 @@ func TestRecordUsage_ImageReasoningPricing(t *testing.T) {
 									APIKey: apiKey, User: user, Account: account,
 								}))
 							} else {
-								svc := newOpenAIRecordUsageServiceForTest(usageRepo, userRepo, subRepo, nil)
+								svc := newOpenAIRecordUsageServiceWithBillingRepoForTest(usageRepo, billingRepo, userRepo, subRepo, nil)
 								svc.resolver = resolver
 								require.NoError(t, svc.RecordUsage(context.Background(), &OpenAIRecordUsageInput{
 									Result: &OpenAIForwardResult{
@@ -80,7 +81,7 @@ func TestRecordUsage_ImageReasoningPricing(t *testing.T) {
 							require.NotNil(t, usageRepo.lastLog)
 							require.InDelta(t, wantTotal, usageRepo.lastLog.TotalCost, 1e-12)
 							require.InDelta(t, wantTotal*wantRate, usageRepo.lastLog.ActualCost, 1e-12)
-							require.InDelta(t, wantTotal*wantRate, userRepo.lastAmount, 1e-12)
+							requireExperimentBilling(t, billingRepo, wantTotal*wantRate)
 							require.Equal(t, forwardedEffort, usageRepo.lastLog.ReasoningEffort)
 							require.Equal(t, 2, usageRepo.lastLog.ImageCount)
 							require.Equal(t, string(mode), *usageRepo.lastLog.BillingMode)

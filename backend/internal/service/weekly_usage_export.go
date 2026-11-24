@@ -341,10 +341,6 @@ func mapExportQueryErr(err error) error {
 	return err
 }
 
-type userAggRow struct {
-	WeeklyUserInput
-}
-
 func (s *WeeklyUsageExportService) collect(ctx context.Context, tx *sql.Tx, start, end, upper, now time.Time, current bool, actorID int64, filter usageSliceFilter) ([]WeeklyUserInput, []WeeklyAccountInput, []weeklySnapshot, error) {
 	users, err := loadUserAggs(ctx, tx, start, upper, filter)
 	if err != nil {
@@ -591,7 +587,7 @@ GROUP BY ul.user_id, ul.group_id, ` + resolvedPlatformExpr
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []WeeklyUserInput
 	index := map[string]int{}
 	for rows.Next() {
@@ -737,7 +733,7 @@ func queryKeyed(ctx context.Context, tx *sql.Tx, query string, start, upper time
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		if err := fn(rows); err != nil {
 			return err
@@ -792,7 +788,7 @@ func loadUsersByIDs(ctx context.Context, tx *sql.Tx, ids []int64) (map[int64]loa
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	out := map[int64]loadedUser{}
 	for rows.Next() {
 		var id int64

@@ -194,12 +194,22 @@ func TestGatewayServiceRecordUsage_PreservesRequestedAndUpstreamModels(t *testin
 	require.Equal(t, mappedModel, *usageRepo.lastLog.UpstreamModel)
 }
 
+func requireExperimentBilling(t *testing.T, repo *openAIRecordUsageBillingRepoStub, expected float64) {
+	t.Helper()
+	require.Equal(t, 1, repo.calls)
+	require.NotNil(t, repo.lastCmd)
+	require.Equal(t, PurposeExperiment, repo.lastCmd.Purpose)
+	require.InDelta(t, expected, repo.lastCmd.PurposeCost, 1e-12)
+	require.Zero(t, repo.lastCmd.BalanceCost)
+}
+
 func TestGatewayServiceRecordUsage_GeminiFlashThinkingTierUsesCatalogPrice(t *testing.T) {
 	for _, baseModel := range []string{"gemini-3.7-flash", "gemini-3.8-flash"} {
 		t.Run(baseModel, func(t *testing.T) {
 			usageRepo := &openAIRecordUsageLogRepoStub{inserted: true}
 			userRepo := &openAIRecordUsageUserRepoStub{}
-			svc := newGatewayRecordUsageServiceForTest(usageRepo, userRepo, &openAIRecordUsageSubRepoStub{})
+			billingRepo := &openAIRecordUsageBillingRepoStub{}
+			svc := newGatewayRecordUsageServiceWithBillingRepoForTest(usageRepo, billingRepo, userRepo, &openAIRecordUsageSubRepoStub{})
 			svc.billingService = NewBillingService(svc.cfg, &PricingService{pricingData: map[string]*LiteLLMModelPricing{
 				baseModel: {InputCostPerToken: 0.75e-6, OutputCostPerToken: 3.75e-6, CacheReadInputTokenCost: 0.075e-6},
 			}})
@@ -225,7 +235,7 @@ func TestGatewayServiceRecordUsage_GeminiFlashThinkingTierUsesCatalogPrice(t *te
 			require.Equal(t, model, usageRepo.lastLog.Model)
 			require.InDelta(t, 0.02007585, usageRepo.lastLog.TotalCost, 1e-12)
 			require.InDelta(t, 0.0030113775, usageRepo.lastLog.ActualCost, 1e-12)
-			require.InDelta(t, 0.0030113775, userRepo.lastAmount, 1e-12)
+			requireExperimentBilling(t, billingRepo, 0.0030113775)
 		})
 	}
 }
