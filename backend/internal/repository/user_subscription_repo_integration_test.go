@@ -40,7 +40,7 @@ func (s *UserSubscriptionRepoSuite) mustCreateUser(email string, role string) *s
 	}
 
 	u, err := s.client.User.Create().
-		SetEmail(email).
+		SetEmail("subscription-" + email).
 		SetPasswordHash("test-password-hash").
 		SetStatus(service.StatusActive).
 		SetRole(role).

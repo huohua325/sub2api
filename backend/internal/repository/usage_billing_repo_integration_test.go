@@ -661,7 +661,7 @@ func TestUsageBillingRepositoryApply_DeduplicatesAgainstArchivedKey(t *testing.T
 	require.InDelta(t, 98.75, balance, 0.000001)
 }
 
-func TestUsageBillingRepositoryApply_KeepsCustomPurposeLimit(t *testing.T) {
+func TestUsageBillingRepositoryApply_KeepsCustomExperimentLimit(t *testing.T) {
 	ctx := context.Background()
 	client := testEntClient(t)
 	repo := NewUsageBillingRepository(client, integrationDB)
@@ -699,15 +699,15 @@ func TestUsageBillingRepositoryApply_KeepsCustomPurposeLimit(t *testing.T) {
 	})
 	_, err = integrationDB.ExecContext(ctx, `
 		INSERT INTO user_purpose_allowances (user_id, purpose, limit_amount, used_amount, period, window_start)
-		VALUES ($1, $2, 80, 10, 'month', NOW())
-	`, user.ID, service.PurposeOpenAI)
+		VALUES ($1, $2, 80, 10, 'week', NOW())
+	`, user.ID, service.PurposeExperiment)
 	require.NoError(t, err)
 
 	result, err := repo.Apply(ctx, &service.UsageBillingCommand{
 		RequestID:   uuid.NewString(),
 		APIKeyID:    apiKey.ID,
 		UserID:      user.ID,
-		Purpose:     service.PurposeOpenAI,
+		Purpose:     service.PurposeExperiment,
 		PurposeCost: 1.25,
 	})
 	require.NoError(t, err)
@@ -720,8 +720,8 @@ func TestUsageBillingRepositoryApply_KeepsCustomPurposeLimit(t *testing.T) {
 		SELECT limit_amount, used_amount, period
 		FROM user_purpose_allowances
 		WHERE user_id = $1 AND purpose = $2
-	`, user.ID, service.PurposeOpenAI).Scan(&limitAmount, &usedAmount, &period))
+	`, user.ID, service.PurposeExperiment).Scan(&limitAmount, &usedAmount, &period))
 	require.InDelta(t, 80, limitAmount, 0.000001)
-	require.Equal(t, "month", period)
+	require.Equal(t, "week", period)
 	require.InDelta(t, 11.25, usedAmount, 0.000001)
 }
