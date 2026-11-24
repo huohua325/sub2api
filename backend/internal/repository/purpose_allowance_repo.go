@@ -31,7 +31,7 @@ func (r *purposeAllowanceRepository) List(ctx context.Context, userID int64) ([]
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	out := make([]service.PurposeAllowance, 0, 3)
 	for rows.Next() {
 		var item service.PurposeAllowance

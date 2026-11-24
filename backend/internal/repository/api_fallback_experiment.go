@@ -28,7 +28,7 @@ func (r *UsageMonitorRepository) listExperimentStandbyKeys(ctx context.Context, 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	keys := []service.APIFallbackExperimentKey{}
 	for rows.Next() {
 		var key service.APIFallbackExperimentKey

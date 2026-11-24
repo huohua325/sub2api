@@ -826,7 +826,7 @@ WHERE deleted_at IS NULL AND platform IN ('openai', 'grok') AND user_id = ANY($1
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var row quotaRow
 		var limit sql.NullFloat64
@@ -910,7 +910,7 @@ WHERE q.deleted_at IS NULL AND q.platform IN ('openai', 'grok') AND q.weekly_lim
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	mode := quotaWeekModeTx(ctx, tx)
 	var out []WeeklyUserInput
 	for rows.Next() {
@@ -948,7 +948,7 @@ ORDER BY platform, name, id`)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []parentAccount
 	for rows.Next() {
 		var item parentAccount
@@ -986,7 +986,7 @@ ORDER BY g.name`, pq.Array(ids))
 	if err != nil {
 		return err
 	}
-	defer queryRows.Close()
+	defer func() { _ = queryRows.Close() }()
 	grouped := map[int64][]string{}
 	for queryRows.Next() {
 		var id int64
@@ -1026,7 +1026,7 @@ GROUP BY 1`, start, upper, pq.Array(ids))
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var id int64
 		var item parentUsage
@@ -1049,7 +1049,7 @@ GROUP BY 1`, start, upper)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	out := map[string]float64{}
 	for rows.Next() {
 		var platform string
@@ -1078,7 +1078,7 @@ ORDER BY account_id, exported_at DESC`, pq.Array(ids), before)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		snap, err := scanSnapshot(rows)
 		if err != nil {
@@ -1103,7 +1103,7 @@ ORDER BY account_id, exported_at DESC`, pq.Array(ids), weekStart)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		snap, err := scanSnapshot(rows)
 		if err != nil {
@@ -1137,7 +1137,7 @@ ORDER BY s.account_id, s.exported_at DESC`, pq.Array(ids), pq.Array(times))
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		snap, err := scanSnapshot(rows)
 		if err != nil {
@@ -1206,7 +1206,7 @@ GROUP BY 1`, pq.Array(ids), pq.Array(times), exportedAt)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var id int64
 		var pair costPair
@@ -1342,7 +1342,7 @@ WHERE q.deleted_at IS NULL AND q.platform IN ('openai', 'grok') AND q.weekly_lim
 	if err != nil {
 		return nil, nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	mode := quotaWeekModeTx(ctx, tx)
 	limits := map[string]float64{}
 	blocked := map[string]float64{}

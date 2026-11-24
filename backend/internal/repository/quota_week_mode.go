@@ -39,7 +39,7 @@ func (r *userPlatformQuotaRepository) QuotaWeekMode(ctx context.Context) string 
 	mode := service.PlatformQuotaWeekModeRegistration
 	rows, err := r.client.QueryContext(ctx, `SELECT value FROM settings WHERE key = $1`, service.SettingKeyPlatformQuotaWeekMode)
 	if err == nil {
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 		if rows.Next() {
 			var raw string
 			if scanErr := rows.Scan(&raw); scanErr == nil {
