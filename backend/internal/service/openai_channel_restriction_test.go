@@ -141,11 +141,12 @@ func TestIsUpstreamModelRestrictedByChannel_CompactMappingMatchesForwardPath(t *
 				mapping.MappedModel,
 				tt.useCompactModelMapping,
 			)
+			requestAccount := *account
 			require.False(t, svc.isUpstreamModelRestrictedByChannel(
-				ctx, 10, account, "gpt-5.4", true,
+				ctx, 10, &requestAccount, "gpt-5.4", true,
 			))
 			require.True(t, svc.isUpstreamModelRestrictedByChannel(
-				context.Background(), 10, account, "gpt-5.4", true,
+				context.Background(), 10, &requestAccount, "gpt-5.4", true,
 			), "without the forward-model context the restriction check follows a different chain")
 		})
 	}

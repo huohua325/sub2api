@@ -297,7 +297,9 @@ func assertAnthropicCacheCreationOverrideCosts(t *testing.T, result *ForwardResu
 		require.InDelta(t, wantTotalCost, usageRepo.lastLog.TotalCost, 1e-12)
 		require.InDelta(t, wantTotalCost*0.5, usageRepo.lastLog.ActualCost, 1e-12)
 		require.Equal(t, 1, billingRepo.calls)
-		require.InDelta(t, wantTotalCost*0.5, billingRepo.lastCmd.BalanceCost, 1e-12)
+		require.Equal(t, PurposeExperiment, billingRepo.lastCmd.Purpose)
+		require.InDelta(t, wantTotalCost*0.5, billingRepo.lastCmd.PurposeCost, 1e-12)
+		require.Zero(t, billingRepo.lastCmd.BalanceCost)
 		require.NotNil(t, usageRepo.lastLog.AccountStatsCost)
 		require.InDelta(t, wantTotalCost*statsMultiplier, *usageRepo.lastLog.AccountStatsCost, 1e-12)
 	}

@@ -25,6 +25,15 @@ type keyBillingUserGroupRateRepo struct {
 	lookupCalls int
 }
 
+type keyBillingDisplayGroupRepo struct {
+	service.GroupRepository
+	group *service.Group
+}
+
+func (r keyBillingDisplayGroupRepo) GetByIDLite(_ context.Context, _ int64) (*service.Group, error) {
+	return r.group, nil
+}
+
 func (r *keyBillingUserGroupRateRepo) GetByUserAndGroup(_ context.Context, userID, groupID int64) (*float64, error) {
 	r.gotUserID = userID
 	r.gotGroupID = groupID
@@ -133,6 +142,31 @@ func TestGatewayHandlerKeyBillingInfoUsesUserOverride(t *testing.T) {
 	require.Equal(t, 0.5, *got.UserRateMultiplier)
 	require.Equal(t, 0.5, got.ResolvedRateMultiplier)
 	require.Equal(t, 0.5, got.EffectiveRateMultiplier)
+}
+
+func TestGatewayHandlerKeyBillingInfoGroupPreviewOnlyForAdmin(t *testing.T) {
+	groupID := int64(7)
+	group := &service.Group{ID: groupID, Name: "group-name", Description: "group-description", RateMultiplier: 0.75}
+	handler := newKeyBillingHandler(nil)
+	handler.apiKeyService = service.NewAPIKeyService(nil, nil, keyBillingDisplayGroupRepo{group: group}, nil, nil, nil, nil)
+	for _, role := range []string{service.RoleUser, service.RoleAdmin} {
+		t.Run(role, func(t *testing.T) {
+			c, w := newKeyBillingContext(&service.APIKey{
+				UserID: 11, User: &service.User{ID: 11, Role: role}, GroupID: &groupID, Group: group,
+			})
+			c.Request.URL.RawQuery = "include=group"
+			handler.KeyBillingInfo(c)
+			require.Equal(t, http.StatusOK, w.Code)
+			var result keyBillingInfoResponse
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &result))
+			require.Equal(t, 0.75, result.ResolvedRateMultiplier)
+			if role == service.RoleAdmin {
+				require.Equal(t, &service.BillingGroupInfo{Name: group.Name, Description: group.Description}, result.BillingGroupInfo)
+			} else {
+				require.Nil(t, result.BillingGroupInfo)
+			}
+		})
+	}
 }
 
 func TestBuildKeyBillingInfoAppliesPeakMultiplier(t *testing.T) {

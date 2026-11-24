@@ -530,7 +530,6 @@ func TestParseAnthropicSSEField(t *testing.T) {
 }
 
 func TestHandleResponsesBufferedStreamingResponse_CompactSSEFormat(t *testing.T) {
-	t.Parallel()
 	gin.SetMode(gin.TestMode)
 
 	rec := httptest.NewRecorder()
@@ -561,7 +560,6 @@ func TestHandleResponsesBufferedStreamingResponse_CompactSSEFormat(t *testing.T)
 }
 
 func TestHandleResponsesStreamingResponse_CompactSSEFormat(t *testing.T) {
-	t.Parallel()
 	gin.SetMode(gin.TestMode)
 
 	rec := httptest.NewRecorder()

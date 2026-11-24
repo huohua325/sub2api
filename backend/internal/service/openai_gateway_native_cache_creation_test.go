@@ -220,7 +220,9 @@ func assertNativeCacheRecordUsageWithSettings(t *testing.T, result *OpenAIForwar
 	totalCost := float64(uncachedInput)*0.001 + float64(result.Usage.OutputTokens)*0.002 + float64(result.Usage.CacheReadInputTokens)*0.0001 + cacheCost
 	require.InDelta(t, totalCost, usageRepo.lastLog.TotalCost, 1e-12)
 	require.InDelta(t, totalCost*0.5, usageRepo.lastLog.ActualCost, 1e-12)
-	require.InDelta(t, totalCost*0.5, billingRepo.lastCmd.BalanceCost, 1e-12)
+	require.Equal(t, PurposeExperiment, billingRepo.lastCmd.Purpose)
+	require.InDelta(t, totalCost*0.5, billingRepo.lastCmd.PurposeCost, 1e-12)
+	require.Zero(t, billingRepo.lastCmd.BalanceCost)
 	require.NotNil(t, usageRepo.lastLog.AccountStatsCost)
 	require.InDelta(t, totalCost*10, *usageRepo.lastLog.AccountStatsCost, 1e-12)
 }
