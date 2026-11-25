@@ -59,8 +59,13 @@ const base = '/admin/development-workspace'
 const taskURL = (id: string) => `${base}/tasks/${encodeURIComponent(id)}`
 
 export const developmentWorkspaceAPI = {
-  nativeTicket: async () =>
-    (await apiClient.post<NativeWorkspaceTicket>(`${base}/native-ticket`)).data,
+  nativeTicket: async (next?: string) => {
+    const trimmed = typeof next === 'string' && next.startsWith('/') && !next.startsWith('//') ? next : ''
+    const response = trimmed
+      ? await apiClient.post<NativeWorkspaceTicket>(`${base}/native-ticket`, { next: trimmed })
+      : await apiClient.post<NativeWorkspaceTicket>(`${base}/native-ticket`)
+    return response.data
+  },
   status: async (signal: AbortSignal) =>
     (await apiClient.get<WorkspaceStatus>(`${base}/status`, { signal })).data,
   list: async (signal: AbortSignal) =>

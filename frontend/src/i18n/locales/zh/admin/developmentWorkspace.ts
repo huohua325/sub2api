@@ -1,6 +1,6 @@
 export default {
   title: '开发工作台',
-  nativePairError: '暂时无法打开 T3 Code，请重新进入开发工作台。',
+  nativePairError: '暂时无法打开开发工作台，请重新进入或检查服务端状态。',
   tasks: '任务',
   newTask: '新建任务',
   noTasks: '暂无任务',
@@ -24,7 +24,7 @@ export default {
   noMessages: '等待对话开始',
   noActivity: '暂无运行记录',
   noChanges: '暂无文件改动记录',
-  disabled: '开发工作台尚未启用。请先在服务器配置 T3 连接。',
+  disabled: '开发工作台尚未启用。请先在服务器配置工作台网关连接。',
   statusError: '无法获取开发工作台状态。',
   listError: '无法刷新任务列表。',
   detailError: '无法读取此任务。请检查链接或重试。',

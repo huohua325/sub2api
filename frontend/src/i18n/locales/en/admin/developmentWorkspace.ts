@@ -1,6 +1,6 @@
 export default {
   title: 'Development Workspace',
-  nativePairError: 'Could not open T3 Code. Try opening the workspace again.',
+  nativePairError: 'Could not open the development workspace. Please try again or check the runner status.',
   tasks: 'Tasks',
   newTask: 'New task',
   noTasks: 'No tasks yet',
@@ -24,7 +24,7 @@ export default {
   noMessages: 'Waiting for the conversation',
   noActivity: 'No activity reported',
   noChanges: 'No file changes reported',
-  disabled: 'The development workspace is disabled. Configure its T3 connection on the server to enable it.',
+  disabled: 'The development workspace is disabled. Configure its workspace gateway connection on the server to enable it.',
   statusError: 'Could not check the development workspace status.',
   listError: 'Could not refresh the task list.',
   detailError: 'Could not load this task. Check the link or retry.',

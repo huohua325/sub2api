@@ -39,11 +39,23 @@ func TestNativeT3RequiresLiveAdminSession(t *testing.T) {
 	}
 	access, err := auth.generateAccessToken(user, "family", "")
 	require.NoError(t, err)
+	identity, err := auth.InspectT3BrowserSession(ctx, access)
+	require.NoError(t, err)
+	require.Equal(t, user.ID, identity.UserID)
+	require.Equal(t, "family", identity.SessionID)
 	require.NoError(t, auth.ValidateT3BrowserSession(ctx, access))
+	require.NoError(t, auth.ValidateT3SessionIdentity(ctx, identity))
 
 	user.Role = RoleUser
 	require.ErrorIs(t, auth.ValidateT3BrowserSession(ctx, access), ErrInvalidToken)
+	require.ErrorIs(t, auth.ValidateT3SessionIdentity(ctx, identity), ErrInvalidToken)
+
 	user.Role = RoleAdmin
+	user.TokenVersion++
+	require.ErrorIs(t, auth.ValidateT3SessionIdentity(ctx, identity), ErrInvalidToken)
+	user.TokenVersion--
+
 	family.active = nil
 	require.ErrorIs(t, auth.ValidateT3BrowserSession(ctx, access), ErrInvalidToken)
+	require.ErrorIs(t, auth.ValidateT3SessionIdentity(ctx, identity), ErrInvalidToken)
 }

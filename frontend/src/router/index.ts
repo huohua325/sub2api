@@ -497,7 +497,7 @@ const routes: RouteRecordRaw[] = [
     path: '/admin/development-workspace',
     name: 'AdminDevelopmentWorkspace',
     component: () => import('@/views/admin/DevelopmentWorkspaceView.vue'),
-    beforeEnter: async () => {
+    beforeEnter: async (to) => {
       try {
         if (nativeWorkspaceUrl) {
           const { apiClient } = await import('@/api/client')
@@ -507,7 +507,10 @@ const routes: RouteRecordRaw[] = [
           window.location.assign(url.href)
         } else {
           const { developmentWorkspaceAPI } = await import('@/api/admin/developmentWorkspace')
-          submitNativeWorkspaceTicket(await developmentWorkspaceAPI.nativeTicket())
+          const nextPath = typeof to.query.next === 'string' && to.query.next.startsWith('/') && !to.query.next.startsWith('//')
+            ? to.query.next
+            : undefined
+          submitNativeWorkspaceTicket(await developmentWorkspaceAPI.nativeTicket(nextPath))
         }
         return false
       } catch (error: unknown) {
@@ -986,9 +989,11 @@ router.beforeEach(async (to, _from, next) => {
   // Route requires authentication
   if (!authStore.isAuthenticated) {
     // Not authenticated, redirect to login
+    const hasWorkspaceNext = to.name === 'AdminDevelopmentWorkspace' &&
+      typeof to.query.next === 'string' && to.query.next.startsWith('/') && !to.query.next.startsWith('//')
     next({
       path: '/login',
-      query: { redirect: to.name === 'AdminDevelopmentWorkspace' ? '/admin/dashboard' : to.fullPath }
+      query: { redirect: to.name === 'AdminDevelopmentWorkspace' && !hasWorkspaceNext ? '/admin/dashboard' : to.fullPath }
     })
     return
   }

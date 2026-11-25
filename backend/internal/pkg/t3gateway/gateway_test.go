@@ -233,3 +233,106 @@ func TestGatewayClosesWebSocketWhenAdministratorLosesAccess(t *testing.T) {
 		t.Fatalf("revoked session was able to reconnect: %d", res.Code)
 	}
 }
+
+func TestGatewayDeepLinkRedirectAndPostPairRestore(t *testing.T) {
+	g := fixture(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("proxied:" + r.URL.RequestURI()))
+	}), nil, nil)
+
+	// Browser HTML navigation without a cookie redirects smoothly to MILE admin with ?next=...
+	navReq := httptest.NewRequest(http.MethodGet, "/threads/abc?tab=diff", nil)
+	navReq.Host = g.Host()
+	navReq.Header.Set("User-Agent", testAgent)
+	navReq.Header.Set("Accept", "text/html,application/xhtml+xml")
+	navRes := httptest.NewRecorder()
+	g.ServeHTTP(navRes, navReq)
+	if navRes.Code != http.StatusSeeOther {
+		t.Fatalf("expected 303 redirect for HTML navigation, got %d", navRes.Code)
+	}
+	wantRedirect := testAdmin + "/admin/development-workspace?next=%2Fthreads%2Fabc%3Ftab%3Ddiff"
+	if navRes.Header().Get("Location") != wantRedirect {
+		t.Fatalf("redirect location = %q, want %q", navRes.Header().Get("Location"), wantRedirect)
+	}
+
+	// API requests with Accept: text/html still get 401 (never redirected).
+	apiReq := httptest.NewRequest(http.MethodGet, "/api/threads", nil)
+	apiReq.Host = g.Host()
+	apiReq.Header.Set("User-Agent", testAgent)
+	apiReq.Header.Set("Accept", "text/html")
+	apiRes := httptest.NewRecorder()
+	g.ServeHTTP(apiRes, apiReq)
+	if apiRes.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 for API path, got %d", apiRes.Code)
+	}
+
+	// Issue a ticket carrying the deep link, enter, and confirm `/` restores the deep link once.
+	ticket, err := g.IssueWithNext(context.Background(), testBearer, testAgent, "/threads/abc?tab=diff")
+	if err != nil {
+		t.Fatal(err)
+	}
+	enterRes := request(t, g, http.MethodPost, enterPath, testAdmin, testAgent, url.Values{"ticket": {ticket.Ticket}})
+	if enterRes.Code != http.StatusSeeOther || enterRes.Header().Get("Location") != "/pair#token=native-pair-code" {
+		t.Fatalf("unexpected enter response: %d %q", enterRes.Code, enterRes.Header().Get("Location"))
+	}
+	cookies := enterRes.Result().Cookies()
+	if len(cookies) != 2 {
+		t.Fatalf("expected session + next cookies, got %d", len(cookies))
+	}
+	rootRes := request(t, g, http.MethodGet, "/", "", testAgent, nil, cookies...)
+	if rootRes.Code != http.StatusSeeOther || rootRes.Header().Get("Location") != "/threads/abc?tab=diff" {
+		t.Fatalf("expected deep-link restore redirect, got %d %q", rootRes.Code, rootRes.Header().Get("Location"))
+	}
+
+	// Subsequent visit to `/` without the one-time next cookie proxies normally.
+	plainRes := request(t, g, http.MethodGet, "/", "", testAgent, nil, cookies[0])
+	if plainRes.Code != http.StatusOK || plainRes.Body.String() != "proxied:/" {
+		t.Fatalf("expected normal proxy after next consumed, got %d %q", plainRes.Code, plainRes.Body.String())
+	}
+}
+
+func TestGatewaySanitizeNextPathRejectsUnsafeTargets(t *testing.T) {
+	for _, bad := range []string{
+		"", "/", "//evil.test/x", "https://evil.test/x", "/\\evil", "/_mile/enter",
+		"/pair", "/pair#token=x", "/api/auth/pairing-token", "/mcp", "/assets/app.js",
+		"/threads/a\r\nb",
+	} {
+		if got := SanitizeNextPath(bad); got != "" {
+			t.Fatalf("SanitizeNextPath(%q) = %q, want empty", bad, got)
+		}
+	}
+	if got := SanitizeNextPath("/threads/123?view=files"); got != "/threads/123?view=files" {
+		t.Fatalf("unexpected sanitized deep link: %q", got)
+	}
+}
+
+func TestGatewaySharedStoreSurvivesRestart(t *testing.T) {
+	shared := newMemoryStore(time.Now)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte("ok"))
+	}))
+	defer upstream.Close()
+	validate := func(_ context.Context, cred, agent string) error {
+		if cred != testBearer || agent != testAgent {
+			return errors.New("denied")
+		}
+		return nil
+	}
+	pair := func(context.Context) (string, error) { return "pair-code", nil }
+	cfg := Config{PublicURL: testPublic, AdminOrigin: testAdmin, UpstreamURL: upstream.URL, Store: shared}
+
+	gw1, err := New(cfg, validate, pair)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sessionCookie := enter(t, gw1)
+
+	// New Gateway instance sharing the same Store simulates a Sub2API process restart.
+	gw2, err := New(cfg, validate, pair)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res := request(t, gw2, http.MethodGet, "/threads/1", "", testAgent, nil, sessionCookie)
+	if res.Code != http.StatusOK || res.Body.String() != "ok" {
+		t.Fatalf("session did not survive gateway restart: %d %q", res.Code, res.Body.String())
+	}
+}
