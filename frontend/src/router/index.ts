@@ -497,7 +497,7 @@ const routes: RouteRecordRaw[] = [
     path: '/admin/development-workspace',
     name: 'AdminDevelopmentWorkspace',
     component: () => import('@/views/admin/DevelopmentWorkspaceView.vue'),
-    beforeEnter: async (to) => {
+    beforeEnter: async (to, from) => {
       try {
         if (nativeWorkspaceUrl) {
           const { apiClient } = await import('@/api/client')
@@ -512,7 +512,7 @@ const routes: RouteRecordRaw[] = [
             : undefined
           submitNativeWorkspaceTicket(await developmentWorkspaceAPI.nativeTicket(nextPath))
         }
-        return false
+        return from.matched.length === 0 ? new Promise(() => {}) : false
       } catch (error: unknown) {
         if (!nativeWorkspaceUrl && (error as { status?: number } | null)?.status === 404) return
         const { default: i18n } = await import('@/i18n')
