@@ -90,7 +90,7 @@ async page => {
   for (const [index, width] of [1440, 375].entries()) {
     await page.setViewportSize({ width, height: 900 })
     if (index) {
-      await page.goto(base + '/admin/dashboard', { waitUntil: 'domcontentloaded' })
+      await page.goto(base + '/admin/dashboard', { waitUntil: 'load' })
       await page.evaluate(() => {
         for (const key of ['auth_token', 'auth_user', 'refresh_token', 'token_expires_at']) localStorage.removeItem(key)
       })
