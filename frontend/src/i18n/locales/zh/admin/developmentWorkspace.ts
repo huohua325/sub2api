@@ -1,5 +1,6 @@
 export default {
   title: '开发工作台',
+  nativePairError: '暂时无法打开 T3 Code，请重新进入开发工作台。',
   tasks: '任务',
   newTask: '新建任务',
   noTasks: '暂无任务',

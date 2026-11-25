@@ -7,6 +7,11 @@ export interface WorkspaceStatus {
   model?: string
 }
 
+export interface NativeWorkspaceTicket {
+  url: string
+  ticket: string
+}
+
 export interface WorkspaceTask {
   id: string
   title: string
@@ -54,6 +59,8 @@ const base = '/admin/development-workspace'
 const taskURL = (id: string) => `${base}/tasks/${encodeURIComponent(id)}`
 
 export const developmentWorkspaceAPI = {
+  nativeTicket: async () =>
+    (await apiClient.post<NativeWorkspaceTicket>(`${base}/native-ticket`)).data,
   status: async (signal: AbortSignal) =>
     (await apiClient.get<WorkspaceStatus>(`${base}/status`, { signal })).data,
   list: async (signal: AbortSignal) =>
