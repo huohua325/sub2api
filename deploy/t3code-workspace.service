@@ -1,0 +1,37 @@
+[Unit]
+Description=T3 Code development workspace
+Documentation=https://github.com/pingdotgg/t3code/tree/v0.1.11/docs
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=t3workspace
+Group=t3workspace
+StateDirectory=t3workspace
+StateDirectoryMode=0700
+WorkingDirectory=/var/lib/t3workspace/project
+Environment=PATH=/var/lib/t3workspace/.local/bin:/usr/local/bin:/usr/bin:/bin
+EnvironmentFile=-/etc/t3code/workspace.env
+UnsetEnvironment=T3CODE_LAN
+ExecStartPre=/opt/t3code/0.1.11/t3 policy check /etc/t3code/policy.json
+ExecStart=/opt/t3code/0.1.11/t3 serve --mode web --host 127.0.0.1 --port 3773 --base-dir /var/lib/t3workspace/.t3 /var/lib/t3workspace/project
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=30s
+# T3 writes the startup pairing QR code to stdout.
+StandardOutput=null
+StandardError=journal
+
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target

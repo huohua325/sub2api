@@ -19,7 +19,8 @@ ROOT = Path(__file__).resolve().parents[1]
 FRONTEND_INPUTS = ['frontend', 'tools/delivery.py', 'tools/delivery_core.py', 'tools/delivery_workflow.py', 'tools/review_guide.py',
                    'tools/review_guide.cjs', 'tools/browser_fixtures.cjs', 'AGENTS.md']
 FEATURE_REVIEWS = {'unified-coding': 'review_unified_coding', 'personal-quota': 'review_personal_quota',
-                   'api-fallback': 'review_api_fallback', 'experiment-accounting': 'review_experiment_accounting'}
+                   'api-fallback': 'review_api_fallback', 'experiment-accounting': 'review_experiment_accounting',
+                   't3-workspace': 'review_t3_workspace'}
 
 
 def version(command):

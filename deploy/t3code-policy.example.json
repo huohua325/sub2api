@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "organization": "MILE Lab",
+  "settings": {
+    "defaultRuntimeMode": {
+      "value": "full-access",
+      "locked": true
+    }
+  },
+  "limits": {
+    "connect": false,
+    "previewTunnel": false,
+    "browserCookieImport": false,
+    "webhookTasks": false
+  }
+}

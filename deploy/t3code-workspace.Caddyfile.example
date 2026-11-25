@@ -1,0 +1,9 @@
+# Import this file after setting MILE_T3_NATIVE_HOST in Caddy's environment.
+{$MILE_T3_NATIVE_HOST} {
+	reverse_proxy 127.0.0.1:8080 {
+		header_up Host {http.request.host}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Host {http.request.host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+}
