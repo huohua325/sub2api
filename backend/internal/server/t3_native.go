@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
@@ -22,14 +23,137 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-type nativeT3Workspace struct {
-	gateway  *t3gateway.Gateway
-	public   *url.URL
-	admin    *url.URL
-	validate func(context.Context, string) error
+const (
+	redisTicketKeyPrefix  = "mile:devws:ticket:"
+	redisSessionKeyPrefix = "mile:devws:session:"
+)
+
+var consumeTicketScript = redis.NewScript(`
+local raw = redis.call("GET", KEYS[1])
+if not raw then
+	return ""
+end
+local ok, parsed = pcall(cjson.decode, raw)
+if ok and parsed and parsed["user_agent"] == ARGV[1] then
+	redis.call("DEL", KEYS[1])
+end
+return raw
+`)
+
+type pairTokenLoader struct {
+	path string
+
+	mu      sync.RWMutex
+	token   string
+	modTime time.Time
+	size    int64
 }
 
-func configureNativeT3(auth *service.AuthService) *nativeT3Workspace {
+func newPairTokenLoader(path string) (*pairTokenLoader, error) {
+	loader := &pairTokenLoader{path: path}
+	if _, err := loader.get(); err != nil {
+		return nil, err
+	}
+	return loader, nil
+}
+
+func (l *pairTokenLoader) get() (string, error) {
+	info, err := os.Stat(l.path)
+	if err != nil {
+		return "", err
+	}
+	l.mu.RLock()
+	if l.token != "" && info.ModTime().Equal(l.modTime) && info.Size() == l.size {
+		tok := l.token
+		l.mu.RUnlock()
+		return tok, nil
+	}
+	l.mu.RUnlock()
+
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	info, err = os.Stat(l.path)
+	if err != nil {
+		return "", err
+	}
+	if l.token != "" && info.ModTime().Equal(l.modTime) && info.Size() == l.size {
+		return l.token, nil
+	}
+	token, err := readNativeT3PairToken(l.path)
+	if err != nil {
+		return "", err
+	}
+	l.token = token
+	l.modTime = info.ModTime()
+	l.size = info.Size()
+	return token, nil
+}
+
+type redisGatewayStore struct {
+	client *redis.Client
+}
+
+func (s *redisGatewayStore) SaveTicket(ctx context.Context, id string, record t3gateway.Record, ttl time.Duration) error {
+	raw, err := json.Marshal(record)
+	if err != nil {
+		return err
+	}
+	return s.client.Set(ctx, redisTicketKeyPrefix+id, raw, ttl).Err()
+}
+
+func (s *redisGatewayStore) ConsumeTicket(ctx context.Context, id, userAgent string) (t3gateway.Record, bool, error) {
+	raw, err := consumeTicketScript.Run(ctx, s.client, []string{redisTicketKeyPrefix + id}, userAgent).Text()
+	if errors.Is(err, redis.Nil) || raw == "" {
+		return t3gateway.Record{}, false, nil
+	}
+	if err != nil {
+		return t3gateway.Record{}, false, err
+	}
+	var record t3gateway.Record
+	if err := json.Unmarshal([]byte(raw), &record); err != nil {
+		return t3gateway.Record{}, false, err
+	}
+	return record, true, nil
+}
+
+func (s *redisGatewayStore) SaveSession(ctx context.Context, key string, record t3gateway.Record, ttl time.Duration) error {
+	raw, err := json.Marshal(record)
+	if err != nil {
+		return err
+	}
+	return s.client.Set(ctx, redisSessionKeyPrefix+key, raw, ttl).Err()
+}
+
+func (s *redisGatewayStore) GetSession(ctx context.Context, key string) (t3gateway.Record, bool, error) {
+	raw, err := s.client.Get(ctx, redisSessionKeyPrefix+key).Bytes()
+	if errors.Is(err, redis.Nil) {
+		return t3gateway.Record{}, false, nil
+	}
+	if err != nil {
+		return t3gateway.Record{}, false, err
+	}
+	var record t3gateway.Record
+	if err := json.Unmarshal(raw, &record); err != nil {
+		return t3gateway.Record{}, false, err
+	}
+	return record, true, nil
+}
+
+func (s *redisGatewayStore) DeleteSession(ctx context.Context, key string) error {
+	return s.client.Del(ctx, redisSessionKeyPrefix+key).Err()
+}
+
+type nativeT3Workspace struct {
+	gateway        *t3gateway.Gateway
+	public         *url.URL
+	admin          *url.URL
+	upstream       *url.URL
+	upstreamSocket string
+	tokens         *pairTokenLoader
+	inspect        func(context.Context, string) (service.T3BrowserSession, error)
+}
+
+func configureNativeT3(auth *service.AuthService, redisClient *redis.Client) *nativeT3Workspace {
 	if auth == nil || strings.TrimSpace(os.Getenv("DEV_T3_NATIVE_PUBLIC_URL")) == "" {
 		return nil
 	}
@@ -39,15 +163,24 @@ func configureNativeT3(auth *service.AuthService) *nativeT3Workspace {
 		AdminOrigin:    strings.TrimSpace(os.Getenv("DEV_T3_NATIVE_ADMIN_ORIGIN")),
 		UpstreamSocket: strings.TrimSpace(os.Getenv("DEV_T3_NATIVE_UPSTREAM_SOCKET_FILE")),
 	}
-	native, err := newNativeT3Workspace(cfg, os.Getenv("DEV_T3_NATIVE_PAIR_TOKEN_FILE"), auth.ValidateT3BrowserSession)
+	if redisClient != nil {
+		cfg.Store = &redisGatewayStore{client: redisClient}
+	}
+	native, err := newNativeT3Workspace(cfg, os.Getenv("DEV_T3_NATIVE_PAIR_TOKEN_FILE"),
+		auth.InspectT3BrowserSession, auth.ValidateT3SessionIdentity)
 	if err != nil {
-		log.Print("Native T3 workspace disabled: invalid gateway or pairing configuration")
+		log.Print("Native development workspace disabled: invalid gateway or pairing configuration")
 		return nil
 	}
 	return native
 }
 
-func newNativeT3Workspace(cfg t3gateway.Config, tokenFile string, validate func(context.Context, string) error) (*nativeT3Workspace, error) {
+func newNativeT3Workspace(
+	cfg t3gateway.Config,
+	tokenFile string,
+	inspect func(context.Context, string) (service.T3BrowserSession, error),
+	validateIdentity func(context.Context, service.T3BrowserSession) error,
+) (*nativeT3Workspace, error) {
 	public, err := url.Parse(cfg.PublicURL)
 	if err != nil {
 		return nil, err
@@ -56,7 +189,11 @@ func newNativeT3Workspace(cfg t3gateway.Config, tokenFile string, validate func(
 	if err != nil {
 		return nil, err
 	}
-	token, err := readNativeT3PairToken(tokenFile)
+	upstream, err := url.Parse(cfg.UpstreamURL)
+	if err != nil {
+		return nil, err
+	}
+	tokens, err := newPairTokenLoader(tokenFile)
 	if err != nil {
 		return nil, err
 	}
@@ -75,15 +212,31 @@ func newNativeT3Workspace(cfg t3gateway.Config, tokenFile string, validate func(
 			return http.ErrUseLastResponse
 		},
 	}
-	gateway, err := t3gateway.New(cfg, func(ctx context.Context, bearer, _ string) error {
-		return validate(ctx, bearer)
+	gateway, err := t3gateway.New(cfg, func(ctx context.Context, encoded, _ string) error {
+		var identity service.T3BrowserSession
+		if err := json.Unmarshal([]byte(encoded), &identity); err != nil {
+			return service.ErrInvalidToken
+		}
+		return validateIdentity(ctx, identity)
 	}, func(ctx context.Context) (string, error) {
+		token, err := tokens.get()
+		if err != nil {
+			return "", errors.New("workspace pairing token is unavailable")
+		}
 		return createNativeT3Pairing(ctx, client, cfg.UpstreamURL, token)
 	})
 	if err != nil {
 		return nil, err
 	}
-	return &nativeT3Workspace{gateway: gateway, public: public, admin: admin, validate: validate}, nil
+	return &nativeT3Workspace{
+		gateway:        gateway,
+		public:         public,
+		admin:          admin,
+		upstream:       upstream,
+		upstreamSocket: cfg.UpstreamSocket,
+		tokens:         tokens,
+		inspect:        inspect,
+	}, nil
 }
 
 func readNativeT3PairToken(path string) (string, error) {
@@ -99,7 +252,7 @@ func readNativeT3PairToken(path string) (string, error) {
 	}
 	token := strings.TrimSpace(string(raw))
 	if len(raw) > maxTokenBytes || token == "" || strings.ContainsAny(token, " \r\n\t") {
-		return "", errors.New("invalid T3 pairing service token")
+		return "", errors.New("invalid workspace pairing service token")
 	}
 	return token, nil
 }
@@ -123,17 +276,17 @@ func createNativeT3Pairing(ctx context.Context, client *http.Client, upstream, t
 	request.Header.Set("Content-Type", "application/json")
 	res, err := client.Do(request)
 	if err != nil {
-		return "", errors.New("T3 pairing service is unavailable")
+		return "", errors.New("workspace pairing service is unavailable")
 	}
 	defer res.Body.Close()
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		return "", errors.New("T3 pairing service rejected the request")
+		return "", errors.New("workspace pairing service rejected the request")
 	}
 	var result struct {
 		Credential string `json:"credential"`
 	}
 	if err := json.NewDecoder(io.LimitReader(res.Body, 16<<10)).Decode(&result); err != nil || result.Credential == "" {
-		return "", errors.New("invalid T3 pairing response")
+		return "", errors.New("invalid workspace pairing response")
 	}
 	return result.Credential, nil
 }
@@ -158,6 +311,48 @@ func (n *nativeT3Workspace) registerTicket(r *gin.Engine, adminAuth middleware.A
 	limiter := middleware.NewPanelRateLimiter(redisClient, settings)
 	r.POST("/api/v1/admin/development-workspace/native-ticket", gin.HandlerFunc(adminAuth), limiter.Global(),
 		gin.HandlerFunc(auditLog), middleware.AdminComplianceGuard(settings), n.issueTicket)
+	r.GET("/api/v1/admin/development-workspace/native-status", gin.HandlerFunc(adminAuth), limiter.Global(),
+		middleware.AdminComplianceGuard(settings), n.nativeStatus)
+}
+
+func (n *nativeT3Workspace) nativeStatus(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	if c.GetString("auth_method") != service.AuditAuthMethodJWT {
+		response.Forbidden(c, "An administrator browser session is required")
+		return
+	}
+	_, tokenErr := n.tokens.get()
+	response.Success(c, gin.H{
+		"configured":       true,
+		"token_loaded":     tokenErr == nil,
+		"runner_reachable": n.probeRunner(c.Request.Context()),
+	})
+}
+
+func (n *nativeT3Workspace) probeRunner(ctx context.Context) bool {
+	dialer := &net.Dialer{Timeout: 1500 * time.Millisecond}
+	var (
+		conn net.Conn
+		err  error
+	)
+	if n.upstreamSocket != "" {
+		conn, err = dialer.DialContext(ctx, "unix", n.upstreamSocket)
+	} else {
+		host := n.upstream.Host
+		if !strings.Contains(host, ":") {
+			if n.upstream.Scheme == "https" {
+				host += ":443"
+			} else {
+				host += ":80"
+			}
+		}
+		conn, err = dialer.DialContext(ctx, "tcp", host)
+	}
+	if err != nil {
+		return false
+	}
+	_ = conn.Close()
+	return true
 }
 
 func (n *nativeT3Workspace) issueTicket(c *gin.Context) {
@@ -171,14 +366,32 @@ func (n *nativeT3Workspace) issueTicket(c *gin.Context) {
 		return
 	}
 	authorization := strings.Fields(c.GetHeader("Authorization"))
-	if len(authorization) != 2 || !strings.EqualFold(authorization[0], "Bearer") ||
-		n.validate(c.Request.Context(), authorization[1]) != nil {
+	if len(authorization) != 2 || !strings.EqualFold(authorization[0], "Bearer") {
 		response.Unauthorized(c, "Sign in again to open the workspace")
 		return
 	}
-	ticket, err := n.gateway.Issue(authorization[1], c.Request.UserAgent())
+	identity, err := n.inspect(c.Request.Context(), authorization[1])
 	if err != nil {
-		response.Error(c, http.StatusServiceUnavailable, "T3 workspace unavailable")
+		response.Unauthorized(c, "Sign in again to open the workspace")
+		return
+	}
+	encoded, err := json.Marshal(identity)
+	if err != nil {
+		response.Error(c, http.StatusServiceUnavailable, "Development workspace unavailable")
+		return
+	}
+	var nextPath string
+	if c.Request.Body != nil && c.Request.ContentLength != 0 {
+		var payload struct {
+			Next string `json:"next"`
+		}
+		if err := json.NewDecoder(io.LimitReader(c.Request.Body, 2048)).Decode(&payload); err == nil {
+			nextPath = t3gateway.SanitizeNextPath(payload.Next)
+		}
+	}
+	ticket, err := n.gateway.IssueWithNext(c.Request.Context(), string(encoded), c.Request.UserAgent(), nextPath)
+	if err != nil {
+		response.Error(c, http.StatusServiceUnavailable, "Development workspace unavailable")
 		return
 	}
 	response.Success(c, ticket)
