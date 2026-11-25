@@ -1,0 +1,10 @@
+[Unit]
+Description=Watch MILE release candidate submissions from t3workspace
+
+[Path]
+PathExistsGlob=/var/spool/mile-release/submissions/*.json
+Unit=mile-release-worker.service
+
+[Install]
+WantedBy=multi-user.target
+

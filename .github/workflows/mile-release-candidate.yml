@@ -1,0 +1,217 @@
+name: MILE Release Candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Git branch, tag, or commit SHA to build'
+        required: true
+        type: string
+        default: 'lab/0.2.17'
+      version:
+        description: 'Immutable MILE release version (e.g. 0.2.25-mile.20261126.rc1)'
+        required: true
+        type: string
+  push:
+    branches:
+      - 'release-candidate/**'
+
+concurrency:
+  group: mile-rc-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  frontend-validate:
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.meta.outputs.sha }}
+      version: ${{ steps.meta.outputs.version }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          fetch-depth: 0
+      - name: Resolve immutable candidate metadata
+        id: meta
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          SHA=$(git rev-parse HEAD)
+          SHORT=${SHA:0:9}
+          if [ -n "$INPUT_VERSION" ]; then
+            VER="$INPUT_VERSION"
+          else
+            VER="0.2.25-mile.$(date -u +%Y%m%d).rc-${SHORT}"
+          fi
+          echo "sha=${SHA}" >> "$GITHUB_OUTPUT"
+          echo "version=${VER}" >> "$GITHUB_OUTPUT"
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 9
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: Full frontend validation and build
+        working-directory: frontend
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm run lint:check
+          pnpm run test:run
+          pnpm exec vue-tsc -b
+          pnpm exec vite build --config vite.config.ts
+      - uses: actions/upload-artifact@v7
+        with:
+          name: mile-rc-frontend-${{ steps.meta.outputs.sha }}
+          path: backend/internal/web/dist/
+          retention-days: 1
+
+  quota-postgres-race:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: quota_ci
+          POSTGRES_PASSWORD: quota_ci_only
+          POSTGRES_DB: quota_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U quota_ci -d quota_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      SUB2API_QUOTA_TEST_DSN: host=127.0.0.1 port=5432 user=quota_ci password=quota_ci_only dbname=quota_ci sslmode=disable
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          check-latest: false
+          cache: true
+          cache-dependency-path: backend/go.sum
+      - name: Verify isolated PostgreSQL quota race suite (zero skips)
+        working-directory: backend
+        run: |
+          go test -json -race ./internal/repository -run '^TestCodingQuotaDB' -count=1 > /tmp/quota-race.jsonl
+          python3 - <<'PY'
+          import json
+          passed = skipped = failed = 0
+          with open('/tmp/quota-race.jsonl', encoding='utf-8') as f:
+              for line in f:
+                  ev = json.loads(line)
+                  if ev.get('Test', '').startswith('TestCodingQuotaDB'):
+                      act = ev.get('Action')
+                      if act == 'pass': passed += 1
+                      elif act == 'skip': skipped += 1
+                      elif act == 'fail': failed += 1
+          summary = {'passed': passed, 'skipped': skipped, 'failed': failed}
+          print(json.dumps(summary))
+          with open('/tmp/quota-summary.json', 'w', encoding='utf-8') as out:
+              json.dump(summary, out, indent=2)
+          if not passed or skipped or failed:
+              raise SystemExit(f'Quota race gate failed: {summary}')
+          PY
+      - uses: actions/upload-artifact@v7
+        with:
+          name: mile-rc-quota-summary
+          path: /tmp/quota-summary.json
+          retention-days: 1
+
+  package-candidate:
+    needs: [frontend-validate, quota-postgres-race]
+    runs-on: ubuntu-latest
+    env:
+      CANDIDATE_SHA: ${{ needs.frontend-validate.outputs.sha }}
+      CANDIDATE_VERSION: ${{ needs.frontend-validate.outputs.version }}
+      WORKFLOW_RUN_ID: ${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.frontend-validate.outputs.sha }}
+          fetch-depth: 0
+      - uses: actions/download-artifact@v8
+        with:
+          name: mile-rc-frontend-${{ needs.frontend-validate.outputs.sha }}
+          path: backend/internal/web/dist/
+      - uses: actions/download-artifact@v8
+        with:
+          name: mile-rc-quota-summary
+          path: /tmp/quota/
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          check-latest: false
+          cache: true
+          cache-dependency-path: backend/go.sum
+      - name: Run targeted gateway and auth tests
+        working-directory: backend
+        run: |
+          go test -race -tags unit ./internal/pkg/t3gateway ./internal/server ./internal/server/routes ./internal/service -run 'TestGateway|TestNativeT3|TestDevelopmentWorkspaceAdminSession' -count=1
+      - name: Build immutable Linux/amd64 embedded binary
+        working-directory: backend
+        run: |
+          BUILD_DATE=$(git show -s --format=%cI "$CANDIDATE_SHA")
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -tags embed -trimpath \
+            -ldflags "-s -w -X main.Version=${CANDIDATE_VERSION} -X main.Commit=${CANDIDATE_SHA} -X main.Date=${BUILD_DATE} -X main.BuildType=release" \
+            -o /tmp/sub2api ./cmd/server
+      - name: Assemble immutable candidate kit
+        run: |
+          python3 - <<'PY'
+          import gzip, hashlib, json, os, shutil
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          out = Path('/tmp/candidate-kit')
+          out.mkdir(parents=True, exist_ok=True)
+          binary = Path('/tmp/sub2api')
+          raw = binary.read_bytes()
+          bin_sha = hashlib.sha256(raw).hexdigest()
+
+          gz_path = out / 'sub2api.gz'
+          with gzip.open(gz_path, 'wb', compresslevel=9, mtime=0) as gz:
+              gz.write(raw)
+          gz_sha = hashlib.sha256(gz_path.read_bytes()).hexdigest()
+
+          migrations = {}
+          for sql in sorted(Path('backend/migrations').glob('*.sql')):
+              migrations[sql.name] = hashlib.sha256(sql.read_bytes()).hexdigest()
+
+          quota_summary = json.loads(Path('/tmp/quota/quota-summary.json').read_text(encoding='utf-8'))
+          manifest = {
+              'schema': 1,
+              'kind': 'mile-ci-release-candidate',
+              'version': os.environ['CANDIDATE_VERSION'],
+              'source_commit': os.environ['CANDIDATE_SHA'],
+              'workflow_run_id': int(os.environ['WORKFLOW_RUN_ID']),
+              'sha256': bin_sha,
+              'bytes': len(raw),
+              'payload': 'sub2api.gz',
+              'payload_sha256': gz_sha,
+              'payload_bytes': gz_path.stat().st_size,
+              'quota_tests': quota_summary,
+              'migrations_count': len(migrations),
+              'migrations_sha256': hashlib.sha256(json.dumps(migrations, sort_keys=True).encode()).hexdigest(),
+              'created_at': datetime.now(timezone.utc).isoformat(),
+          }
+          (out / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
+          for tool in ['delivery_core.py', 'release_server.py', 'upstream_v0225_upgrade.py', 't3_workspace_upgrade.py', 'release_worker.py']:
+              src = Path('tools') / tool
+              if src.exists():
+                  shutil.copy2(src, out / tool)
+          print(json.dumps(manifest, indent=2))
+          PY
+      - uses: actions/upload-artifact@v7
+        with:
+          name: mile-release-candidate-${{ needs.frontend-validate.outputs.sha }}
+          path: /tmp/candidate-kit/
+          retention-days: 14
+

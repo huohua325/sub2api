@@ -67,7 +67,13 @@ async page => {
     }
     if (path === ticketPath && method === 'POST') {
       check('authenticated-admin-ticket-request', request.headers().authorization === 'Bearer ' + sessionToken)
-      check('empty-ticket-request-body', !request.postData())
+      const bodyText = request.postData() || ''
+      if (bodyText) {
+        const parsed = JSON.parse(bodyText)
+        check('valid-ticket-next-body', typeof parsed.next === 'string' && parsed.next.startsWith('/'))
+      } else {
+        check('empty-ticket-request-body', !bodyText)
+      }
       if (!enabled) return route.fulfill({ status: 404, json: { code: 404, message: 'Native workspace disabled' } })
       issued++
       pendingTicket = 'synthetic-ticket-' + issued
@@ -106,10 +112,14 @@ async page => {
       page.url() === gateway + '/_mile/enter' && submitted === index + 1 && issued === index + 1)
   }
 
+  await page.goto(base + workspace + '?next=%2Fthreads%2Fdemo-1', { waitUntil: 'domcontentloaded' })
+  await page.getByRole('heading', { name: 'Native T3 workspace fixture' }).waitFor({ state: 'visible' })
+  check('deep-link-next-ticket-handoff', page.url() === gateway + '/_mile/enter' && submitted === 3 && issued === 3)
+
   enabled = false
   await page.goto(base + workspace, { waitUntil: 'domcontentloaded' })
   await page.getByRole('heading', { name: 'Development Workspace', exact: true }).waitFor({ state: 'visible' })
-  check('disabled-native-gateway-preserves-existing-workspace', page.url() === base + workspace && submitted === 2 && issued === 2)
+  check('disabled-native-gateway-preserves-existing-workspace', page.url() === base + workspace && submitted === 3 && issued === 3)
   check('no-real-business-writes', apiMutations.length === 0)
   return { errors, apiMutations, checks, issued, submitted, logins }
 }
