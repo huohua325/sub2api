@@ -71,11 +71,11 @@ async page => {
       if (bodyText) {
         const parsed = JSON.parse(bodyText)
         check('valid-ticket-next-body', typeof parsed.next === 'string' && parsed.next.startsWith('/'))
-        await new Promise(resolve => setTimeout(resolve, 600))
       } else {
         check('empty-ticket-request-body', !bodyText)
       }
       if (!enabled) return route.fulfill({ status: 404, json: { code: 404, message: 'Native workspace disabled' } })
+      await new Promise(resolve => setTimeout(resolve, 400))
       issued++
       pendingTicket = 'synthetic-ticket-' + issued
       return json(route, { url: gateway + '/_mile/enter', ticket: pendingTicket })
