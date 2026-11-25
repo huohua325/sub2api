@@ -124,10 +124,16 @@ def main():
     args = parser.parse_args()
     if args.command == 'package':
         from release_package import package_release
-        result = package_release(Path(__file__).resolve().parents[1], args.output, args.destination,
+        root = Path(__file__).resolve().parents[1]
+        evidence = json.loads((args.output / 'manifest.json').read_text(encoding='utf-8'))
+        built = next((step.get('source_commit') for step in reversed(evidence['steps'])
+                      if step['name'] == 'backend-build' and step['status'] in ('passed', 'reused')), None)
+        runtime_contract = contract_for_release(built)
+        T3WorkspaceUpgrade(contract_for_release(args.source_commit)).validate_sources(root, BASELINE, built)
+        result = package_release(root, args.output, args.destination,
                                  args.output / 'sub2api-linux-amd64', args.version, BASELINE_SHA256,
                                  BASELINE, baseline_binary=args.baseline_binary,
-                                 upgrade_contract=contract_for_release(args.source_commit))
+                                 upgrade_contract=runtime_contract)
     else:
         manifest = json.loads((args.release / 'manifest.json').read_text(encoding='utf-8'))
         policy = T3WorkspaceUpgrade(manifest.get('upgrade_contract', {}))
