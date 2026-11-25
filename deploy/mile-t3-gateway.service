@@ -1,0 +1,13 @@
+[Unit]
+Description=Forward the private MILE T3 socket to the local runner
+Requires=t3code-workspace.service
+After=t3code-workspace.service
+
+[Service]
+ExecStart=/usr/lib/systemd/systemd-socket-proxyd 127.0.0.1:3773
+DynamicUser=true
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+RestrictAddressFamilies=AF_UNIX AF_INET

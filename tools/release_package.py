@@ -9,6 +9,7 @@ import shutil
 import subprocess
 
 from delivery_core import DeliveryError, contained, digest, exclusive, tree_hash, utcnow, write_json
+from t3_workspace_upgrade import CONTRACT as T3_WORKSPACE_CONTRACT, FEATURE as T3_WORKSPACE_FEATURE
 
 
 def verified_delta(root, baseline_binary, binary):
@@ -73,7 +74,14 @@ def package_release(root, evidence, destination, binary, version, baseline_sha25
     if upgrade_contract is None and any(not path.endswith('_test.go') for path in backend_changes):
         raise DeliveryError('Backend changes require the full upgrade runbook; this lane is frontend-only')
     if upgrade_contract is not None:
-        if upgrade_contract.get('name') == 'unified-coding-preview-v1':
+        if upgrade_contract.get('name') == T3_WORKSPACE_CONTRACT:
+            from t3_workspace_upgrade import BASELINE_SHA256, T3WorkspaceUpgrade
+            T3WorkspaceUpgrade(upgrade_contract).validate_sources(root, baseline_commit, source)
+            if baseline_sha256 != BASELINE_SHA256:
+                raise DeliveryError('Unexpected reviewed T3 workspace baseline binary')
+            if not final_path.exists() or T3_WORKSPACE_FEATURE not in final.get('features', []):
+                raise DeliveryError('T3 workspace requires its native gateway artifact review')
+        elif upgrade_contract.get('name') == 'unified-coding-preview-v1':
             from coding_upgrade import UnifiedCodingUpgrade
             UnifiedCodingUpgrade(upgrade_contract).validate_sources(root, baseline_commit, source)
         elif upgrade_contract.get('name') == 'upstream-merge-no-migrations-v1':
@@ -128,7 +136,8 @@ def package_release(root, evidence, destination, binary, version, baseline_sha25
         from delivery_workflow import verify_record
         features = final.get('features', [])
         scripts = {'unified-coding': 'review_unified_coding.cjs', 'personal-quota': 'review_personal_quota.cjs',
-                   'api-fallback': 'review_api_fallback.cjs', 'experiment-accounting': 'review_experiment_accounting.cjs'}
+                   'api-fallback': 'review_api_fallback.cjs', 'experiment-accounting': 'review_experiment_accounting.cjs',
+                   T3_WORKSPACE_FEATURE: 'review_t3_workspace.cjs'}
         if not features or any(f not in {*scripts, 'guide-only'} for f in features):
             raise DeliveryError('Finalization must identify the actual feature path')
         for name in features:
@@ -152,7 +161,7 @@ def package_release(root, evidence, destination, binary, version, baseline_sha25
             raise DeliveryError('Stale input evidence: ' + name)
         if stage['artifacts'] != tree_hash(root, list(stage['artifacts'])) or digest(contained(evidence, stage['log'])) != stage['log_sha256']:
             raise DeliveryError('Corrupt artifact or log evidence: ' + name)
-    if upgrade_contract is not None and upgrade_contract.get('name') not in ('upstream-merge-no-migrations-v1', 'upstream-additive-v0222-v1', 'api-fallback-admin-v1', 'experiment-accounting-v1', 'coding-continuation-v1', 'coding-standby-v2', 'experiment-concurrency-v1', 'experiment-record-only-v1', 'experiment-key-standby-v1', 'experiment-account-standby-v1', 'admin-quota-self-reset-v1'):
+    if upgrade_contract is not None and upgrade_contract.get('name') not in ('upstream-merge-no-migrations-v1', 'upstream-additive-v0222-v1', 'api-fallback-admin-v1', 'experiment-accounting-v1', 'coding-continuation-v1', 'coding-standby-v2', 'experiment-concurrency-v1', 'experiment-record-only-v1', 'experiment-key-standby-v1', 'experiment-account-standby-v1', 'admin-quota-self-reset-v1', T3_WORKSPACE_CONTRACT):
         coding_preview = upgrade_contract.get('name') == 'unified-coding-preview-v1'
         name = 'artifact-feature-' + ('unified-coding' if coding_preview else 'personal-quota')
         if name in stages:
@@ -178,6 +187,9 @@ def package_release(root, evidence, destination, binary, version, baseline_sha25
     built_source = stages['backend-build'].get('source_commit', '')
     if not re.fullmatch(r'[0-9a-f]{40}', built_source):
         raise DeliveryError('Build must record its committed source')
+    if upgrade_contract is not None and upgrade_contract.get('name') == T3_WORKSPACE_CONTRACT:
+        if built_source != upgrade_contract['source_commit']:
+            raise DeliveryError('T3 workspace package must use the reviewed program build source')
     try:
         git('merge-base', '--is-ancestor', built_source, source)
     except subprocess.CalledProcessError:
@@ -223,7 +235,12 @@ def package_release(root, evidence, destination, binary, version, baseline_sha25
     if upgrade_contract is not None:
         manifest['upgrade_contract'] = upgrade_contract
         shutil.copyfile(kit / 'full_upgrade.py', destination / 'full_upgrade.py')
-        if upgrade_contract.get('name') == 'unified-coding-preview-v1':
+        if upgrade_contract.get('name') == T3_WORKSPACE_CONTRACT:
+            for name in ('t3_workspace_upgrade.py', 'upstream_v0225_upgrade.py', 'experiment_account_standby_upgrade.py',
+                         'experiment_key_standby_upgrade.py', 'experiment_accounting_upgrade.py',
+                         'api_fallback_upgrade.py', 'upstream_additive_upgrade.py'):
+                shutil.copyfile(kit / name, destination / name)
+        elif upgrade_contract.get('name') == 'unified-coding-preview-v1':
             shutil.copyfile(kit / 'coding_upgrade.py', destination / 'coding_upgrade.py')
             shutil.copyfile(kit / 'coding_preview_live.py', destination / 'coding_preview_live.py')
         elif upgrade_contract.get('name') == 'upstream-merge-no-migrations-v1':

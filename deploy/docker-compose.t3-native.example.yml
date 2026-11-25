@@ -1,0 +1,24 @@
+# Opt-in overlay for a T3 runner on the same host as the MILE container.
+services:
+  sub2api:
+    environment:
+      DEV_T3_NATIVE_PUBLIC_URL: "${DEV_T3_NATIVE_PUBLIC_URL:?Set the workspace HTTPS origin}"
+      DEV_T3_NATIVE_ADMIN_ORIGIN: "${DEV_T3_NATIVE_ADMIN_ORIGIN:?Set the MILE HTTPS origin}"
+      DEV_T3_NATIVE_UPSTREAM_URL: "http://127.0.0.1:3773"
+      DEV_T3_NATIVE_UPSTREAM_SOCKET_FILE: "/run/mile-t3-gateway/t3.sock"
+      DEV_T3_NATIVE_PAIR_TOKEN_FILE: "/run/secrets/mile-t3-native-pair"
+    group_add:
+      - "${DEV_T3_NATIVE_SOCKET_GID:?Set the numeric mile-t3-proxy group ID}"
+    volumes:
+      - type: bind
+        source: /run/mile-t3-gateway
+        target: /run/mile-t3-gateway
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: "${DEV_T3_NATIVE_PAIR_TOKEN_HOST_FILE:?Set the path to the protected token file}"
+        target: /run/secrets/mile-t3-native-pair
+        read_only: true
+        bind:
+          create_host_path: false

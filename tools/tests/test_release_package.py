@@ -178,6 +178,53 @@ class PackageTests(unittest.TestCase):
             'application': application_snapshot(self.root), 'features': ['unified-coding']}))
         with self.assertRaises(DeliveryError): self.package()
 
+    def test_t3_workspace_lane_requires_its_native_review_and_packages_runtime(self):
+        from delivery_core import tree_hash, write_json
+        from delivery_workflow import application_snapshot
+        import t3_workspace_upgrade as upgrade
+
+        baseline = self.commit
+        (self.root / 'backend/source.go').write_text('workspace gateway')
+        for name in ('review_t3_workspace.cjs', 'browser_fixtures.cjs'):
+            path = self.root / 'tools' / name
+            path.parent.mkdir(exist_ok=True)
+            path.write_text('fixture')
+        self.git('add', 'backend/source.go', 'tools')
+        self.git('-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'native workspace')
+        source = self.git('rev-parse', 'HEAD')
+        result = self.out / upgrade.FEATURE / 'result.json'
+        write_json(result, dict(ok=True, engines={'chromium': {}, 'webkit': {}},
+            frontend_sha256=tree_hash(self.root, ['backend/internal/web/dist'])['backend/internal/web/dist'],
+            script_sha256=digest(self.root / 'tools/review_t3_workspace.cjs'),
+            fixtures_sha256=digest(self.root / 'tools/browser_fixtures.cjs')))
+        self.runner.run('artifact-feature-' + upgrade.FEATURE, [sys.executable, '-c', 'print("verified")'],
+                        ['src.txt'], artifacts=[result.relative_to(self.root).as_posix()])
+        build = next(step for step in self.runner.manifest['steps'] if step['name'] == 'backend-build')
+        build['source_commit'] = source
+        write_json(self.out / 'manifest.json', self.runner.manifest)
+        final = dict(status='passed', version='test1', application=application_snapshot(self.root),
+                     features=['guide-only'])
+        write_json(self.out / 'finalize.json', final)
+        args = [self.root, self.out, self.out / 'release', self.binary, 'test1', upgrade.BASELINE_SHA256, baseline]
+        with patch.multiple(upgrade, BASELINE=baseline, ADDED=set(), MODIFIED={'backend/source.go'}):
+            contract = upgrade.contract_for_release(source)
+            with self.assertRaisesRegex(DeliveryError, 'native gateway artifact review'):
+                package_release(*args, full_upload=True, upgrade_contract=contract)
+            final['features'] = [upgrade.FEATURE]
+            write_json(self.out / 'finalize.json', final)
+            build['source_commit'] = baseline
+            write_json(self.out / 'manifest.json', self.runner.manifest)
+            with self.assertRaisesRegex(DeliveryError, 'reviewed program build source'):
+                package_release(*args, full_upload=True, upgrade_contract=contract)
+            build['source_commit'] = source
+            write_json(self.out / 'manifest.json', self.runner.manifest)
+            manifest = package_release(*args, full_upload=True, upgrade_contract=contract)
+        self.assertEqual(manifest['source_commit'], source)
+        self.assertEqual(manifest['upgrade_contract'], contract)
+        shipped = self.out / 'release/t3_workspace_upgrade.py'
+        subprocess.check_call([sys.executable, str(shipped), 'deploy', '--help'],
+                              stdout=subprocess.DEVNULL, timeout=10)
+
     def test_finalized_feature_result_can_be_packaged_with_current_artifact_hashes(self):
         from delivery_core import tree_hash, write_json
         from delivery_workflow import application_snapshot
