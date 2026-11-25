@@ -489,6 +489,17 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/admin/development-workspace',
+    name: 'AdminDevelopmentWorkspace',
+    component: () => import('@/views/admin/DevelopmentWorkspaceView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'Development Workspace',
+      titleKey: 'admin.developmentWorkspace.title',
+    },
+  },
+  {
     path: '/admin/users',
     name: 'AdminUsers',
     component: () => import('@/views/admin/UsersView.vue'),

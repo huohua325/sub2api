@@ -132,6 +132,8 @@ func RegisterAdminRoutes(
 
 		// 操作审计日志
 		registerAuditLogRoutes(admin, h, stepUpAuth)
+
+		registerDevelopmentWorkspaceRoutes(admin)
 	}
 }
 

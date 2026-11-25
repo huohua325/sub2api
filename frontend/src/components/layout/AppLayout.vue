@@ -12,7 +12,7 @@
       :class="[sidebarCollapsed ? 'lg:ml-[72px]' : 'lg:ml-64']"
     >
       <!-- Header -->
-      <AppHeader />
+      <AppHeader :compact="compactHeader" />
 
       <!-- Main Content -->
       <main id="main-content" tabindex="-1" class="lab-main p-4 md:p-6 lg:p-8">
@@ -40,7 +40,7 @@ import AppHeader from './AppHeader.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import { usePageMetadata } from '@/composables/usePageMetadata'
 
-withDefaults(defineProps<{ pageHeader?: boolean }>(), { pageHeader: true })
+withDefaults(defineProps<{ pageHeader?: boolean; compactHeader?: boolean }>(), { pageHeader: true })
 const { pageTitle, pageDescription } = usePageMetadata()
 const headingRef = ref<HTMLElement | null>(null)
 const headingHeight = ref(0)
