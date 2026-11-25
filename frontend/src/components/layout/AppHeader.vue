@@ -1,5 +1,5 @@
 <template>
-  <header class="lab-header sticky top-0 z-30">
+  <header class="lab-header sticky top-0 z-30" :class="{ 'lab-header-compact': compact }">
     <div class="flex h-16 items-center justify-between gap-2 px-2 sm:px-4 md:px-6">
       <!-- Left: Mobile Menu Toggle + Page Title -->
       <div class="flex min-w-0 items-center gap-2 sm:gap-4">
@@ -30,7 +30,7 @@
           class="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-dark-400 dark:hover:bg-dark-800 dark:hover:text-white"
         >
           <Icon name="arrowLeft" size="sm" />
-          <span class="hidden sm:inline">{{ t('nav.backHome') }}</span>
+          <span class="header-action-label hidden sm:inline">{{ t('nav.backHome') }}</span>
         </router-link>
 
         <!-- Announcement Bell -->
@@ -42,10 +42,11 @@
           :href="docUrl"
           target="_blank"
           rel="noopener noreferrer"
+          :aria-label="t('nav.docs')"
           class="hidden items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-dark-400 dark:hover:bg-dark-800 dark:hover:text-white sm:flex"
         >
           <Icon name="book" size="sm" />
-          <span class="hidden sm:inline">{{ t('nav.docs') }}</span>
+          <span class="header-action-label hidden sm:inline">{{ t('nav.docs') }}</span>
         </a>
 
         <!-- Model Plaza Entry (icon only below sm) -->
@@ -57,7 +58,7 @@
           class="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-dark-400 dark:hover:bg-dark-800 dark:hover:text-white"
         >
           <Icon name="grid" size="sm" />
-          <span class="hidden sm:inline">{{ t('nav.modelPlaza') }}</span>
+          <span class="header-action-label hidden sm:inline">{{ t('nav.modelPlaza') }}</span>
         </router-link>
 
         <!-- Language Switcher -->
@@ -129,7 +130,7 @@
               >
               <span v-else>{{ userInitials }}</span>
             </div>
-            <div class="hidden text-left md:block">
+            <div class="header-account-label hidden text-left md:block">
               <div class="text-sm font-medium text-gray-900 dark:text-white">
                 {{ displayName }}
               </div>
@@ -137,7 +138,7 @@
                 {{ t('admin.users.roles.' + user.role) }}
               </div>
             </div>
-            <Icon name="chevronDown" size="sm" class="hidden text-gray-400 md:block" />
+            <Icon name="chevronDown" size="sm" class="header-account-chevron hidden text-gray-400 md:block" />
           </button>
 
           <!-- Dropdown Menu -->
@@ -322,6 +323,8 @@ const displayName = computed(() => {
 // 订阅功能关闭时不挂载顶栏订阅徽章（组件 onMounted 会拉取订阅接口）。
 const subscriptionFeatureEnabled = computed(() => isFeatureFlagEnabled(FeatureFlags.subscription))
 
+defineProps<{ compact?: boolean }>()
+
 const { pageTitle, pageDescription } = usePageMetadata()
 
 function toggleMobileSidebar(event: MouseEvent) {
@@ -375,6 +378,16 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.lab-header-compact { container: header / inline-size; }
+.lab-header-compact .header-account-label { max-width: 10rem; min-width: 0; }
+.lab-header-compact .header-account-label > div { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+@container header (max-width: 800px) {
+  .lab-header-compact .header-action-label,
+  .lab-header-compact .header-account-label,
+  .lab-header-compact .header-account-chevron { display: none; }
+}
+
 .dropdown-enter-active,
 .dropdown-leave-active {
   transition: all 0.2s ease;
