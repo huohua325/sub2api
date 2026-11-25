@@ -71,7 +71,7 @@ async page => {
       if (bodyText) {
         const parsed = JSON.parse(bodyText)
         check('valid-ticket-next-body', typeof parsed.next === 'string' && parsed.next.startsWith('/'))
-        await new Promise(resolve => setTimeout(resolve, 250))
+        await new Promise(resolve => setTimeout(resolve, 600))
       } else {
         check('empty-ticket-request-body', !bodyText)
       }
