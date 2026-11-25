@@ -1,0 +1,10 @@
+[Unit]
+Description=Rotate MILE development workspace pairing issuer token
+After=t3code-workspace.service
+Requires=t3code-workspace.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/mile-rotate-workspace-pair-token
+UMask=0077
+

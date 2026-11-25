@@ -1,0 +1,11 @@
+[Unit]
+Description=Rotate MILE development workspace pairing issuer token every 14 days
+
+[Timer]
+OnCalendar=*-*-01,15 04:15:00 UTC
+Persistent=true
+RandomizedDelaySec=10m
+
+[Install]
+WantedBy=timers.target
+

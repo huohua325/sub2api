@@ -1,0 +1,16 @@
+[Unit]
+Description=MILE controlled release worker (stage and preflight submitted CI candidates)
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+EnvironmentFile=-/etc/mile-release/worker.env
+ExecStart=/usr/local/sbin/mile-release-worker-scan
+UMask=0027
+NoNewPrivileges=true
+ProtectHome=true
+PrivateTmp=true
+
