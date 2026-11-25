@@ -33,11 +33,13 @@ func SetupRouter(
 	subscriptionService *service.SubscriptionService,
 	opsService *service.OpsService,
 	settingService *service.SettingService,
+	authService *service.AuthService,
 	compositeResolver *service.CompositeRouteResolver,
 	cfg *config.Config,
 	redisClient *redis.Client,
 ) *gin.Engine {
 	middleware2.SetIngressRejectRecorder(opsService)
+	nativeT3 := configureNativeT3(authService)
 	// 缓存 iframe 页面的 origin 列表，用于动态注入 CSP frame-src
 	var cachedFrameOrigins atomic.Pointer[[]string]
 	emptyOrigins := []string{}
@@ -60,6 +62,9 @@ func SetupRouter(
 	// 将客户端 IP + UA 注入 request context，供 token 签发/会话绑定/审计日志统一读取。
 	// 解析模式按请求快照：兼容开关开启时信任原始转发头，关闭时使用 server.trusted_proxies。
 	r.Use(middleware2.SessionBindingContext(cfg))
+	if nativeT3 != nil {
+		r.Use(nativeT3.serveOrigin)
+	}
 	r.Use(middleware2.Logger())
 	r.Use(middleware2.CORS(cfg.CORS))
 	r.Use(middleware2.SecurityHeaders(cfg.Security.CSP, func() []string {
@@ -67,7 +72,7 @@ func SetupRouter(
 			return *p
 		}
 		return nil
-	}))
+	}, nativeT3.formAction()))
 	r.Use(middleware2.ServerTiming(cfg.Server.EnableServerTiming))
 
 	// Serve embedded frontend with settings injection if available
@@ -91,6 +96,9 @@ func SetupRouter(
 
 	// 注册路由
 	registerRoutes(r, handlers, jwtAuth, optionalJWTAuth, adminAuth, apiKeyAuth, auditLog, stepUpAuth, apiKeyService, subscriptionService, opsService, settingService, compositeResolver, cfg, redisClient)
+	if nativeT3 != nil {
+		nativeT3.registerTicket(r, adminAuth, auditLog, settingService, redisClient)
+	}
 
 	return r
 }

@@ -1,5 +1,6 @@
 export default {
   title: 'Development Workspace',
+  nativePairError: 'Could not open T3 Code. Try opening the workspace again.',
   tasks: 'Tasks',
   newTask: 'New task',
   noTasks: 'No tasks yet',

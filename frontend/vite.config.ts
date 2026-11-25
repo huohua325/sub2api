@@ -2,6 +2,9 @@ import { defineConfig, loadEnv, Plugin } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import checker from 'vite-plugin-checker'
 import { resolve } from 'path'
+import { execFile } from 'node:child_process'
+import { isAbsolute } from 'node:path'
+import { promisify } from 'node:util'
 
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (character) => ({
@@ -77,6 +80,62 @@ function injectPublicSettings(backendUrl: string): Plugin {
   }
 }
 
+function localT3Pairing(backendUrl: string, env: Record<string, string>): Plugin {
+  const native = env.VITE_DEV_WORKSPACE_NATIVE_URL
+  const cli = env.DEV_WORKSPACE_NATIVE_CLI || ''
+  const dataDir = env.DEV_WORKSPACE_NATIVE_DATA_DIR || ''
+  const run = promisify(execFile)
+  const loopback = /^http:\/\/127\.0\.0\.1:[1-9]\d{0,4}\/?$/
+  return {
+    name: 'local-t3-pairing',
+    apply: 'serve',
+    configureServer(server) {
+      if (server.config.server.host !== '127.0.0.1' || !loopback.test(native || '') ||
+          !loopback.test(backendUrl) || !isAbsolute(cli) || !isAbsolute(dataDir)) return
+      const t3Origin = new URL(native).origin
+      server.middlewares.use(async (request, response, next) => {
+        if (request.url !== '/api/v1/local-t3/pair') return next()
+        response.setHeader('Cache-Control', 'no-store')
+        response.setHeader('Content-Type', 'application/json')
+        const localHost = `127.0.0.1:${request.socket.localPort}`
+        if (request.method !== 'POST' || request.socket.remoteAddress !== '127.0.0.1' ||
+            request.headers.host !== localHost || request.headers.origin !== `http://${localHost}` ||
+            !request.headers.authorization?.startsWith('Bearer ')) {
+          response.statusCode = 403
+          return response.end()
+        }
+        try {
+          const status = await fetch(new URL('/api/v1/admin/development-workspace/status', backendUrl), {
+            headers: {
+              Authorization: request.headers.authorization,
+              'User-Agent': request.headers['user-agent'] || '',
+              'X-Admin-UI-Request': '1',
+            },
+            redirect: 'error',
+            signal: AbortSignal.timeout(5000),
+          })
+          if (!status.ok || (await status.json()).data?.enabled !== true) {
+            response.statusCode = status.ok ? 503 : status.status
+            return response.end()
+          }
+          const { stdout } = await run(cli, [
+            'auth', 'pairing', 'create', '--base-dir', dataDir, '--base-url', t3Origin,
+            '--ttl', '1m', '--label', 'MILE local preview', '--json',
+          ], { timeout: 8000, maxBuffer: 16384, windowsHide: true })
+          const grant = JSON.parse(stdout) as { credential?: string }
+          if (typeof grant.credential !== 'string' || !grant.credential) throw new Error('Missing T3 pairing grant')
+          const url = new URL('/pair', t3Origin)
+          url.hash = new URLSearchParams({ token: grant.credential }).toString()
+          response.end(JSON.stringify({ code: 0, message: 'success', data: { url: url.href } }))
+        } catch {
+          response.statusCode = 502
+          response.end()
+        }
+      })
+    },
+  }
+}
+
 export default defineConfig(({ mode }) => {
   // 加载环境变量
   const env = loadEnv(mode, process.cwd(), '')
@@ -89,7 +148,8 @@ export default defineConfig(({ mode }) => {
       checker({
         vueTsc: true
       }),
-      injectPublicSettings(backendUrl)
+      injectPublicSettings(backendUrl),
+      localT3Pairing(backendUrl, env)
     ],
   resolve: {
     alias: {

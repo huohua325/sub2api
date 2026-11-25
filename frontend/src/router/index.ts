@@ -13,12 +13,17 @@ import { useRoutePrefetch } from '@/composables/useRoutePrefetch'
 import { getSetupStatus } from '@/api/setup'
 import { resolveCompletedSetupRedirectPath } from './setupRedirect'
 import { registrationEmailGateRedirect } from './registrationEmailGate'
+import { submitNativeWorkspaceTicket } from './nativeWorkspace'
 import { resolveRouteDocumentTitle } from './title'
 import { scrollBehavior } from './scrollBehavior'
 
 /**
  * Route definitions with lazy loading
  */
+const nativeWorkspaceUrl = import.meta.env.DEV && window.location.hostname === '127.0.0.1'
+  ? import.meta.env.VITE_DEV_WORKSPACE_NATIVE_URL
+  : undefined
+
 const routes: RouteRecordRaw[] = [
   // ==================== Setup Routes ====================
   {
@@ -492,6 +497,26 @@ const routes: RouteRecordRaw[] = [
     path: '/admin/development-workspace',
     name: 'AdminDevelopmentWorkspace',
     component: () => import('@/views/admin/DevelopmentWorkspaceView.vue'),
+    beforeEnter: async () => {
+      try {
+        if (nativeWorkspaceUrl) {
+          const { apiClient } = await import('@/api/client')
+          const { data } = await apiClient.post<{ url: string }>('/local-t3/pair')
+          const url = new URL(data.url)
+          if (url.origin !== new URL(nativeWorkspaceUrl).origin || url.pathname !== '/pair') throw new Error('Invalid T3 pairing URL')
+          window.location.assign(url.href)
+        } else {
+          const { developmentWorkspaceAPI } = await import('@/api/admin/developmentWorkspace')
+          submitNativeWorkspaceTicket(await developmentWorkspaceAPI.nativeTicket())
+        }
+        return false
+      } catch (error: unknown) {
+        if (!nativeWorkspaceUrl && (error as { status?: number } | null)?.status === 404) return
+        const { default: i18n } = await import('@/i18n')
+        useAppStore().showError(i18n.global.t('admin.developmentWorkspace.nativePairError'))
+        return { name: 'AdminDashboard' }
+      }
+    },
     meta: {
       requiresAuth: true,
       requiresAdmin: true,
@@ -963,7 +988,7 @@ router.beforeEach(async (to, _from, next) => {
     // Not authenticated, redirect to login
     next({
       path: '/login',
-      query: { redirect: to.fullPath } // Save intended destination
+      query: { redirect: to.name === 'AdminDevelopmentWorkspace' ? '/admin/dashboard' : to.fullPath }
     })
     return
   }
